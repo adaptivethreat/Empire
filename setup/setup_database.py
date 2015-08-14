@@ -48,7 +48,9 @@ DEFAULT_CERT_PATH = ''
 DEFAULT_PORT = 8080
 
 # the installation path for Empire, defaults to auto-calculating it
-INSTALL_PATH = "/".join(os.getcwd().split("/")[0:-1])+"/"
+# INSTALL_PATH = "/".join(os.getcwd().split("/")[0:-1])+"/"
+# asmc
+INSTALL_PATH = os.sep.join(os.getcwd().split(os.sep)[0:-1])+os.sep
 
 # the version version to appear as
 SERVER_VERSION = "Microsoft-IIS/7.5"

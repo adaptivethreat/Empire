@@ -100,7 +100,7 @@ class Module:
 
 
         hijackPath = self.options['HijackPath']['Value']
-        batPath = "\\".join(hijackPath.split("\\")[0:-1]) + "\debug.bat".replace('/', os.sep)
+        batPath = "\\".join(hijackPath.split("\\")[0:-1]) + "\debug.bat"
 
         # generate the .bat launcher code to write out to the specified location
         l = self.mainMenu.stagers.stagers['launcher_bat']

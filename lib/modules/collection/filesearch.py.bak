@@ -1,17 +1,16 @@
 from lib.common import helpers
-import os
 
 class Module:
 
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Invoke-Portscan',
+            'Name': 'Invoke-Filesearch',
 
-            'Author': ['Rich Lundeen'],
+            'Author': ['@harmj0y'],
 
-            'Description': ('Does a simple port scan using regular sockets, based '
-                            '(pretty) loosely on nmap.'),
+            'Description': ('Recurively searches a given file path for files with '
+                            'specified terms in their names.'),
 
             'Background' : True,
 
@@ -20,11 +19,11 @@ class Module:
             'NeedsAdmin' : False,
 
             'OpsecSafe' : True,
-            
+
             'MinPSVersion' : '2',
-            
+
             'Comments': [
-                'https://github.com/mattifestation/PowerSploit/blob/master/Recon/Invoke-Portscan.ps1'
+                'https://github.com/Veil-Framework/PowerTools/blob/master/PowerView/powerview.ps1'
             ]
         }
 
@@ -37,63 +36,48 @@ class Module:
                 'Required'      :   True,
                 'Value'         :   ''
             },
-            'Hosts' : {
-                'Description'   :   "Hosts to scan.",
+            'Path' : {
+                'Description'   :   "Path to search, defaults to current dir.",
+                'Required'      :   False,
+                'Value'         :   ''
+            },       
+            'Terms' : {
+                'Description'   :   "Comma-separated terms to search for (overrides defaults).",
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'HostFile' : {
-                'Description'   :   "Input hosts from file (on the target)",
+            'OfficeDocs' : {
+                'Description'   :   "Switch. Return only office documents.",
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'ExcludeHosts' : {
-                'Description'   :   "Exclude thsee comma separated hosts.",
+            'FreshEXES' : {
+                'Description'   :   "Switch. Find .EXEs accessed in the last week.",
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'Ports' : {
-                'Description'   :   "Comma separated ports to scan for.",
+            'ExcludeHidden' : {
+                'Description'   :   "Switch. Exclude hidden files and folders from the search results.",
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'TopPorts' : {
-                'Description'   :   "Scan for X top ports, default 50.",
+            'CheckWriteAccess' : {
+                'Description'   :   "Switch. Only returns files the current user has write access to.",
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'SkipDiscovery' : {
-                'Description'   :   "Switch. Treat all hosts as online.",
+            'AccessDateLimit' : {
+                'Description'   :   "Only return files with a LastAccessTime greater than this date value.",
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'PingOnly' : {
-                'Description'   :   "Switch. Ping only, don't scan for ports.",
+            'CreateDateLimit' : {
+                'Description'   :   "Only return files with a CreationDate greater than this date value.",
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'Open' : {
-                'Description'   :   "Switch. Only show hosts with open ports.",
-                'Required'      :   False,
-                'Value'         :   'True'
-            },        
-            'GrepOut' : {
-                'Description'   :   "Greppable (.gnmap) output file.",
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'XmlOut' : {
-                'Description'   :   ".XML output file.",
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'ReadableOut' : {
-                'Description'   :   "Readable (.nmap) output file.",
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'AllformatsOut' : {
-                'Description'   :   "Output file of all formats.",
+            'FreshEXES' : {
+                'Description'   :   "Switch. Find .EXEs accessed within the last week.",
                 'Required'      :   False,
                 'Value'         :   ''
             }
@@ -113,7 +97,7 @@ class Module:
     def generate(self):
 
         # read in the common module source code
-        moduleSource = self.mainMenu.installPath + "/data/module_source/situational_awareness/network/Invoke-Portscan.ps1".replace('/', os.sep)
+        moduleSource = self.mainMenu.installPath + "/data/module_source/collection/Invoke-Filesearch.ps1".replace('/', os.sep)
 
         try:
             f = open(moduleSource, 'r')
@@ -126,7 +110,7 @@ class Module:
 
         script = moduleCode
 
-        script += "Invoke-PortScan -noProgressMeter -f"
+        script += "Invoke-Filesearch "
 
         for option,values in self.options.iteritems():
             if option.lower() != "agent":
@@ -135,8 +119,8 @@ class Module:
                         # if we're just adding a switch
                         script += " -" + str(option)
                     else:
-                        script += " -" + str(option) + " " + str(values['Value']) 
-
-        script += " | ? {$_.alive}| Select-Object HostName,@{name='OpenPorts';expression={$_.openPorts -join ','}} | ft -wrap | Out-String | %{$_ + \"`n\"}"
+                        script += " -" + str(option) + " " + str(values['Value'])
         
+        script += " | Out-String"
+
         return script

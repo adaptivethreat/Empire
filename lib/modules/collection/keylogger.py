@@ -1,4 +1,5 @@
 from lib.common import helpers
+import os
 
 class Module:
 
@@ -51,7 +52,7 @@ class Module:
     def generate(self):
 
         # read in the common module source code
-        moduleSource = self.mainMenu.installPath + "/data/module_source/collection/Get-Keystrokes.ps1"
+        moduleSource = self.mainMenu.installPath + "/data/module_source/collection/Get-Keystrokes.ps1".replace('/', os.sep)
 
         try:
             f = open(moduleSource, 'r')

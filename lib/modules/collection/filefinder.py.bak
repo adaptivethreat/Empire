@@ -1,17 +1,15 @@
 from lib.common import helpers
-import os
 
 class Module:
 
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Invoke-Portscan',
+            'Name': 'Invoke-FileFinder',
 
-            'Author': ['Rich Lundeen'],
+            'Author': ['@harmj0y'],
 
-            'Description': ('Does a simple port scan using regular sockets, based '
-                            '(pretty) loosely on nmap.'),
+            'Description': ('Finds sensitive files on the domain.'),
 
             'Background' : True,
 
@@ -20,11 +18,11 @@ class Module:
             'NeedsAdmin' : False,
 
             'OpsecSafe' : True,
-            
+
             'MinPSVersion' : '2',
-            
+
             'Comments': [
-                'https://github.com/mattifestation/PowerSploit/blob/master/Recon/Invoke-Portscan.ps1'
+                'https://github.com/Veil-Framework/PowerTools/blob/master/PowerView/powerview.ps1'
             ]
         }
 
@@ -38,62 +36,72 @@ class Module:
                 'Value'         :   ''
             },
             'Hosts' : {
-                'Description'   :   "Hosts to scan.",
+                'Description'   :   "Host array to enumerate.",
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'HostFile' : {
-                'Description'   :   "Input hosts from file (on the target)",
+            'HostList' : {
+                'Description'   :   "List of hostnames/IPs to search.",
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'ExcludeHosts' : {
-                'Description'   :   "Exclude thsee comma separated hosts.",
+            'HostFilter' : {
+                'Description'   :   "Host filter name to query AD for, wildcards accepted.",
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'Ports' : {
-                'Description'   :   "Comma separated ports to scan for.",
+            'ShareList' : {
+                'Description'   :   "List if \\HOST\shares to search through.",
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'TopPorts' : {
-                'Description'   :   "Scan for X top ports, default 50.",
+            'Terms' : {
+                'Description'   :   "Comma-separated terms to search for (overrides defaults).",
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'SkipDiscovery' : {
-                'Description'   :   "Switch. Treat all hosts as online.",
+            'OfficeDocs' : {
+                'Description'   :   "Switch. Return only office documents.",
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'PingOnly' : {
-                'Description'   :   "Switch. Ping only, don't scan for ports.",
+            'FreshEXES' : {
+                'Description'   :   "Switch. Find .EXEs accessed in the last week.",
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'Open' : {
-                'Description'   :   "Switch. Only show hosts with open ports.",
-                'Required'      :   False,
-                'Value'         :   'True'
-            },        
-            'GrepOut' : {
-                'Description'   :   "Greppable (.gnmap) output file.",
+            'ExcludeHidden' : {
+                'Description'   :   "Switch. Exclude hidden files and folders from the search results.",
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'XmlOut' : {
-                'Description'   :   ".XML output file.",
+            'CheckWriteAccess' : {
+                'Description'   :   "Switch. Only returns files the current user has write access to.",
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'ReadableOut' : {
-                'Description'   :   "Readable (.nmap) output file.",
+            'AccessDateLimit' : {
+                'Description'   :   "Only return files with a LastAccessTime greater than this date value.",
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'AllformatsOut' : {
-                'Description'   :   "Output file of all formats.",
+            'CreateDateLimit' : {
+                'Description'   :   "Only return files with a CreationDate greater than this date value.",
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'NoPing' : {
+                'Description'   :   "Switch. Don't ping each host to ensure it's up before enumerating.",
+                'Required'      :   False,
+                'Value'         :   ''
+            },            
+            'Delay' : {
+                'Description'   :   "Delay between enumerating hosts, defaults to 0.",
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'Domain' : {
+                'Description'   :   "Domain to query for machines.",
                 'Required'      :   False,
                 'Value'         :   ''
             }
@@ -102,7 +110,7 @@ class Module:
         # save off a copy of the mainMenu object to access external functionality
         #   like listeners/agent handlers/etc.
         self.mainMenu = mainMenu
-
+        
         for param in params:
             # parameter format is [Name, Value]
             option, value = param
@@ -113,7 +121,7 @@ class Module:
     def generate(self):
 
         # read in the common module source code
-        moduleSource = self.mainMenu.installPath + "/data/module_source/situational_awareness/network/Invoke-Portscan.ps1".replace('/', os.sep)
+        moduleSource = self.mainMenu.installPath + "/data/module_source/collection/Invoke-FileFinder.ps1".replace('/', os.sep)
 
         try:
             f = open(moduleSource, 'r')
@@ -126,17 +134,13 @@ class Module:
 
         script = moduleCode
 
-        script += "Invoke-PortScan -noProgressMeter -f"
+        script += "Invoke-FileFinder "
 
         for option,values in self.options.iteritems():
             if option.lower() != "agent":
                 if values['Value'] and values['Value'] != '':
-                    if values['Value'].lower() == "true":
-                        # if we're just adding a switch
-                        script += " -" + str(option)
-                    else:
-                        script += " -" + str(option) + " " + str(values['Value']) 
+                    script += " -" + str(option) + " " + str(values['Value']) 
 
-        script += " | ? {$_.alive}| Select-Object HostName,@{name='OpenPorts';expression={$_.openPorts -join ','}} | ft -wrap | Out-String | %{$_ + \"`n\"}"
-        
+        script += " | Out-String"
+
         return script

@@ -1,5 +1,4 @@
 from lib.common import helpers
-import os
 
 class Module:
 

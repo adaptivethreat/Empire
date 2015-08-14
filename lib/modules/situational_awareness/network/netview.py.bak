@@ -1,16 +1,16 @@
 from lib.common import helpers
-import os
 
 class Module:
 
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Invoke-ReverseDNSLookup',
+            'Name': 'Invoke-Netview',
 
-            'Author': ['DarkOperator'],
+            'Author': ['@harmj0y'],
 
-            'Description': ('Performs a DNS Reverse Lookup of a given IPv4 IP Range.'),
+            'Description': ('Queries the domain for all hosts, and retrieves open shares, '
+                            'sessions, and logged on users for each host. Part of PowerView.'),
 
             'Background' : True,
 
@@ -23,7 +23,8 @@ class Module:
             'MinPSVersion' : '2',
             
             'Comments': [
-                'https://github.com/darkoperator/Posh-SecMod/blob/master/Discovery/Discovery.psm1'
+                'https://github.com/Veil-Framework/PowerTools/tree/master/PowerView',
+                'https://github.com/mubix/netview'
             ]
         }
 
@@ -36,13 +37,38 @@ class Module:
                 'Required'      :   True,
                 'Value'         :   ''
             },
-            'Range' : {
-                'Description'   :   "Range to perform reverse DNS on.",
+            'Hosts' : {
+                'Description'   :   'Hosts to enumerate.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'CIDR' : {
-                'Description'   :   "CIDR to perform reverse DNS on.",
+            'HostList' : {
+                'Description'   :   'Hostlist to enumerate.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'HostFilter' : {
+                'Description'   :   'Host filter name to query AD for, wildcards accepted.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'NoPing' : {
+                'Description'   :   'Don\'t ping each host to ensure it\'s up before enumerating.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'CheckShareAccess' : {
+                'Description'   :   'Switch. Only display found shares that the local user has access to.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'Delay' : {
+                'Description'   :   'Delay between enumerating hosts, defaults to 0.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'Domain' : {
+                'Description'   :   'Domain to enumerate for hosts.',
                 'Required'      :   False,
                 'Value'         :   ''
             }
@@ -60,9 +86,9 @@ class Module:
 
 
     def generate(self):
-
+        
         # read in the common module source code
-        moduleSource = self.mainMenu.installPath + "/data/module_source/situational_awareness/network/Invoke-ReverseDNSLookup.ps1".replace('/', os.sep)
+        moduleSource = self.mainMenu.installPath + "/data/module_source/situational_awareness/network/Invoke-Netview.ps1".replace('/', os.sep)
 
         try:
             f = open(moduleSource, 'r')
@@ -75,7 +101,7 @@ class Module:
 
         script = moduleCode
 
-        script += "Invoke-ReverseDNSLookup"
+        script += "Invoke-NetView "
 
         for option,values in self.options.iteritems():
             if option.lower() != "agent":
@@ -85,8 +111,7 @@ class Module:
                         script += " -" + str(option)
                     else:
                         script += " -" + str(option) + " " + str(values['Value']) 
-
-        # only return objects where HostName is not an IP (i.e. the address resolves)
-        script += " | % {try{$entry=$_; $ipObj = [System.Net.IPAddress]::parse($entry.HostName); if(-not [System.Net.IPAddress]::tryparse([string]$_.HostName, [ref]$ipObj)) { $entry }} catch{$entry} } | Select-Object HostName, AddressList | ft -autosize | Out-String | %{$_ + \"`n\"}"
+        
+        script += '| Out-String | %{$_ + \"`n\"};"`nInvoke-Netview completed"'
 
         return script

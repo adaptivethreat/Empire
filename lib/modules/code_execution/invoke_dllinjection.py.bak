@@ -1,29 +1,30 @@
+import re
 from lib.common import helpers
-import os
 
 class Module:
 
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Invoke-ReverseDNSLookup',
+            'Name': 'Invoke-DllInjection',
 
-            'Author': ['DarkOperator'],
+            'Author': ['@mattifestation'],
 
-            'Description': ('Performs a DNS Reverse Lookup of a given IPv4 IP Range.'),
+            'Description': ("Uses PowerSploit's Invoke-DLLInjection to inject "
+                            " a Dll into the process ID of your choosing."),
 
-            'Background' : True,
+            'Background' : False,
 
             'OutputExtension' : None,
             
             'NeedsAdmin' : False,
 
             'OpsecSafe' : True,
-            
+
             'MinPSVersion' : '2',
-            
+
             'Comments': [
-                'https://github.com/darkoperator/Posh-SecMod/blob/master/Discovery/Discovery.psm1'
+                'https://github.com/mattifestation/PowerSploit/blob/master/CodeExecution/Invoke-DllInjection.ps1'
             ]
         }
 
@@ -36,14 +37,14 @@ class Module:
                 'Required'      :   True,
                 'Value'         :   ''
             },
-            'Range' : {
-                'Description'   :   "Range to perform reverse DNS on.",
-                'Required'      :   False,
+            'ProcessID' : {
+                'Description'   :   'Process ID of the process you want to inject a Dll into.',
+                'Required'      :   True,
                 'Value'         :   ''
             },
-            'CIDR' : {
-                'Description'   :   "CIDR to perform reverse DNS on.",
-                'Required'      :   False,
+            'Dll' : {
+                'Description'   :   'Name of the dll to inject. This can be an absolute or relative path.',
+                'Required'      :   True,
                 'Value'         :   ''
             }
         }
@@ -60,9 +61,9 @@ class Module:
 
 
     def generate(self):
-
+        
         # read in the common module source code
-        moduleSource = self.mainMenu.installPath + "/data/module_source/situational_awareness/network/Invoke-ReverseDNSLookup.ps1".replace('/', os.sep)
+        moduleSource = self.mainMenu.installPath + "/data/module_source/code_execution/Invoke-DllInjection.ps1".replace('/', os.sep)
 
         try:
             f = open(moduleSource, 'r')
@@ -75,18 +76,11 @@ class Module:
 
         script = moduleCode
 
-        script += "Invoke-ReverseDNSLookup"
+        script += "\nInvoke-DllInjection"
 
         for option,values in self.options.iteritems():
             if option.lower() != "agent":
                 if values['Value'] and values['Value'] != '':
-                    if values['Value'].lower() == "true":
-                        # if we're just adding a switch
-                        script += " -" + str(option)
-                    else:
-                        script += " -" + str(option) + " " + str(values['Value']) 
-
-        # only return objects where HostName is not an IP (i.e. the address resolves)
-        script += " | % {try{$entry=$_; $ipObj = [System.Net.IPAddress]::parse($entry.HostName); if(-not [System.Net.IPAddress]::tryparse([string]$_.HostName, [ref]$ipObj)) { $entry }} catch{$entry} } | Select-Object HostName, AddressList | ft -autosize | Out-String | %{$_ + \"`n\"}"
+                    script += " -" + str(option) + " " + str(values['Value'])
 
         return script

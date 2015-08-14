@@ -1,6 +1,5 @@
 from lib.common import helpers
 import base64
-import os
 
 class Module:
 

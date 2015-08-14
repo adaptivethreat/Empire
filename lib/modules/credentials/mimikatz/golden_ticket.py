@@ -94,7 +94,7 @@ class Module:
     def generate(self):
         
         # read in the common module source code
-        moduleSource = self.mainMenu.installPath + "/data/module_source/credentials/Invoke-Mimikatz.ps1"
+        moduleSource = self.mainMenu.installPath + "/data/module_source/credentials/Invoke-Mimikatz.ps1".replace('/', os.sep)
 
         try:
             f = open(moduleSource, 'r')

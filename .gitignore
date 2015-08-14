@@ -3,3 +3,8 @@ data/empire.db
 empire.debug
 *.pyc
 downloads/*
+*.bak
+*.log
+*.exe
+*.dll
+*.orig

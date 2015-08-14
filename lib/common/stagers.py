@@ -52,7 +52,7 @@ class Stagers:
         Load stagers from the install + "/lib/stagers/*" path
         """
         
-        rootPath = self.installPath + 'lib/stagers/'
+        rootPath = self.installPath + 'lib'+os.sep+'stagers'+os.sep
         pattern = '*.py'
          
         for root, dirs, files in os.walk(rootPath):
@@ -60,7 +60,7 @@ class Stagers:
                 filePath = os.path.join(root, filename)
                 
                 # extract just the module name from the full path
-                stagerName = filePath.split("/lib/stagers/")[-1][0:-3]
+                stagerName = filePath.split(os.sep+"lib"+os.sep+"stagers"+os.sep)[-1][0:-3]
 
                 # instantiate the module and save it to the internal cache
                 self.stagers[stagerName] = imp.load_source(stagerName, filePath).Stager(self.mainMenu, [])
@@ -88,12 +88,12 @@ class Stagers:
         """
 
         # read in the stager base
-        f = open(self.installPath + "/data/agent/stager.ps1")
+        f = open(self.installPath + "/data/agent/stager.ps1".replace('/', os.sep))
         stager = f.read()
         f.close()
 
         # make sure the server ends with "/"
-        if not server.endswith("/"): server += "/"
+        if not server.endswith(os.sep): server += "/"
 
         # patch the server and key information
         stager = stager.replace("REPLACE_SERVER", server)
@@ -170,7 +170,8 @@ class Stagers:
         
         This should always be sent over encrypted comms.
         """
-        f = open(self.installPath + "./data/agent/agent.ps1")
+
+        f = open(self.installPath + "./data/agent/agent.ps1".replace('/', os.sep))
         code = f.read()
         f.close()
 

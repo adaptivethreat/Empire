@@ -89,7 +89,7 @@ Invoke-Something"""
         # if you're reading in a large, external script that might be updates,
         #   use the pattern below
         # read in the common module source code
-        moduleSource = self.mainMenu.installPath + "/data/module_source/..."
+        moduleSource = self.mainMenu.installPath + "/data/module_source/...".replace('/', os.sep)
         try:
             f = open(moduleSource, 'r')
         except:

@@ -13,6 +13,7 @@ import os
 import imp
 import messages
 import helpers
+import platform
 
 
 class Modules:
@@ -44,7 +45,7 @@ class Modules:
         Load modules from the install + "/lib/modules/*" path
         """
         
-        rootPath = self.installPath + 'lib/modules/'
+        rootPath = self.installPath + 'lib'+os.sep+'modules'+os.sep
         pattern = '*.py'
          
         for root, dirs, files in os.walk(rootPath):
@@ -55,7 +56,7 @@ class Modules:
                 if filename == "template.py": continue
                 
                 # extract just the module name from the full path
-                moduleName = filePath.split("/lib/modules/")[-1][0:-3]
+                moduleName = filePath.split(os.sep+"lib"+os.sep+"modules"+os.sep)[-1][0:-3]
 
                 # TODO: extract and CLI arguments and pass onto the modules
 
@@ -68,7 +69,7 @@ class Modules:
         Reload a specific module from the install + "/lib/modules/*" path
         """
 
-        rootPath = self.installPath + 'lib/modules/'
+        rootPath = self.installPath + 'lib/modules/'.replace('/', os.sep)
         pattern = '*.py'
          
         for root, dirs, files in os.walk(rootPath):
@@ -79,7 +80,7 @@ class Modules:
                 if filename == "template.py": continue
                 
                 # extract just the module name from the full path
-                moduleName = filePath.split("/lib/modules/")[-1][0:-3]
+                moduleName = filePath.split("/lib/modules/".replace('/', os.sep))[-1][0:-3]
 
                 # check to make sure we've found the specific module
                 if moduleName.lower() == moduleToReload.lower():

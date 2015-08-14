@@ -7,3 +7,16 @@ To install, run the ./setup/install.sh script. There's also a [quickstart here](
 Empire relies heavily on the work from several other projects for its underlying functionality. We have tried to call out a few of those people we've interacted with [heavily here](http://www.powershellempire.com/?page_id=2) and have included author/reference link information in the source of each Empire module as appropriate. If we have failed to improperly cite existing or prior work, please let us know.
 
 Empire is developed by @harmj0y, @sixdub, and @enigma0x3.
+
+=========================================================================
+
+Install for any system:
+python setup/install-all.py
+it will install all necessary dependencies files
+
+Start Empire:
+ windows: Double click start.bat
+ *nix: python empire
+
+ Empire windows version by asmc modify:) 
+ Happy hunting~
