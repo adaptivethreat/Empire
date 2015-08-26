@@ -408,37 +408,54 @@ def lhost():
                 pass
     return ip
 
-
-def color(string, color=None):
+def color(string, color=None, graphic=''):
     """
     Change text color for the Linux terminal.
-    """
-    
-    attr = []
-    # bold
-    attr.append('1')
-    
-    if color:
-        if color.lower() == "red":
-            attr.append('31')
-        elif color.lower() == "green":
-            attr.append('32')
-        elif color.lower() == "blue":
-            attr.append('34')
-        return '\x1b[%sm%s\x1b[0m' % (';'.join(attr), string)
 
+    Args:
+        string (str): String to colorify
+        color (str): Color to colorify the string in the following list:
+            black, red, green, yellow, blue, purple, cyan, gr[ae]y
+        graphic (str): Graphic to append to the beginning of the line
+    """
+
+    colors = {
+    'normal'         : "\x1b[0m",
+    'black'          : "\x1b[30m",
+    'red'            : "\x1b[31m",
+    'green'          : "\x1b[32m",
+    'yellow'         : "\x1b[33m",
+    'blue'           : "\x1b[34m",
+    'purple'         : "\x1b[35m",
+    'cyan'           : "\x1b[36m",
+    'grey'           : "\x1b[90m",
+    'gray'           : "\x1b[90m",
+    'bold'           : "\x1b[1m"
+    }
+    
+    if color and color not in colors:
+        print colors['red'] + 'Color not found: {}'.format(color) + colors['normal']
+    if not color:
+        if string.startswith("[!] "): color = 'red'
+        if string.startswith("[+] "): color = 'green'
+        if string.startswith("[*] "): color = 'blue'
+
+    if color:
+        return colors[color] + graphic + string + colors['normal']
     else:
-        if string.startswith("[!]"):
-            attr.append('31')
-            return '\x1b[%sm%s\x1b[0m' % (';'.join(attr), string)
-        elif string.startswith("[+]"):
-            attr.append('32')
-            return '\x1b[%sm%s\x1b[0m' % (';'.join(attr), string)
-        elif string.startswith("[*]"):
-            attr.append('34')
-            return '\x1b[%sm%s\x1b[0m' % (';'.join(attr), string)
-        else:
-            return string
+        return string + colors['normal']
+
+def output(string):
+    print color(string)
+
+def success(string):
+    print color(string, color="green", graphic='[+] ')
+
+def warning(string):
+    print color(string, color="blue", graphic='[*] ')
+
+def error(string):
+    print color(string, color="red", graphic='[!] ')
 
 
 def unique(seq, idfun=None):
