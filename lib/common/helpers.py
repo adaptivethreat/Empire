@@ -551,3 +551,53 @@ def complete_path(text, line, arg=False):
 
     return completions
 
+def tableify(data, headers=None):
+    '''ASCII table for a list of strings
+
+    Args:
+        data (list of lists): List of lists for each row of data
+        headers (list) optional: List of column names
+
+    Return:
+        None
+    '''
+    from itertools import izip_longest
+
+    if not isinstance(data, list):
+        return ''
+    if headers and not isinstance(headers, list):
+        headers = [headers]
+    if headers:
+        data = [headers] + data
+
+    # Example color in order to pad for colors
+    red = "\x1b[31m"
+    table = []
+    
+    columns = izip_longest(*data, fillvalue='')
+    widths = []
+    for column in columns:
+        new_row = []
+        # Need to be a string in order to get length
+        column = [str(item) for item in column]
+        max_len = len(max(column, key=len))
+        max_len = max(max_len, len(red)*2)
+        widths.append(max_len)
+        for item in column:
+            new_row.append(item.ljust(max_len, ' '))
+        table.append(new_row)
+
+    table = izip_longest(*table)
+
+    result = []
+    result.append('+' + '+'.join(['-' * (width+2) for width in widths]) + '+')
+    result.append('| ' + ' | '.join(table.next()) + ' |')
+    result.append('+' + '+'.join(['-' * (width+2) for width in widths]) + '+')
+
+    for row in table:
+        result.append('  ' + '   '.join(row) + '  ')
+
+    # result.append('+' + '+'.join(['-' * (width+2) for width in widths]) + '+')
+
+    for line in result:
+        print line
