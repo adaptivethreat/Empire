@@ -432,13 +432,15 @@ def color(string, color=None, graphic=''):
     'gray'           : "\x1b[90m",
     'bold'           : "\x1b[1m"
     }
-    
-    if color and color not in colors:
-        print colors['red'] + 'Color not found: {}'.format(color) + colors['normal']
+
     if not color:
         if string.startswith("[!] "): color = 'red'
         if string.startswith("[+] "): color = 'green'
         if string.startswith("[*] "): color = 'blue'
+
+    if color not in colors:
+        print colors['red'] + 'Color not found: {}'.format(color) + colors['normal']
+        return
 
     if color:
         return colors[color] + graphic + string + colors['normal']
