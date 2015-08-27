@@ -174,6 +174,17 @@ c.execute('''CREATE TABLE "reporting" (
     )''')
 
 
+c.execute('''CREATE TABLE "targets" (
+    "id" integer PRIMARY KEY,
+    "target" text,
+    "port" text,
+    "access" text,
+    "username" text,
+    "password" text,
+    "domain" text
+    )''')
+
+
 # commit the changes and close everything off
 conn.commit()
 conn.close()
