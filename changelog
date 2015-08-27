@@ -1,3 +1,9 @@
+8/26/2015
+---------
+-Added module privesc/bypassuac_wscript
+-Added module collection/inveigh
+-Added stager war
+
 8/24/2015
 ---------
 -Added credentials/mimikatz/dcsync for remote DC credential extraction

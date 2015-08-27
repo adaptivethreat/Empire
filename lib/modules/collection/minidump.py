@@ -46,7 +46,7 @@ class Module:
                 'Value'         :   ''
             },
             'DumpFilePath' : {
-                'Description'   :   'Specifies the path where dump files will be written. Defaults to the working directory.',
+                'Description'   :   'Specifies the folder path where dump files will be written. Defaults to the current user directory.',
                 'Required'      :   False,
                 'Value'         :   ''
             }
