@@ -9,6 +9,7 @@ Titles, agent displays, listener displays, etc.
 import os, sys, textwrap
 
 # Empire imports
+from helpers import tableify
 import helpers
 
 
@@ -383,12 +384,16 @@ def display_module(moduleName, module):
     # print out any options, if present
     if module.options:
         print "\nOptions:\n"
-        print "  Name             Required    Value                     Description"
-        print "  ----             --------    -------                   -----------"
+        headers = ['Name', 'Required', 'Value', 'Description']
+        data = []
 
         for option,values in module.options.iteritems():
+            data.append([str(option), values.get('Required', 'False'), str(values.get('Value', '')), str(values.get('Description', ''))])
+
             # print "  %s%s%s%s" % ('{0: <17}'.format(option), '{0: <12}'.format(("True" if values['Required'] else "False")), '{0: <25}'.format(values['Value']), wrap_string(values['Description'], indent=56))
-            print "  %s%s%s" % ('{0: <17}'.format(str(option)), '{0: <12}'.format(("True" if values['Required'] else "False")), wrap_columns(str(values['Value']), str(values['Description'])))
+            # print "  %s%s%s" % ('{0: <17}'.format(str(option)), '{0: <12}'.format(("True" if values['Required'] else "False")), wrap_columns(str(values['Value']), str(values['Description'])))
+
+        tableify(data, headers=headers)
 
     print ""
     
