@@ -170,8 +170,8 @@ class Module:
         if username and password:
             creds += [(username, password)]
 
-        if ',' in rhosts:
-            rhosts = rhosts.split(',')
+        if ' ' in rhosts or ',' in rhosts:
+            rhosts = rhosts.replace(',', ' ').split()
         elif rhosts:
             rhosts = [rhosts]
         else:
