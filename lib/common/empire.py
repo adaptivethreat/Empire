@@ -28,6 +28,7 @@ import listeners
 import modules
 import stagers
 import credentials
+import targets
 import time
 
 
@@ -88,6 +89,7 @@ class MainMenu(cmd.Cmd):
         self.stagers = stagers.Stagers(self, args=args)
         self.modules = modules.Modules(self, args=args)
         self.credentials = credentials.Credentials(self, args=args)
+        self.targets = targets.Targets(self, args=args)
 
         # make sure all the references are passed after instantiation
         # TODO: replace these with self?
@@ -213,6 +215,10 @@ class MainMenu(cmd.Cmd):
             except KeyboardInterrupt as e:
                 self.cmdloop()
 
+        except:
+            import traceback; traceback.print_exc()
+            self.cmdloop()
+
 
     # print a nicely formatted help menu
     # stolen/adapted from recon-ng
@@ -265,6 +271,19 @@ class MainMenu(cmd.Cmd):
         elif sender == "Listeners":
             print helpers.color(signal)
 
+    def query(self, query):
+        cur = self.conn.cursor()
+        cur.execute(query)
+        # a rowcount of -1 typically refers to a select statement
+        if cur.rowcount == -1:
+            rows = cur.fetchall()
+            results = rows
+        # a rowcount of 1 == success and 0 == failure
+        else:
+            conn.commit()
+            results = cur.rowcount
+        cur.close()
+        return results
 
     ###################################################
     # CMD methods
@@ -2206,6 +2225,7 @@ class ModuleMenu(cmd.Cmd):
                     print helpers.color("[!] Error: module requires PS version "+str(modulePSVersion)+" but agent running PS version "+str(agentPSVersion))
                     return False
         except Exception as e:
+            import traceback; traceback.print_exc()
             print "exception: ",e
             print helpers.color("[!] Invalid module or agent PS version!")
             return False
@@ -2372,6 +2392,18 @@ class ModuleMenu(cmd.Cmd):
 
     def do_execute(self, line):
         "Execute the given Empire module."
+
+
+        # Deploy is the function used for modules that are not generating powershell scripts
+        # but rather are simply executing commands. We attempt to execute the function
+        # and return. If we raise an AttributeError, we know that we are executing
+        # an original Empire module and continue as normal.
+        try:
+            self.module.execute()
+            return
+        except AttributeError:
+            pass
+
 
         if not self.validate_options():
             return
