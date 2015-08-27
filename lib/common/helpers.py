@@ -408,7 +408,7 @@ def lhost():
                 pass
     return ip
 
-def color(string, color=None, graphic=''):
+def color(string, color='', graphic=''):
     """
     Change text color for the Linux terminal.
 
@@ -434,9 +434,14 @@ def color(string, color=None, graphic=''):
     }
 
     if not color:
-        if string.startswith("[!] "): color = 'red'
-        if string.startswith("[+] "): color = 'green'
-        if string.startswith("[*] "): color = 'blue'
+        if string.startswith("[!] "): 
+            color = 'red'
+        elif string.startswith("[+] "): 
+            color = 'green'
+        elif string.startswith("[*] "): 
+            color = 'blue'
+        else:
+            color = 'normal'
 
     if color not in colors:
         print colors['red'] + 'Color not found: {}'.format(color) + colors['normal']
@@ -454,10 +459,13 @@ def success(string):
     print color(string, color="green", graphic='[+] ')
 
 def warning(string):
-    print color(string, color="blue", graphic='[*] ')
+    print color(string, color="yellow", graphic='[*] ')
 
 def error(string):
     print color(string, color="red", graphic='[!] ')
+
+def info(string):
+    print color(string, color="blue", graphic='[-] ')
 
 
 def unique(seq, idfun=None):
