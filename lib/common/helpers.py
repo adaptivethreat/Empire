@@ -603,9 +603,9 @@ def tableify(data, headers=None):
     result.append('+' + '+'.join(['-' * (width+2) for width in widths]) + '+')
 
     for row in table:
-        result.append('  ' + '   '.join(row) + '  ')
+        result.append('| ' + ' | '.join(row) + ' |')
 
-    # result.append('+' + '+'.join(['-' * (width+2) for width in widths]) + '+')
+    result.append('+' + '+'.join(['-' * (width+2) for width in widths]) + '+')
 
     for line in result:
         print line
