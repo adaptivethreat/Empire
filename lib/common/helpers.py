@@ -9,6 +9,7 @@ randomized stagers.
 
 from time import localtime, strftime
 from Crypto.Random import random
+
 import re
 import string
 import commands
@@ -19,6 +20,8 @@ import os
 import socket
 import sqlite3
 import iptools
+
+import textwrap
 
 
 ###############################################################
@@ -559,6 +562,37 @@ def complete_path(text, line, arg=False):
 
     return completions
 
+def wrap_string(data, width=40, indent=32, indentAll=False, followingHeader=None):
+    """
+    Print a option description message in a nicely 
+    wrapped and formatted paragraph.
+
+    followingHeader -> text that also goes on the first line
+    """
+
+    data = str(data)
+
+    if len(data) > width:
+        lines = textwrap.wrap(textwrap.dedent(data).strip(), width=width)
+        return lines
+        """
+        if indentAll:
+            returnString = ' '*indent+lines[0]
+            if followingHeader: 
+                returnString += " " + followingHeader
+        else:
+            returnString = lines[0]
+            if followingHeader: 
+                returnString += " " + followingHeader
+        i = 1
+        while i < len(lines):
+            returnString += "\n"+' '*indent+(lines[i]).strip()
+            i += 1
+        return returnString
+        """
+    else:
+        return [data.strip()]
+
 def tableify(data, headers=None):
     '''ASCII table for a list of strings
 
@@ -581,13 +615,18 @@ def tableify(data, headers=None):
     # Example color in order to pad for colors
     red = "\x1b[31m"
     table = []
-    
-    columns = izip_longest(*data, fillvalue='')
+
+    columns = []
+    for curr_row in data:
+        x = izip_longest(*[wrap_string(item) for item in curr_row], fillvalue='')
+        columns.extend(list(x))
+
+    columns = izip_longest(*columns, fillvalue='')
     widths = []
     for column in columns:
         new_row = []
         # Need to be a string in order to get length
-        column = [str(item) for item in column]
+        # column = [str(item) for item in column]
         max_len = len(max(column, key=len))
         max_len = max(max_len, len(red)*2)
         widths.append(max_len)

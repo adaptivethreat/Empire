@@ -9,8 +9,9 @@ Titles, agent displays, listener displays, etc.
 import os, sys, textwrap
 
 # Empire imports
-from helpers import tableify
-import helpers
+# from helpers import *
+# from lib.common.helpers import *
+from helpers import *
 
 
 ###############################################################
@@ -150,13 +151,6 @@ def display_staleagents(agents):
         agent_print(agents)
     else:
         print helpers.color("[!] No stale agents currently registered ")
-
-
-
-
-
-
-
 
 
 
@@ -336,9 +330,8 @@ def display_stager(stagerName, stager):
     Displays a stager's information structure.
     """
     
-    print "\nName: " + stager.info['Name']
-
-    print "\nDescription:"
+    print "Name: {}".format(stager.info['Name'])
+    print "Description:"
     desc = wrap_string(stager.info['Description'], width=50, indent=2, indentAll=True)
     if len(desc.splitlines()) == 1:
         print "  " + str(desc)
@@ -347,15 +340,15 @@ def display_stager(stagerName, stager):
 
     # print out any options, if present
     if stager.options:
-        print "\nOptions:\n"
-        print "  Name             Required    Value             Description"
-        print "  ----             --------    -------           -----------"
+        # print color("Options:", color='blue')
+        print ""
+        data = []
+        headers = ['Name', 'Required', 'Value', 'Description']
 
         for option,values in stager.options.iteritems():
-            print "  %s%s%s%s" % ('{0: <17}'.format(option), '{0: <12}'.format(("True" if values['Required'] else "False")), '{0: <18}'.format(values['Value']), wrap_string(values['Description'], indent=49))
-    
-    print "\n"
+            data.append([option, values.get('Required', 'False'), values.get('Value', ''), values.get('Description', '')])
 
+        tableify(data, headers=headers)
 
 def display_module(moduleName, module):
     """
@@ -390,9 +383,6 @@ def display_module(moduleName, module):
         for option,values in module.options.iteritems():
             data.append([str(option), values.get('Required', 'False'), str(values.get('Value', '')), str(values.get('Description', ''))])
 
-            # print "  %s%s%s%s" % ('{0: <17}'.format(option), '{0: <12}'.format(("True" if values['Required'] else "False")), '{0: <25}'.format(values['Value']), wrap_string(values['Description'], indent=56))
-            # print "  %s%s%s" % ('{0: <17}'.format(str(option)), '{0: <12}'.format(("True" if values['Required'] else "False")), wrap_columns(str(values['Value']), str(values['Description'])))
-
         tableify(data, headers=headers)
 
     print ""
@@ -414,21 +404,7 @@ def display_module_search(moduleName, module):
 
 
 def display_credentials(creds):
-
-    print helpers.color("\nCredentials:\n", "blue")
-    print "  CredID  CredType   Domain                   UserName         Host             Password"
-    print "  ------  --------   ------                   --------         ----             --------"
-
-    for cred in creds:
-        # (id, credtype, domain, username, password, host, notes, sid)
-        credID = cred[0]
-        credType = cred[1]
-        domain = cred[2]
-        username = cred[3]
-        password = cred[4]
-        host = cred[5]
-
-        print "  %s%s%s%s%s%s" % ('{0: <8}'.format(credID), '{0: <11}'.format(credType), '{0: <25}'.format(domain), '{0: <17}'.format(username), '{0: <17}'.format(host),password)
-
+    # print color("Options:", 'blue')
     print ""
-
+    headers = ['CredID', 'CredType', 'Domain', 'Username', 'Password', 'Host', 'Notes', 'SID']
+    tableify(creds, headers=headers)
