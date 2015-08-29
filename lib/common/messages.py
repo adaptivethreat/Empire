@@ -40,7 +40,7 @@ def title(version):
 
 """
 
-def wrap_string(data, width=40, indent=32, indentAll=False, followingHeader=None):
+def wrap_string(data, width=48, indent=32, indentAll=False, followingHeader=None):
     """
     Print a option description message in a nicely 
     wrapped and formatted paragraph.
@@ -119,19 +119,21 @@ def agent_print (agents):
     """
     Take an agent dictionary and display everything nicely.
     """
-    print ""    
-    print helpers.color("[*] Active agents:\n")
-    print "  Name               Internal IP     Machine Name    Username            Process             Delay    Last Seen"
-    print "  ---------          -----------     ------------    ---------           -------             -----    --------------------"
+    print info("Active agents:")
 
+    data = []
     for agent in agents:
         [ID, sessionID, listener, name, delay, jitter, external_ip, internal_ip, username, high_integrity, process_name, process_id, hostname, os_details, session_key, checkin_time, lastseen_time, parent, children, servers, uris, old_uris, user_agent, headers, functions, kill_date, working_hours, ps_version, lost_limit] = agent
         if str(high_integrity) == "1":
             # add a * to the username if it's high integrity 
             username = "*" + username
-        print "  %.19s%.16s%.16s%.20s%.20s%.9s%.20s" % ('{0: <19}'.format(name),'{0: <16}'.format(internal_ip),'{0: <16}'.format(hostname),'{0: <20}'.format(username), '{0: <20}'.format(str(process_name)+"/"+str(process_id)), '{0: <9}'.format(str(delay)+"/"+str(jitter)), lastseen_time)
 
-    print ""
+        data.append([name, internal_ip, hostname, username, 
+                    '/'.join([str(process_name), str(process_id)]), 
+                    '/'.join([str(delay), str(jitter)]), lastseen_time])
+
+    headers = ['Name', 'Internal IP', 'Machine Name', 'Username', 'Process', 'Delay', 'Last Seen']
+    tableify(data, headers=headers)
 
 def display_agents(agents):
 
@@ -182,11 +184,11 @@ def display_listeners(listeners):
 
     if len(listeners) > 0:
         print ""    
-        print helpers.color("[*] Active listeners:\n")
+        print info("Active listeners:\n")
         
-        print "  ID    Name              Host                                 Type      Delay/Jitter   KillDate    Redirect Target"
-        print "  --    ----              ----                                 -------   ------------   --------    ---------------"
+        headers = ['ID', 'Name', 'Host', 'Type', 'Delay', 'KillDate', 'Redirect']
 
+        data = []
         for listener in listeners:
 
             [ID,name,host,port,cert_path,staging_key,default_delay,default_jitter,default_profile,kill_date,working_hours,listener_type,redirect_target,default_lost_limit] = listener
@@ -196,33 +198,33 @@ def display_listeners(listeners):
                     host = "https://" + host
                 else:
                     host = "http://" + host
+
                 host += ":" + str(port)
 
-            print "  %s%s%s%s%s%s%s" % ('{0: <6}'.format(ID), '{0: <18}'.format(name), '{0: <37}'.format(host), '{0: <10}'.format(listener_type), '{0: <15}'.format(str(default_delay)+"/"+str(default_jitter)), '{0: <12}'.format(kill_date), redirect_target)
-
-        print ""
-
+            data.append([ID, name, host, listener_type, '/'.join([str(default_delay), str(default_jitter)]), kill_date, redirect_target])
+        
+        tableify(data, headers=headers)
     else:
-        print helpers.color("[!] No listeners currently active ")
-
+        print warning("[!] No listeners currently active ")
 
 def display_listener(options):
     """
     Displays a listener's information structure.
     """
 
-    print "\nListener Options:\n"
-    print "  Name              Required    Value                            Description"
-    print "  ----              --------    -------                          -----------"
+    info("Listener Options:")
+    headers = ['Name', 'Required', 'Value', 'Description']
 
+    data = []
     for option,values in options.iteritems():
         # if there's a long value length, wrap it
-        if len(str(values['Value'])) > 33:
-            print "  %s%s%s" % ('{0: <18}'.format(option), '{0: <12}'.format(("True" if values['Required'] else "False")), '{0: <33}'.format(wrap_string(values['Value'], width=32, indent=32, followingHeader=values['Description'])))
-        else:
-            print "  %s%s%s%s" % ('{0: <18}'.format(option), '{0: <12}'.format(("True" if values['Required'] else "False")), '{0: <33}'.format(values['Value']), values['Description'])
+        data.append([option, values.get('Required', 'False'), values.get('Value'), values.get('Description', '')])
+        # if len(str(values['Value'])) > 33:
+            # print "  %s%s%s" % ('{0: <18}'.format(option), '{0: <12}'.format(("True" if values['Required'] else "False")), '{0: <33}'.format(wrap_string(values['Value'], width=32, indent=32, followingHeader=values['Description'])))
+        # else:
+            # print "  %s%s%s%s" % ('{0: <18}'.format(option), '{0: <12}'.format(("True" if values['Required'] else "False")), '{0: <33}'.format(values['Value']), values['Description'])
 
-    print "\n"
+    tableify(data, headers=headers)
 
 
 def display_listener_database(listener):
@@ -350,6 +352,7 @@ def display_stager(stagerName, stager):
 
         tableify(data, headers=headers)
 
+
 def display_module(moduleName, module):
     """
     Displays a module's information structure.
@@ -385,8 +388,6 @@ def display_module(moduleName, module):
 
         tableify(data, headers=headers)
 
-    print ""
-    
 
 def display_module_search(moduleName, module):
     """
@@ -401,7 +402,6 @@ def display_module_search(moduleName, module):
         print "\t" + line
 
     print "\n"
-
 
 def display_credentials(creds):
     # print color("Options:", 'blue')
