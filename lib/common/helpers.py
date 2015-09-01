@@ -206,6 +206,42 @@ def strip_powershell_comments(data):
 #
 ###############################################################
 
+def parse_credentials(data):
+    """
+    Parse module output, looking for any parseable sections.
+    """
+
+    parts = data.split("\n")
+
+    # tag for Invoke-Mimikatz output
+    if parts[0].startswith("Hostname:"):
+        return parse_mimikatz(data)
+
+    # collection/prompt output
+    elif parts[0].startswith("[+] Prompted credentials:"):
+        
+        parts = parts[0].split("->")
+        if len(parts) == 2:
+            
+            username = parts[1].split(":",1)[0].strip()
+            password = parts[1].split(":",1)[1].strip()
+
+            if "\\" in username:
+                domain = username.split("\\")[0].strip()
+                username = username.split("\\")[1].strip()
+            else:
+                domain = ""
+            
+            return [("plaintext", domain, username, password, "", "")]
+
+        else:
+            print helpers.color("[!] Error in parsing prompted credential output.")
+            return None
+
+    else:
+        return None
+
+
 def parse_mimikatz(data):
     """
     Parse the output from Invoke-Mimikatz to return credential sets.
@@ -251,7 +287,6 @@ def parse_mimikatz(data):
                     elif "Domain" in line:
                         domain = line.split(":",1)[1].strip()
                     elif "NTLM" in line or "Password" in line:
-                        print line.split(":")
                         password = line.split(":",1)[1].strip()
                 except:
                     pass

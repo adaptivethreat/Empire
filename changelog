@@ -1,3 +1,18 @@
+============
+8/30/2015 - RELEASE 1.2
+============
+-Encompasses all changes below
+--- 'Native' shell commands in agent core ported to WMI equivalents
+--- HMAC now uses SHA1 instead of MD5
+--- Numerous bug fixes and UI tweaks throughout code
+--- Six new modules and WAR stager added, /sids option added to golden_ticket
+--- Fixed international locale bug with unicode text in agent.ps1
+
+8/29/2015
+---------
+-HMAC algorithm for packet comms upgraded to use SHA1 instead of MD5
+-credentials collected from collection/prompt now scraped/added to credential model
+
 8/26/2015
 ---------
 -Added module privesc/bypassuac_wscript

