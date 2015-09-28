@@ -122,6 +122,6 @@ class Module:
             print helpers.color("[!] Error in launcher .bat generation.")
             return ""
         else:
-            script += "Write-HijackDll -HijackPath '"+hijackPath+"';"
-
+            # script += "Write-HijackDll -HijackPath '"+hijackPath+"';"
+            script += "Write-HijackDll -OutputFile '"+str(hijackPath)+"' -BatPath '"+str(batPath)+"';"
             return script

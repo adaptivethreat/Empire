@@ -19,8 +19,8 @@ class Module:
             # True if the module needs to run in the background
             'Background' : False,
 
-            # True if we're saving the output as a file
-            'SaveOutput' : True,
+            # File extension to save the file as
+            'OutputExtension' : None,
 
             # True if the module needs admin rights to run
             'NeedsAdmin' : False,

@@ -195,6 +195,13 @@ class Agents:
         savePath =  self.installPath + "/downloads/"+str(sessionID)+"/" + "/".join(parts[0:-1])
         filename = parts[-1]
 
+        # fix for 'skywalker' exploit by @zeroSteiner
+        safePath = os.path.abspath("%s/downloads/%s/" %(self.installPath, sessionID))
+        if not os.path.abspath(savePath+"/"+filename).startswith(safePath):
+            dispatcher.send("[!] WARNING: agent %s attempted skywalker exploit!" %(sessionID), sender="Agents")
+            dispatcher.send("[!] attempted overwrite of %s with data %s" %(path, data), sender="Agents")
+            return
+
         # make the recursive directory structure if it doesn't already exist
         if not os.path.exists(savePath):
             os.makedirs(savePath)
@@ -210,7 +217,7 @@ class Agents:
         f.close()
 
         # notify everyone that the file was downloaded
-        dispatcher.send("[+] Part of file "+filename+" from "+str(sessionID)+" saved", sender="Agents")
+        dispatcher.send("[+] Part of file %s from %s saved" %(filename, sessionID), sender="Agents")
     
 
     def save_module_file(self, sessionID, path, data):
@@ -226,6 +233,13 @@ class Agents:
         # construct the appropriate save path
         savePath =  self.installPath + "/downloads/"+str(sessionID)+"/" + "/".join(parts[0:-1])
         filename = parts[-1]
+
+        # fix for 'skywalker' exploit by @zeroSteiner
+        safePath = os.path.abspath("%s/downloads/%s/" %(self.installPath, sessionID))
+        if not os.path.abspath(savePath+"/"+filename).startswith(safePath):
+            dispatcher.send("[!] WARNING: agent %s attempted skywalker exploit!" %(sessionID), sender="Agents")
+            dispatcher.send("[!] attempted overwrite of %s with data %s" %(path, data), sender="Agents")
+            return
 
         # make the recursive directory structure if it doesn't already exist
         if not os.path.exists(savePath):

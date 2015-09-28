@@ -1,4 +1,3 @@
-
 function Write-HijackDll {
     <#
     .SYNOPSIS
@@ -8,8 +7,8 @@ function Write-HijackDll {
     .PARAMETER OutputFile
     File name to write the .dll to.
 
-    .PARAMETER BatchPath
-    Patch to the .bat for the .dll to launch. Defaults to "debug.bat" in the
+    .PARAMETER BatPath
+    Path to the .bat for the .dll to launch. Defaults to "debug.bat" in the
     .dll's current directory.
 
     .PARAMETER Arch
@@ -28,7 +27,7 @@ function Write-HijackDll {
         $OutputFile,
 
         [string]
-        $BatchPath,        
+        $BatPath,        
 
         [string]
         $Arch
@@ -62,8 +61,8 @@ function Write-HijackDll {
     }
 
     # patch in the appropriate .bat launcher path if specified
-    if ($BatchPath) {
-        $DllBytes = Invoke-PatchDll -DllBytes $DllBytes -FindString "debug.bat" -ReplaceString $BatchPath
+    if ($BatPath) {
+        $DllBytes = Invoke-PatchDll -DllBytes $DllBytes -FindString "debug.bat" -ReplaceString $BatPath
     }
 
     Set-Content -value $DllBytes -encoding byte -path $OutputFile

@@ -26,7 +26,7 @@ class Stager:
                 'Value'         :   ''
             },
             'OutFile' : {
-                'Description'   :   'File to output .bat launcher to, otherwise displayed on the screen.',
+                'Description'   :   'File to output .vbs launcher to, otherwise displayed on the screen.',
                 'Required'      :   False,
                 'Value'         :   '/tmp/launcher.vbs'
             },

