@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import sqlite3, os, string, hashlib
+import sqlite3, os, string, hashlib, argparse
 from Crypto.Random import random
 
 
@@ -10,11 +10,19 @@ from Crypto.Random import random
 #
 ###################################################
 
+# this is just to set up the ability to call args.
+parser = argparse.ArgumentParser(description="Setup the database for Empire")
+parser.add_argument("-y", "--yes", help="run in non-interactive mode. Say yes to everything", action="store_true", default=False)
+args = parser.parse_args()
+
 # to set a static key used for initial agent staging:
 #   STAGING_KEY = '8q=SDS%l5&Bpf?xIjKL8=Kk2RNwY(f*d'
 
 # otherwise prompt the user for a set value to hash for the negotiation password
-choice = raw_input("\n [>] Enter server negotiation password, enter for random generation: ")
+if not args.yes:
+    choice = raw_input("\n [>] Enter server negotiation password, enter for random generation: ")
+else:
+    choice = ""
 if choice == "":
     # if no password is entered, generation something random
     punctuation = '!#$%&()*+,-./:;<=>?@[\]^_`{|}~'
