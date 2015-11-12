@@ -184,17 +184,130 @@ def parse_powershell_script(data):
 
 def strip_powershell_comments(data):
     """
-    Strip block comments, line comments, and emtpy lines from a
-    PowerShell file.
+    Strip block comments, line comments, empty lines, verbose statements,
+    and debug statements from a PowerShell source file.
     """
     
     # strip block comments
     strippedCode = re.sub(re.compile('<#.*?#>', re.DOTALL), '', data)
 
-    # strip blank lines and lines starting with #
-    strippedCode = "\n".join([line for line in strippedCode.split('\n') if ((line.strip() != '') and (not line.strip().startswith("#")))])
+    # strip blank lines, lines starting with #, and verbose/debug statements
+    strippedCode = "\n".join([line for line in strippedCode.split('\n') if ((line.strip() != '') and (not line.strip().startswith("#")) and (not line.strip().lower().startswith("write-verbose ")) and (not line.strip().lower().startswith("write-debug ")) )])
     
     return strippedCode
+
+
+# PowerView dynamic helpers
+
+def get_powerview_psreflect_overhead(script):
+    """
+    Helper to extract some of the psreflect overhead for PowerView.
+    """
+    pattern = re.compile(r'\n\$Mod =.*\[\'wtsapi32\'\]', re.DOTALL)
+    
+    try:
+        return strip_powershell_comments(pattern.findall(script)[0])
+    except:
+        print color("[!] Error extracting psreflect overhead from powerview.ps1 !")
+        return ""
+
+
+def get_dependent_functions(code, functionNames):
+    """
+    Helper that takes a chunk of PowerShell code and a set of function 
+    names and returns the unique set of function names within the script block.
+    """
+
+    dependentFunctions = set()
+    for functionName in functionNames:
+        # find all function names that aren't followed by another alpha character
+        if re.search("[^A-Za-z']+"+functionName+"[^A-Za-z']+", code, re.IGNORECASE):
+            dependentFunctions.add(functionName)
+
+    if re.search("\$Netapi32|\$Advapi32|\$Kernel32\$Wtsapi32", code, re.IGNORECASE):
+        dependentFunctions |= set(["New-InMemoryModule", "func", "Add-Win32Type", "psenum", "struct"])
+
+    return dependentFunctions
+
+
+def find_all_dependent_functions(functions, functionsToProcess, resultFunctions=[]):
+    """
+    Takes a dictionary of "[functionName] -> functionCode" and a set of functions
+    to process, and recursively returns all nested functions that may be required.
+
+    Used to map the dependent functions for nested script dependencies like in
+    PowerView.
+    """
+
+    if isinstance(functionsToProcess, str):
+        functionsToProcess = [functionsToProcess]
+
+    while len(functionsToProcess) != 0:
+
+        # pop the next function to process off the stack
+        requiredFunction = functionsToProcess.pop()
+
+        if requiredFunction not in resultFunctions:
+            resultFunctions.append(requiredFunction)
+
+        # get the dependencies for the function we're currently processing
+        try:
+            functionDependencies = get_dependent_functions(functions[requiredFunction], functions.keys())
+        except:
+            functionDependencies = []
+            print color("[!] Error in retrieving dependencies for function %s !" %(requiredFunction))
+
+        for functionDependency in functionDependencies:
+            if functionDependency not in resultFunctions and functionDependency not in functionsToProcess:
+                # for each function dependency, if we haven't already seen it
+                #   add it to the stack for processing
+                functionsToProcess.append(functionDependency)
+                resultFunctions.append(functionDependency)
+
+        resultFunctions = find_all_dependent_functions(functions, functionsToProcess, resultFunctions)
+
+    return resultFunctions
+
+
+def generate_dynamic_powershell_script(script, functionName):
+    """
+    Takes a PowerShell script and a function name, generates a dictionary
+    of "[functionName] -> functionCode", and recurisvely maps all 
+    dependent functions for the specified function name.
+
+    A script is returned with only the code necessary for the given
+    functionName, stripped of comments and whitespace.
+
+    Note: for PowerView, it will also dynamically detect if psreflect 
+    overhead is needed and add it to the result script.
+    """
+
+    newScript = ""
+    psreflect_functions = ["New-InMemoryModule", "func", "Add-Win32Type", "psenum", "struct"]
+
+    # build a mapping of functionNames -> stripped function code
+    functions = {}
+    pattern = re.compile(r'\nfunction.*?{.*?\n}\n', re.DOTALL)
+
+    for match in pattern.findall(script):
+        name = match[:40].split()[1]
+        functions[name] = strip_powershell_comments(match)
+
+    # recursively enumerate all possible function dependencies and
+    #   start building the new result script
+    functionDependencies = find_all_dependent_functions(functions, functionName, [])
+
+    for functionDependency in functionDependencies:
+        try:
+            newScript += functions[functionDependency] + "\n"
+        except:
+            print color("[!] Key error with function %s !" %(functionDependency))
+
+    # if any psreflect methods are needed, add in the overhead at the end
+    if any(el in set(psreflect_functions) for el in functionDependencies):
+        newScript += get_powerview_psreflect_overhead(script)
+
+    return newScript + "\n"
 
 
 ###############################################################
@@ -232,7 +345,7 @@ def parse_credentials(data):
             return [("plaintext", domain, username, password, "", "")]
 
         else:
-            print helpers.color("[!] Error in parsing prompted credential output.")
+            print color("[!] Error in parsing prompted credential output.")
             return None
 
     else:
@@ -566,4 +679,3 @@ def complete_path(text, line, arg=False):
                     completions.append(f+'/')
 
     return completions
-

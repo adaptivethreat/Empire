@@ -5,11 +5,11 @@ class Module:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Find-DLLHijack',
+            'Name': 'Find-InterestingFile',
 
             'Author': ['@harmj0y'],
 
-            'Description': ('Finds generic .DLL hijacking opportunities.'),
+            'Description': ('Finds sensitive files on the domain.'),
 
             'Background' : True,
 
@@ -18,11 +18,11 @@ class Module:
             'NeedsAdmin' : False,
 
             'OpsecSafe' : True,
-            
+
             'MinPSVersion' : '2',
-            
+
             'Comments': [
-                'https://github.com/PowerShellEmpire/PowerTools/tree/master/PowerUp'
+                'https://github.com/PowerShellEmpire/PowerTools/tree/master/PowerView'
             ]
         }
 
@@ -35,18 +35,48 @@ class Module:
                 'Required'      :   True,
                 'Value'         :   ''
             },
-            'ExcludeWindows' : {
-                'Description'   :   "Switch. Exclude paths from C:\Windows\* instead of just C:\Windows\System32\*",
+            'Path' : {
+                'Description'   :   'UNC/local path to recursively search.',
+                'Required'      :   True,
+                'Value'         :   ''
+            },
+            'Terms' : {
+                'Description'   :   "Comma-separated terms to search for (overrides defaults).",
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'ExcludeProgramFiles' : {
-                'Description'   :   "Switch. Exclude paths from C:\Program Files\* and C:\Program Files (x86)\*",
+            'OfficeDocs' : {
+                'Description'   :   "Switch. Return only office documents.",
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'ExcludeOwned' : {
-                'Description'   :   "Switch. Exclude processes the current user owns.",
+            'FreshEXES' : {
+                'Description'   :   "Switch. Find .EXEs accessed in the last week.",
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'LastAccessTime' : {
+                'Description'   :   "Only return files with a LastAccessTime greater than this date value.",
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'CreationTime' : {
+                'Description'   :   "Only return files with a CreationDate greater than this date value.",
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'FreshEXES' : {
+                'Description'   :   "Switch. Find .EXEs accessed in the last week.",
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'ExcludeHidden' : {
+                'Description'   :   "Switch. Exclude hidden files and folders from the search results.",
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'CheckWriteAccess' : {
+                'Description'   :   "Switch. Only returns files the current user has write access to.",
                 'Required'      :   False,
                 'Value'         :   ''
             }
@@ -55,7 +85,7 @@ class Module:
         # save off a copy of the mainMenu object to access external functionality
         #   like listeners/agent handlers/etc.
         self.mainMenu = mainMenu
-
+        
         for param in params:
             # parameter format is [Name, Value]
             option, value = param
@@ -67,8 +97,8 @@ class Module:
 
         moduleName = self.info["Name"]
         
-        # read in the common powerup.ps1 module source code
-        moduleSource = self.mainMenu.installPath + "/data/module_source/privesc/PowerUp.ps1"
+        # read in the common powerview.ps1 module source code
+        moduleSource = self.mainMenu.installPath + "/data/module_source/situational_awareness/network/powerview.ps1"
 
         try:
             f = open(moduleSource, 'r')
@@ -93,6 +123,6 @@ class Module:
                     else:
                         script += " -" + str(option) + " " + str(values['Value']) 
 
-        script += ' | ft -wrap | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
-
+        script += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
+        
         return script

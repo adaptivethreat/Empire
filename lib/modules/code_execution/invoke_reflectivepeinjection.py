@@ -112,10 +112,5 @@ class Module:
                 elif values['Value'] and values['Value'] != '':
                     script += " -" + str(option) + " " + str(values['Value'])
 
-        # return script
-
-        f = open("/tmp/t", 'w')
-        f.write(script)
-        f.close()
-
-        return ""
+                    
+        return script

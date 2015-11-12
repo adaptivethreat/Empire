@@ -5,11 +5,11 @@ class Module:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Find-DLLHijack',
+            'Name': 'Find-GPOComputerAdmin',
 
             'Author': ['@harmj0y'],
 
-            'Description': ('Finds generic .DLL hijacking opportunities.'),
+            'Description': ('Takes a computer (or GPO) object and determines what users/groups have administrative access over it. Part of PowerView.'),
 
             'Background' : True,
 
@@ -22,7 +22,7 @@ class Module:
             'MinPSVersion' : '2',
             
             'Comments': [
-                'https://github.com/PowerShellEmpire/PowerTools/tree/master/PowerUp'
+                'https://github.com/PowerShellEmpire/PowerTools/tree/master/PowerView'
             ]
         }
 
@@ -35,18 +35,33 @@ class Module:
                 'Required'      :   True,
                 'Value'         :   ''
             },
-            'ExcludeWindows' : {
-                'Description'   :   "Switch. Exclude paths from C:\Windows\* instead of just C:\Windows\System32\*",
+            'ComputerName' : {
+                'Description'   :   'The computer to determine local administrative access to.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'ExcludeProgramFiles' : {
-                'Description'   :   "Switch. Exclude paths from C:\Program Files\* and C:\Program Files (x86)\*",
+            'OUName' : {
+                'Description'   :   'OU name to determine who has local adminisrtative acess to computers within it.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'ExcludeOwned' : {
-                'Description'   :   "Switch. Exclude processes the current user owns.",
+            'Domain' : {
+                'Description'   :   'The domain to use for the query, defaults to the current domain.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'DomainController' : {
+                'Description'   :   'Domain controller to reflect LDAP queries through.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'Recurse' : {
+                'Description'   :   'Switch. If a returned member is a group, recurse and get all members.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'LocalGroup' : {
+                'Description'   :   'The local group to check access against, "Administrators", "RDP/Remote Desktop Users", or a custom SID. Defaults to "Administrators".',
                 'Required'      :   False,
                 'Value'         :   ''
             }
@@ -64,11 +79,11 @@ class Module:
 
 
     def generate(self):
-
+        
         moduleName = self.info["Name"]
         
-        # read in the common powerup.ps1 module source code
-        moduleSource = self.mainMenu.installPath + "/data/module_source/privesc/PowerUp.ps1"
+        # read in the common powerview.ps1 module source code
+        moduleSource = self.mainMenu.installPath + "/data/module_source/situational_awareness/network/powerview.ps1"
 
         try:
             f = open(moduleSource, 'r')
@@ -93,6 +108,6 @@ class Module:
                     else:
                         script += " -" + str(option) + " " + str(values['Value']) 
 
-        script += ' | ft -wrap | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
+        script += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
 
         return script

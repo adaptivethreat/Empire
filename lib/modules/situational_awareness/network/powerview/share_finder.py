@@ -5,11 +5,11 @@ class Module:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Find-DLLHijack',
+            'Name': 'Invoke-ShareFinder',
 
             'Author': ['@harmj0y'],
 
-            'Description': ('Finds generic .DLL hijacking opportunities.'),
+            'Description': ('Finds shares on machines in the domain. Part of PowerView.'),
 
             'Background' : True,
 
@@ -22,7 +22,7 @@ class Module:
             'MinPSVersion' : '2',
             
             'Comments': [
-                'https://github.com/PowerShellEmpire/PowerTools/tree/master/PowerUp'
+                'https://github.com/PowerShellEmpire/PowerTools/tree/master/PowerView'
             ]
         }
 
@@ -35,18 +35,43 @@ class Module:
                 'Required'      :   True,
                 'Value'         :   ''
             },
-            'ExcludeWindows' : {
-                'Description'   :   "Switch. Exclude paths from C:\Windows\* instead of just C:\Windows\System32\*",
+            'ComputerName' : {
+                'Description'   :   'Hosts to enumerate.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'ExcludeProgramFiles' : {
-                'Description'   :   "Switch. Exclude paths from C:\Program Files\* and C:\Program Files (x86)\*",
+            'ComputerFilter' : {
+                'Description'   :   'Host filter name to query AD for, wildcards accepted.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'ExcludeOwned' : {
-                'Description'   :   "Switch. Exclude processes the current user owns.",
+            'CheckShareAccess' : {
+                'Description'   :   'Switch. Only display found shares that the local user has access to.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'NoPing' : {
+                'Description'   :   "Don't ping each host to ensure it's up before enumerating.",
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'Delay' : {
+                'Description'   :   'Delay between enumerating hosts, defaults to 0.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'Domain' : {
+                'Description'   :   'The domain to use for the query, defaults to the current domain.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'DomainController' : {
+                'Description'   :   'Domain controller to reflect LDAP queries through.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'Threads' : {
+                'Description'   :   'The maximum concurrent threads to execute.',
                 'Required'      :   False,
                 'Value'         :   ''
             }
@@ -64,11 +89,11 @@ class Module:
 
 
     def generate(self):
-
+        
         moduleName = self.info["Name"]
         
-        # read in the common powerup.ps1 module source code
-        moduleSource = self.mainMenu.installPath + "/data/module_source/privesc/PowerUp.ps1"
+        # read in the common powerview.ps1 module source code
+        moduleSource = self.mainMenu.installPath + "/data/module_source/situational_awareness/network/powerview.ps1"
 
         try:
             f = open(moduleSource, 'r')
@@ -93,6 +118,6 @@ class Module:
                     else:
                         script += " -" + str(option) + " " + str(values['Value']) 
 
-        script += ' | ft -wrap | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
-
+        script += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
+        
         return script

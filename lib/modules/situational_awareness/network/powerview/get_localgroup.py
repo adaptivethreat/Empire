@@ -5,11 +5,12 @@ class Module:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Find-DLLHijack',
+            'Name': 'Get-NetLocalGroup',
 
             'Author': ['@harmj0y'],
 
-            'Description': ('Finds generic .DLL hijacking opportunities.'),
+            'Description': ('Returns a list of all current users in a specified local group '
+                            'on a local or remote machine. Part of PowerView.'),
 
             'Background' : True,
 
@@ -21,9 +22,7 @@ class Module:
             
             'MinPSVersion' : '2',
             
-            'Comments': [
-                'https://github.com/PowerShellEmpire/PowerTools/tree/master/PowerUp'
-            ]
+            'Comments': [ ]
         }
 
         # any options needed by the module, settable during runtime
@@ -35,18 +34,23 @@ class Module:
                 'Required'      :   True,
                 'Value'         :   ''
             },
-            'ExcludeWindows' : {
-                'Description'   :   "Switch. Exclude paths from C:\Windows\* instead of just C:\Windows\System32\*",
+            'ComputerName' : {
+                'Description'   :   'The hostname or IP to query for local group users.',
+                'Required'      :   False,
+                'Value'         :   'localhost'
+            },
+            'GroupName' : {
+                'Description'   :   'The local group name to query for users, defaults to "Administrators".',
+                'Required'      :   False,
+                'Value'         :   'Administrators'
+            },
+            'ListGroups' : {
+                'Description'   :   'Switch. List all the local groups instead of their members.',
                 'Required'      :   False,
                 'Value'         :   ''
-            },
-            'ExcludeProgramFiles' : {
-                'Description'   :   "Switch. Exclude paths from C:\Program Files\* and C:\Program Files (x86)\*",
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'ExcludeOwned' : {
-                'Description'   :   "Switch. Exclude processes the current user owns.",
+            },            
+            'Recurse' : {
+                'Description'   :   'Switch. If the local member member is a domain group, recursively try to resolve its members to get a list of domain users who can access this machine.',
                 'Required'      :   False,
                 'Value'         :   ''
             }
@@ -55,7 +59,7 @@ class Module:
         # save off a copy of the mainMenu object to access external functionality
         #   like listeners/agent handlers/etc.
         self.mainMenu = mainMenu
-
+        
         for param in params:
             # parameter format is [Name, Value]
             option, value = param
@@ -67,8 +71,8 @@ class Module:
 
         moduleName = self.info["Name"]
         
-        # read in the common powerup.ps1 module source code
-        moduleSource = self.mainMenu.installPath + "/data/module_source/privesc/PowerUp.ps1"
+        # read in the common powerview.ps1 module source code
+        moduleSource = self.mainMenu.installPath + "/data/module_source/situational_awareness/network/powerview.ps1"
 
         try:
             f = open(moduleSource, 'r')
@@ -93,6 +97,6 @@ class Module:
                     else:
                         script += " -" + str(option) + " " + str(values['Value']) 
 
-        script += ' | ft -wrap | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
+        script += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
 
         return script

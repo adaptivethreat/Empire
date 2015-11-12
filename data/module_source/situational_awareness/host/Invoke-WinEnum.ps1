@@ -5,54 +5,39 @@ function Invoke-WinEnum{
     Collects all revelant information about a host and the current user context.
 
     .DESCRIPTION
-    After gaining initial access to a target host. It is recommended to gain situational awareness by enumerating the user and system. 
+    This script conducts user, system, and network enumeration using the current user context or with a specified user and/or keyword. 
 
-    .PARAMETER User
-    Specify a user to enumerate. The default is the current user. 
+    .PARAMETER UserName
+    Specify a user to enumerate. The default is the current user context. 
 
-    .PARAMETER keyword
-    Specify a keyword to use in file searches. 
-
-    .PARAMETER UserInfo
-    Enumerate user information
-
-    .PARAMETER SysInfo
-    Enumerate system information of the current host
-
-    .PARAMETER NetInfo
-    Enumerate the current network
+    .PARAMETER keywords
+    Specify a keyword or array of keywords to use in file searches.
     
     .EXAMPLE
-    Conduct all enumeration with a keyword for file searches. 
+    Conduct enumeration with a username and keyword
     
-    Invoke-WinEnum -UserInfo keyword "putty" -SysInfo -NetInfo
-    
+    Invoke-WindowsEnum -User "sandersb"
+
     .EXAMPLE
-    Conduct all enumeration with a username
+    Conduct enumeration with a keyword for file searches. 
     
-    Invoke-WinEnum -User "sandersb" -UserInfo -SysInfo -NetInfo
+    Invoke-WindowsEnum -keyword "putty"
 
     #>
 
     [CmdletBinding()]
     Param(
+        [Parameter(Mandatory=$False,Position=0)]
+        [string]$UserName,
         [Parameter(Mandatory=$False,Position=1)]
-        [string]$User,
-        [Parameter(Mandatory=$False)]
-        [string]$keyword,
-        [Parameter(Mandatory=$False)]
-        [switch]$UserInfo,
-        [Parameter(Mandatory=$False)]
-        [switch]$SysInfo,
-        [Parameter(Mandatory=$False)]
-        [switch]$NetInfo
+        [string[]]$keywords
     )
 
 
-    If($UserInfo){
-        if($User){
-            "UserName: $User`n"
-            $DomainUser = $User  
+    Function Get-UserInfo{
+        if($UserName){
+            "UserName: $UserName`n"
+            $DomainUser = $UserName  
         }
         else{
              #If the username was not provided, 
@@ -79,7 +64,7 @@ function Invoke-WinEnum{
         #Get the distinguishedName for the domain 
         $usr = $dsclassUP::FindByIdentity($contextTypeDomain,$iType,$DomainUser)
         #Grab the user principal object for the domain.
-        $usr.GetGroups() | foreach {$_.Name + "`n"}
+        $usr.GetGroups() | foreach {$_.Name}
         #Enumerate all groups the user is apart of
         
         
@@ -87,42 +72,58 @@ function Invoke-WinEnum{
         "Password Last changed"
         "`n-------------------------------------`n"
 
-        $usr.LastPasswordSet + "`n"
+        $($usr.LastPasswordSet) + "`n"
             
         "`n-------------------------------------`n"
         "Last 5 files opened"
         "`n-------------------------------------`n"
             
-        $LastOpenedFiles = Get-ChildItem -Path "C:\Users\$Username" -Recurse -Include @("*.txt","*.pdf","*.docx","*.doc","*.xls","*.ppt") -ea SilentlyContinue | Sort-Object {$_.LastAccessTime} | select -First 5 
-        if($LastOpenedFiles){
-            foreach ($file in $LastOpenedFiles){
-                "Filepath: " + $file.FullName + "`n"
-                "Last Accessed: " + $file.LastAccessTime + "`n"    
+        $AllOpenedFiles = Get-ChildItem -Path "C:\" -Recurse -Include @("*.txt","*.pdf","*.docx","*.doc","*.xls","*.ppt") -ea SilentlyContinue | Sort-Object {$_.LastAccessTime} 
+        $LastOpenedFiles = @()
+        $AllOpenedFiles | ForEach-Object {
+            $owner = $($_.GetAccessControl()).Owner
+            $owner = $owner.split('\')[-1]
+            if($owner -eq $UserName){
+                $LastOpenedFiles += $_
             }
+        }
+        if($LastOpenedFiles){
+            $LastOpenedFiles | Sort-Object LastAccessTime -Descending | Select-Object FullName, LastAccessTime -First 5 | Format-List | Out-String
         }
         
         "`n-------------------------------------`n"
         "Interesting Files"
         "`n-------------------------------------`n"
         #If the keyword is set, use it in the file search 
-        if($keyword){
-            $interestingFiles = Get-ChildItem -Path "C:\Users\$Username" -Recurse -Include @($keyword) -ea SilentlyContinue | where {$_.Mode.StartsWith('d') -eq $False} | Sort-Object {$_.LastAccessTime} 
-            if($interestingFiles){
-                foreach($file in $interestingFiles){
-                    "Filepath: " + $file.FullName + "`n"
-                    "Last Accessed: " + $file.LastAccessTime + "`n"
+        $NewestInterestingFiles = @()
+        if($keywords)
+        {
+            $AllInterestingFiles = Get-ChildItem -Path "C:\" -Recurse -Include $keywords -ea SilentlyContinue | where {$_.Mode.StartsWith('d') -eq $False} | Sort-Object {$_.LastAccessTime}
+            $AllInterestingFiles | ForEach-Object {
+                $owner = $_.GetAccessControl().Owner
+                $owner = $owner.split('\')[-1]
+                if($owner -eq $UserName){
+                    $NewestInterestingFiles += $_
                 }
+            } 
+            if($NewestInterestingFiles){
+                $NewestInterestingFiles | Sort-Object LastAccessTime -Descending | Select-Object FullName, LastAccessTime | Format-List | Out-String
             }
         }
-        #Otherwise, search using the pre-defined list
-        else{
-             $interestingFiles = Get-ChildItem -Path "C:\Users\$Username" -Recurse -Include @("*pass*","*admin*","*config*","*cred*","*key*","*ssh*","*putty*","*vpn*") -ea SilentlyContinue | where {$_.Mode.StartsWith('d') -eq $False} 
-             if($interestingFiles){
-                 foreach($file in $interestingFiles){
-                     "Filepath: " + $file.FullName + "`n"
-                     "Last Accessed: " + $file.LastAccessTime + "`n"
+        else
+        {
+            $AllInterestingFiles = Get-ChildItem -Path "C:\" -Recurse -Include @("*.txt","*.pdf","*.docx","*.doc","*.xls","*.ppt","*pass*","*cred*") -ErrorAction SilentlyContinue | where {$_.Mode.StartsWith('d') -eq $False} | Sort-Object {$_.LastAccessTime} 
+            $AllInterestingFiles | ForEach-Object {
+                $owner = $_.GetAccessControl().Owner
+                $owner = $owner.split('\')[-1]
+                if($owner -eq $UserName){
+                    $NewestInterestingFiles += $_
                 }
-             }            
+            }
+            if($NewestInterestingFiles)
+            {
+                $NewestInterestingFiles | Sort-Object LastAccessTime -Descending | Select-Object FullName, LastAccessTime | Format-List | Out-String
+            }
         }
         
         "`n-------------------------------------`n"
@@ -143,7 +144,7 @@ function Invoke-WinEnum{
         "`n"
     }
       
-    if($SysInfo){
+    Function Get-SysInfo{
         "`n-------------------------------------`n"
         "System Information"
         "`n-------------------------------------`n"
@@ -152,16 +153,41 @@ function Invoke-WinEnum{
         $OSArch = (Get-WmiObject -class win32_operatingsystem).OSArchitecture
         "OS: $OSVersion $OSArch`n"
         
-        If($OSArch -eq '64-bit'){
+        if($OSArch -eq '64-bit')
+        {
             $registeredAppsx64 = Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* | Select-Object DisplayName | Sort-Object DisplayName
-            $registeredApps = Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* | Select-Object DisplayName | Sort-Object DisplayName
-            $registeredApps = $registeredApps + $registeredAppsx64
-            $registeredApps = $registeredApps | Sort-Object DisplayName -Unique
-            
+            $registeredAppsx86 = Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* | Select-Object DisplayName | Sort-Object DisplayName
+            $registeredAppsx64 | Where-Object {$_.DisplayName -ne ' '} | Select-Object DisplayName | Format-Table -AutoSize | Out-String
+            $registeredAppsx86 | Where-Object {$_.DisplayName -ne ' '} | Select-Object DisplayName | Format-Table -AutoSize | Out-String
         }
-        else{
-            $registeredApps =  Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* | Select-Object DisplayName | Sort-Object DisplayName
+        else
+        {
+            $registeredAppsx86 =  Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* | Select-Object DisplayName | Sort-Object DisplayName
+            $registeredAppsx86 | Where-Object {$_.DisplayName -ne ' '} | Select-Object DisplayName | Format-Table -AutoSize | Out-String
         }
+
+        "`n-------------------------------------`n"
+        "Services"
+        "`n-------------------------------------`n"
+
+        $AllServices = @()
+        Get-WmiObject -class win32_service | ForEach-Object{
+            $service = New-Object PSObject -Property @{
+                ServiceName = $_.DisplayName
+                ServiceStatus = (Get-service | where-object { $_.DisplayName -eq $ServiceName}).status
+                ServicePathtoExe = $_.PathName
+                StartupType = $_.StartMode
+            }
+            $AllServices += $service  
+        }
+
+        $AllServices | Select ServicePathtoExe, ServiceName | Format-Table -AutoSize | Out-String
+
+        "`n-------------------------------------`n"
+        "Available Shares"
+        "`n-------------------------------------`n"
+
+        Get-WmiObject -class win32_share | Format-Table -AutoSize Name, Path, Description, Status | Out-String
 
         "`n-------------------------------------`n"
         "AV Solution"
@@ -218,17 +244,17 @@ function Invoke-WinEnum{
 
     }
 
-    #Coming soon
-    if($NetInfo){
+    
+    Function Get-NetInfo{
         "`n-------------------------------------`n"
         "Network Adapters"
         "`n-------------------------------------`n"
         #http://thesurlyadmin.com/2013/05/20/using-powershell-to-get-adapter-information/
         foreach ($Adapter in (Get-WmiObject -class win32_networkadapter -Filter "NetConnectionStatus='2'")){
             $config = Get-WmiObject -class win32_networkadapterconfiguration -Filter "Index = '$($Adapter.Index)'"
-            "--------------------------`n"
+            "`n"
             "Adapter: " + $Adapter.Name + "`n"
-            "--------------------------`n"
+            "`n"
             "IP Address: "
             if($config.IPAddress -is [system.array]){
                 $config.IPAddress[0] + "`n"
@@ -236,10 +262,9 @@ function Invoke-WinEnum{
             else{
                 $config.IPAddress + "`n"
             }
-            "---------------------------`n"
+            "`n"
             "Mac Address: " + $Config.MacAddress
-            "---------------------------`n"
-
+            "`n"
         }
 
         "`n-------------------------------------`n"
@@ -310,8 +335,56 @@ function Invoke-WinEnum{
                 Name = $DriveName
             }
             $NetworkDrive
-        }   
+        }
+
+
+        "`n-------------------------------------`n"
+        "Firewall Rules"
+        "`n-------------------------------------`n"
+        #http://blogs.technet.com/b/heyscriptingguy/archive/2010/07/03/hey-scripting-guy-weekend-scripter-how-to-retrieve-enabled-windows-firewall-rules.aspx
+        #Create the firewall com object to enumerate 
+        $fw = New-Object -ComObject HNetCfg.FwPolicy2 
+        #Retrieve all firewall rules 
+        $FirewallRules = $fw.rules 
+        #create a hashtable to define all values
+        $fwprofiletypes = @{1GB="All";1="Domain"; 2="Private" ; 4="Public"}
+        $fwaction = @{1="Allow";0="Block"}
+        $FwProtocols = @{1="ICMPv4";2="IGMP";6="TCP";17="UDP";41="IPV6";43="IPv6Route"; 44="IPv6Frag";
+                  47="GRE"; 58="ICMPv6";59="IPv6NoNxt";60="IPv60pts";112="VRRP"; 113="PGM";115="L2TP"}
+        $fwdirection = @{1="Inbound"; 2="Outbound"} 
+
+        #Retrieve the profile type in use and the current rules
+
+        $fwprofiletype = $fwprofiletypes.Get_Item($fw.CurrentProfileTypes)
+        $fwrules = $fw.rules
+
+        "Current Firewall Profile Type in use: $fwprofiletype"
+        $AllFWRules = @()
+        #enumerate the firewall rules
+        $fwrules | ForEach-Object{
+            #Create custom object to hold properties for each firewall rule 
+            $FirewallRule = New-Object PSObject -Property @{
+                ApplicationName = $_.Name
+                Protocol = $fwProtocols.Get_Item($_.Protocol)
+                Direction = $fwdirection.Get_Item($_.Direction)
+                Action = $fwaction.Get_Item($_.Action)
+                LocalIP = $_.LocalAddresses
+                LocalPort = $_.LocalPorts
+                RemoteIP = $_.RemoteAddresses
+                RemotePort = $_.RemotePorts
+            }
+
+            $AllFWRules += $FirewallRule
+
+            
+        } 
+        $AllFWRules | Select-Object Action, Direction, RemoteIP, RemotePort, LocalPort, ApplicationName | Format-List | Out-String  
     }
+
+    Get-UserInfo
+    Get-SysInfo
+    Get-NetInfo
+
 
 
 }

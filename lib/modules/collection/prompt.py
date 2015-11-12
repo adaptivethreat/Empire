@@ -7,7 +7,7 @@ class Module:
         self.info = {
             'Name': 'Invoke-Prompt',
 
-            'Author': ['greg.fossk', '@harmj0y'],
+            'Author': ['greg.fossk', '@harmj0y', '@enigma0x3'],
 
             'Description': ("Prompts the current user to enter their credentials "
                             "in a forms box and returns the results."),
@@ -24,6 +24,7 @@ class Module:
             
             'Comments': [
                 'http://blog.logrhythm.com/security/do-you-trust-your-computer/'
+                'https://enigma0x3.wordpress.com/2015/01/21/phishing-for-credentials-if-you-want-it-just-ask/'
             ]
         }
 
@@ -68,7 +69,9 @@ class Module:
         
         script = """
 # Adapted from http://blog.logrhythm.com/security/do-you-trust-your-computer/
+# https://enigma0x3.wordpress.com/2015/01/21/phishing-for-credentials-if-you-want-it-just-ask/
 #   POC from greg.foss[at]owasp.org
+#   @enigma0x3
 
 function Invoke-Prompt {
     [CmdletBinding()]

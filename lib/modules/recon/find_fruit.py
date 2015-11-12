@@ -1,3 +1,4 @@
+import base64
 from lib.common import helpers
 
 class Module:
@@ -5,24 +6,24 @@ class Module:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Find-DLLHijack',
+            'Name': 'Find-Fruit',
 
-            'Author': ['@harmj0y'],
+            'Author': ['@424f424f'],
 
-            'Description': ('Finds generic .DLL hijacking opportunities.'),
+            'Description': ("Searches a network range for potentially vulnerable web services."),
 
             'Background' : True,
 
             'OutputExtension' : None,
             
             'NeedsAdmin' : False,
-
+ 
             'OpsecSafe' : True,
-            
+
             'MinPSVersion' : '2',
             
             'Comments': [
-                'https://github.com/PowerShellEmpire/PowerTools/tree/master/PowerUp'
+                'Inspired by mattifestation Get-HttpStatus in PowerSploit'
             ]
         }
 
@@ -35,20 +36,45 @@ class Module:
                 'Required'      :   True,
                 'Value'         :   ''
             },
-            'ExcludeWindows' : {
-                'Description'   :   "Switch. Exclude paths from C:\Windows\* instead of just C:\Windows\System32\*",
+            'Rhosts' : {
+                'Description'   :   'Specify the CIDR range or host to scan.',
+                'Required'      :   True,
+                'Value'         :   ''
+            },
+            'Port' : {
+                'Description'   :   'Specify the port to scan.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'ExcludeProgramFiles' : {
-                'Description'   :   "Switch. Exclude paths from C:\Program Files\* and C:\Program Files (x86)\*",
+            'Path' : {
+                'Description'   :   'Specify the path to a dictionary file.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'ExcludeOwned' : {
-                'Description'   :   "Switch. Exclude processes the current user owns.",
+            'Timeout' : {
+                'Description'   :   'Set timeout for each connection in milliseconds',
+                'Required'      :   False,
+                'Value'         :   '50'
+            },
+            'UseSSL' : {
+                'Description'   :   'Force SSL useage.',
                 'Required'      :   False,
                 'Value'         :   ''
+            },
+            'ShowAll' : {
+                'Description'   :   'Switch. Show all results (default is to only show 200s).',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'Threads' : {
+                'Description'   :   'The maximum concurrent threads to execute.',
+                'Required'      :   False,
+                'Value'         :   '10'
+            },
+            'FoundOnly' : {
+                'Description'   :   'Switch. Show only found sites',
+                'Required'      :   False,
+                'Value'         :   'True'
             }
         }
 
@@ -64,11 +90,9 @@ class Module:
 
 
     def generate(self):
-
-        moduleName = self.info["Name"]
         
-        # read in the common powerup.ps1 module source code
-        moduleSource = self.mainMenu.installPath + "/data/module_source/privesc/PowerUp.ps1"
+        # read in the common module source code
+        moduleSource = self.mainMenu.installPath + "/data/module_source/recon/Find-Fruit.ps1"
 
         try:
             f = open(moduleSource, 'r')
@@ -79,13 +103,14 @@ class Module:
         moduleCode = f.read()
         f.close()
 
-        # get just the code needed for the specified function
-        script = helpers.generate_dynamic_powershell_script(moduleCode, moduleName)
+        script = moduleCode
 
-        script += moduleName + " "
+        script += "\nFind-Fruit"
+
+        showAll = self.options['ShowAll']['Value'].lower()
 
         for option,values in self.options.iteritems():
-            if option.lower() != "agent":
+            if option.lower() != "agent" and option.lower() != "showall":
                 if values['Value'] and values['Value'] != '':
                     if values['Value'].lower() == "true":
                         # if we're just adding a switch
@@ -93,6 +118,9 @@ class Module:
                     else:
                         script += " -" + str(option) + " " + str(values['Value']) 
 
-        script += ' | ft -wrap | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
+        if showAll != "true":
+            script += " | ?{$_.Status -eq 'OK'}"
+
+        script += " | Format-Table -AutoSize | Out-String"
 
         return script

@@ -5,11 +5,11 @@ class Module:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Find-DLLHijack',
+            'Name': 'Get-NetComputer',
 
             'Author': ['@harmj0y'],
 
-            'Description': ('Finds generic .DLL hijacking opportunities.'),
+            'Description': ('Queries the domain for current computer objects. Part of PowerView.'),
 
             'Background' : True,
 
@@ -22,7 +22,7 @@ class Module:
             'MinPSVersion' : '2',
             
             'Comments': [
-                'https://github.com/PowerShellEmpire/PowerTools/tree/master/PowerUp'
+                'https://github.com/PowerShellEmpire/PowerTools/tree/master/PowerView'
             ]
         }
 
@@ -35,18 +35,48 @@ class Module:
                 'Required'      :   True,
                 'Value'         :   ''
             },
-            'ExcludeWindows' : {
-                'Description'   :   "Switch. Exclude paths from C:\Windows\* instead of just C:\Windows\System32\*",
+            'ComputerName' : {
+                'Description'   :   'Return computers with a specific name, wildcards accepted.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'ExcludeProgramFiles' : {
-                'Description'   :   "Switch. Exclude paths from C:\Program Files\* and C:\Program Files (x86)\*",
+            'SPN' : {
+                'Description'   :   'Return computers with a specific service principal name, wildcards accepted.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'ExcludeOwned' : {
-                'Description'   :   "Switch. Exclude processes the current user owns.",
+            'OperatingSystem' : {
+                'Description'   :   'Return computers with a specific operating system, wildcards accepted.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'Filter' : {
+                'Description'   :   'A customized ldap filter string to use, e.g. "(description=*admin*)"',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'Printers' : {
+                'Description'   :   'Switch. Return only printers.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'Ping' : {
+                'Description'   :   "Switch. Ping each host to ensure it's up before enumerating.",
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'FullData' : {
+                'Description'   :   "Switch. Return full computer objects instead of just system names (the default).",
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'Domain' : {
+                'Description'   :   'The domain to use for the query, defaults to the current domain.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'DomainController' : {
+                'Description'   :   'Domain controller to reflect LDAP queries through.',
                 'Required'      :   False,
                 'Value'         :   ''
             }
@@ -64,11 +94,11 @@ class Module:
 
 
     def generate(self):
-
+        
         moduleName = self.info["Name"]
         
-        # read in the common powerup.ps1 module source code
-        moduleSource = self.mainMenu.installPath + "/data/module_source/privesc/PowerUp.ps1"
+        # read in the common powerview.ps1 module source code
+        moduleSource = self.mainMenu.installPath + "/data/module_source/situational_awareness/network/powerview.ps1"
 
         try:
             f = open(moduleSource, 'r')
@@ -93,6 +123,6 @@ class Module:
                     else:
                         script += " -" + str(option) + " " + str(values['Value']) 
 
-        script += ' | ft -wrap | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
+        script += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
 
         return script

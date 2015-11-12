@@ -9,7 +9,7 @@ menu loops.
 """
 
 # make version for Empire
-VERSION = "1.2"
+VERSION = "1.3.3"
 
 
 from pydispatch import dispatcher
@@ -253,6 +253,9 @@ class MainMenu(cmd.Cmd):
                 print helpers.color(signal)
 
             elif "[!] Agent" in signal and "exiting" in signal:
+                print helpers.color(signal)
+
+            elif "WARNING" in signal or "attempted overwrite" in signal:
                 print helpers.color(signal)
 
             elif "on the blacklist" in signal:

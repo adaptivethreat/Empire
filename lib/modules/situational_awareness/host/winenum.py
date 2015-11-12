@@ -22,7 +22,7 @@ class Module:
             'MinPSVersion' : '2',
             
             'Comments': [
-                'https://github.com/xorrior/RandomPS-Scripts/blob/master/Invoke-WinEnum.ps1'
+                'https://github.com/xorrior/RandomPS-Scripts/blob/master/Invoke-WindowsEnum.ps1'
             ]
         }
 
@@ -35,25 +35,15 @@ class Module:
                 'Required'      :   True,
                 'Value'         :   ''
             },
-            'Keyword' : {
-                'Description'   :   'Specify a keyword to use in file searches.',
+            'Keywords' : {
+                'Description'   :   'Array of keywords to use in file searches.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'UserInfo' : {
-                'Description'   :   'Switch. Enumerate user information.',
+            'UserName' : {
+                'Description'   :   'UserName to enumerate. Defaults to the current user context.',
                 'Required'      :   False,
-                'Value'         :   'True'
-            },
-            'SysInfo' : {
-                'Description'   :   'Switch. Enumerate system information of the current host.',
-                'Required'      :   False,
-                'Value'         :   'True'
-            },
-            'NetInfo' : {
-                'Description'   :   'Switch. Enumerate the current network.',
-                'Required'      :   False,
-                'Value'         :   'True'
+                'Value'         :   ''
             }
         }
 

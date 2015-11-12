@@ -84,7 +84,7 @@ function Invoke-BypassUAC
         "[!] Current user not a local administrator!"
         Throw ("Current user not a local administrator!")
     }
-    if (($(whoami /groups) -like "*Medium Mandatory Level*").length -eq 0) {
+    if (($(whoami /groups) -like "*S-1-16-8192*").length -eq 0) {
         "[!] Not in a medium integrity process!"
         Throw ("Not in a medium integrity process!")
     }

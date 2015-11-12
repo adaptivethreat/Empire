@@ -55,11 +55,6 @@ class Module:
                 'Description'   :   "Local group to add the user to.",
                 'Required'      :   False,
                 'Value'         :   'Administrators'
-            },
-            'Restore' : {
-                'Description'   :   "Switch. Restore the original service binary.",
-                'Required'      :   False,
-                'Value'         :   ''                
             }
         }
 
@@ -76,8 +71,10 @@ class Module:
 
     def generate(self):
 
-        # read in the common module source code
-        moduleSource = self.mainMenu.installPath + "/data/module_source/privesc/powerup/PowerUp.ps1"
+        moduleName = self.info["Name"]
+        
+        # read in the common powerup.ps1 module source code
+        moduleSource = self.mainMenu.installPath + "/data/module_source/privesc/PowerUp.ps1"
 
         try:
             f = open(moduleSource, 'r')
@@ -88,21 +85,20 @@ class Module:
         moduleCode = f.read()
         f.close()
 
-        script = moduleCode
+        # get just the code needed for the specified function
+        script = helpers.generate_dynamic_powershell_script(moduleCode, moduleName)
 
-
-        if self.options['Restore']['Value'] != '':
-            script += "Restore-ServiceEXE "
-        else:
-            script += "Write-ServiceEXE "
+        script += moduleName + " "
 
         for option,values in self.options.iteritems():
-            if option.lower() != "agent" and option.lower() != "restore":
+            if option.lower() != "agent":
                 if values['Value'] and values['Value'] != '':
                     if values['Value'].lower() == "true":
                         # if we're just adding a switch
                         script += " -" + str(option)
                     else:
                         script += " -" + str(option) + " " + str(values['Value']) 
+
+        script += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
 
         return script

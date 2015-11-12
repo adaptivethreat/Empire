@@ -5,11 +5,11 @@ class Module:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Find-DLLHijack',
+            'Name': 'Find-ComputerField',
 
-            'Author': ['@harmj0y'],
+            'Author': ['@obscuresec', '@harmj0y'],
 
-            'Description': ('Finds generic .DLL hijacking opportunities.'),
+            'Description': ("Searches user object fields for a given word (default *pass*). Default field being searched is 'description'."),
 
             'Background' : True,
 
@@ -22,7 +22,8 @@ class Module:
             'MinPSVersion' : '2',
             
             'Comments': [
-                'https://github.com/PowerShellEmpire/PowerTools/tree/master/PowerUp'
+                'http://obscuresecurity.blogspot.com/2014/04/ADSISearcher.html',
+                'https://github.com/PowerShellEmpire/PowerTools/tree/master/PowerView'
             ]
         }
 
@@ -35,21 +36,26 @@ class Module:
                 'Required'      :   True,
                 'Value'         :   ''
             },
-            'ExcludeWindows' : {
-                'Description'   :   "Switch. Exclude paths from C:\Windows\* instead of just C:\Windows\System32\*",
+            'SearchTerm' : {
+                'Description'   :   'Term to search for, default of "pass".',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'ExcludeProgramFiles' : {
-                'Description'   :   "Switch. Exclude paths from C:\Program Files\* and C:\Program Files (x86)\*",
+            'SearchField' : {
+                'Description'   :   'Field to search in, default of "description".',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'ExcludeOwned' : {
-                'Description'   :   "Switch. Exclude processes the current user owns.",
+            'Domain' : {
+                'Description'   :   'The domain to use for the query, defaults to the current domain.',
                 'Required'      :   False,
                 'Value'         :   ''
-            }
+            },
+            'DomainController' : {
+                'Description'   :   'Domain controller to reflect LDAP queries through.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
         }
 
         # save off a copy of the mainMenu object to access external functionality
@@ -64,11 +70,11 @@ class Module:
 
 
     def generate(self):
-
+        
         moduleName = self.info["Name"]
         
-        # read in the common powerup.ps1 module source code
-        moduleSource = self.mainMenu.installPath + "/data/module_source/privesc/PowerUp.ps1"
+        # read in the common powerview.ps1 module source code
+        moduleSource = self.mainMenu.installPath + "/data/module_source/situational_awareness/network/powerview.ps1"
 
         try:
             f = open(moduleSource, 'r')
@@ -93,6 +99,6 @@ class Module:
                     else:
                         script += " -" + str(option) + " " + str(values['Value']) 
 
-        script += ' | ft -wrap | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
+        script += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
 
         return script
