@@ -27,6 +27,25 @@ then
 	
 	#Configure database
 	./setup_database.py
+
+#Fedora-like
+elif [ -e /etc/yum ]
+then
+	#dependencies
+	yum install -y python-pip python-devel m2crypto python-m2ext swig python-iptools
+	
+	pip install pycrypto iptools pydispatcher
+	
+	#Configure database
+	python2 setup_database.py
+else
+	echo "It was not possible determine your distro. Using default configuration."
+	
+	sudo apt-get install python-pip python-dev python-m2crypto swig
+	pip install pycrypto iptools pydispatcher
+
+	#Configure database
+	./setup_database.py
 fi
 
 sudo mv ../../Empire ../../empire
