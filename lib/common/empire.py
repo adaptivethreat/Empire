@@ -1562,7 +1562,7 @@ class AgentMenu(cmd.Cmd):
 
 
     def do_download(self,line):
-        "Task an agent to download a file."
+        "Task an agent to download a file 'download filename [chunk size in KB]'"
 
         line = line.strip()
 
