@@ -13,6 +13,7 @@ VERSION = "1.4.1"
 
 
 from pydispatch import dispatcher
+from os.path import expanduser
 
 # import time, sys, re, readline
 import sys, cmd, sqlite3, os, hashlib, traceback
@@ -215,7 +216,7 @@ class MainMenu(cmd.Cmd):
     def database_connect(self):
         try:
             # set the database connectiont to autocommit w/ isolation level
-            self.conn = sqlite3.connect('./data/empire.db', check_same_thread=False)
+            self.conn = sqlite3.connect(expanduser("~") + '/.powershell-empire/empire.db', check_same_thread=False)
             self.conn.text_factory = str
             self.conn.isolation_level = None
             return self.conn

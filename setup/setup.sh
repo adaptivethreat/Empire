@@ -2,6 +2,10 @@
 
 pushd "$(dirname "$0")"
 
+if [ ! -d ~/.powershell-empire ]; then
+  mkdir ~/.powershell-empire
+fi
+
 # Setup database schema
 ./setup_database.py
 
