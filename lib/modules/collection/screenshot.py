@@ -84,10 +84,10 @@ function Get-Screenshot
     		$iQual=1;
     	}
     	$encoderParams = New-Object System.Drawing.Imaging.EncoderParameters;
-			$encoderParams.Param[0] = New-Object Drawing.Imaging.EncoderParameter ([System.Drawing.Imaging.Encoder]::Quality, $iQual);
-			$jpegCodec = [Drawing.Imaging.ImageCodecInfo]::GetImageEncoders() | Where-Object { $_.FormatDescription -eq \"JPEG\" }
-			$ScreenshotObject.save($ms, $jpegCodec, $encoderParams);
-		} else {
+    	$encoderParams.Param[0] = New-Object Drawing.Imaging.EncoderParameter ([System.Drawing.Imaging.Encoder]::Quality, $iQual);
+    	$jpegCodec = [Drawing.Imaging.ImageCodecInfo]::GetImageEncoders() | Where-Object { $_.FormatDescription -eq \"JPEG\" }
+    	$ScreenshotObject.save($ms, $jpegCodec, $encoderParams);
+    } else {
     	$ScreenshotObject.save($ms, [Drawing.Imaging.ImageFormat]::Png);
     }
     $ScreenshotObject.Dispose();
