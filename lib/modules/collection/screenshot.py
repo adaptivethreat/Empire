@@ -37,7 +37,7 @@ class Module:
                 'Value'         :   ''
             },
             'Ratio' : {
-                'Description'   :   "JPEG Compression ration 1 to 100.",
+                'Description'   :   "JPEG Compression ratio: 1 to 100.",
                 'Required'      :   False,
                 'Value'         :   ''
             }
