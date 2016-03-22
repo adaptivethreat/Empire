@@ -69,9 +69,15 @@ IP_WHITELIST = ""
 #   format is 192.168.1.1,192.168.1.10-192.168.1.100,10.0.0.0/8
 IP_BLACKLIST = ""
 
-#number of times an agent will call back without an answer prior to exiting
+# number of times an agent will call back without an answer prior to exiting
 DEFAULT_LOST_LIMIT = 60 
 
+# default credentials used to log into the RESTful API
+API_USERNAME = "empireadmin"
+API_PASSWORD = ''.join(random.sample(string.ascii_letters + string.digits + punctuation, 32))
+
+# the 'permanent' API token (doesn't change)
+API_PERMANENT_TOKEN = ''.join(random.choice(string.ascii_lowercase + string.digits) for x in range(40))
 
 
 ###################################################
@@ -105,11 +111,14 @@ c.execute('''CREATE TABLE config (
     "default_lost_limit" integer,
     "autorun_command" text,
     "autorun_data" text,
-    "api_token" text
+    "api_username" text,
+    "api_password" text,
+    "api_current_token" text,
+    "api_permanent_token" text
     )''')
 
 # kick off the config component of the database
-c.execute("INSERT INTO config VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, ?)", (STAGING_KEY,STAGE0_URI,STAGE1_URI,STAGE2_URI,DEFAULT_DELAY,DEFAULT_JITTER,DEFAULT_PROFILE,DEFAULT_CERT_PATH,DEFAULT_PORT,INSTALL_PATH,SERVER_VERSION,IP_WHITELIST,IP_BLACKLIST, DEFAULT_LOST_LIMIT, "", "", ""))
+c.execute("INSERT INTO config VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (STAGING_KEY,STAGE0_URI,STAGE1_URI,STAGE2_URI,DEFAULT_DELAY,DEFAULT_JITTER,DEFAULT_PROFILE,DEFAULT_CERT_PATH,DEFAULT_PORT,INSTALL_PATH,SERVER_VERSION,IP_WHITELIST,IP_BLACKLIST, DEFAULT_LOST_LIMIT, "", "", API_USERNAME, API_PASSWORD, "", API_PERMANENT_TOKEN))
 
 c.execute('''CREATE TABLE "agents" (
     "id" integer PRIMARY KEY,
