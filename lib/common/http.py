@@ -111,17 +111,18 @@ class RequestHandler(BaseHTTPRequestHandler):
         dispatcher.send("[*] Post to "+resource+" from "+str(sessionID)+" at "+clientIP, sender="HttpHandler")
 
         # read in the length of the POST data
-        length = int(self.headers.getheader('content-length'))
-        postData = self.rfile.read(length)
+        if self.headers.getheader('content-length'):
+            length = int(self.headers.getheader('content-length'))
+            postData = self.rfile.read(length)
 
-        # get the appropriate response for this agent
-        (code, responsedata) = self.server.agents.process_post(self.server.server_port, clientIP, sessionID, resource, postData)
+            # get the appropriate response for this agent
+            (code, responsedata) = self.server.agents.process_post(self.server.server_port, clientIP, sessionID, resource, postData)
 
-        # write the response out
-        self.send_response(code)
-        self.end_headers()
-        self.wfile.write(responsedata)
-        self.wfile.flush()
+            # write the response out
+            self.send_response(code)
+            self.end_headers()
+            self.wfile.write(responsedata)
+            self.wfile.flush()
         # self.wfile.close() # causes an error with HTTP comms
     
     # supress all the stupid default stdout/stderr output

@@ -10,7 +10,7 @@ class Module:
             'Author': ['@harmj0y'],
 
             'Description': ('Uses remote registry functionality to query all entries for the '
-                            'Windows Remote Desktop Connection Client" on a machine'),
+                            'Windows Remote Desktop Connection Client" on a machine. Part of PowerView.'),
 
             'Background' : True,
 

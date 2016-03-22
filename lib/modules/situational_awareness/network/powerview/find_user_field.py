@@ -5,11 +5,11 @@ class Module:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Find-ComputerField',
+            'Name': 'Find-UserField',
 
             'Author': ['@obscuresec', '@harmj0y'],
 
-            'Description': ("Searches user object fields for a given word (default *pass*). Default field being searched is 'description'."),
+            'Description': ("Searches user object fields for a given word (default *pass*). Default field being searched is 'description'. Part of PowerView."),
 
             'Background' : True,
 

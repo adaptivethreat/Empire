@@ -35,6 +35,11 @@ class Stager:
                 'Required'      :   True,
                 'Value'         :   ''
             },
+            'StagerRetries' : {
+                'Description'   :   'Times for the stager to retry connecting.',
+                'Required'      :   False,
+                'Value'         :   '0'
+            },
             'UserAgent' : {
                 'Description'   :   'User-agent string to use for the staging request (default, none, or other).',
                 'Required'      :   False,
@@ -77,7 +82,7 @@ class Stager:
         userAgent = self.options['UserAgent']['Value']
         proxy = self.options['Proxy']['Value']
         proxyCreds = self.options['ProxyCreds']['Value']
-
+        stagerRetries = self.options['StagerRetries']['Value']
 
         if not self.mainMenu.listeners.is_listener_valid(listenerName):
             # not a valid listener, return nothing for the script
@@ -85,7 +90,7 @@ class Stager:
             return ""
         else:
             # generate the PowerShell one-liner with all of the proper options set
-            launcher = self.mainMenu.stagers.generate_launcher(listenerName, encode=True, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds)
+            launcher = self.mainMenu.stagers.generate_launcher(listenerName, encode=True, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries)
 
             if launcher == "":
                 print helpers.color("[!] Error in launcher generation.")

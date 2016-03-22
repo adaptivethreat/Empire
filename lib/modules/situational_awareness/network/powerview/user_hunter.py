@@ -154,6 +154,6 @@ class Module:
                     else:
                         script += " -" + str(option) + " " + str(values['Value']) 
 
-        script += ' | ft -wrap | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
+        script += ' | fl | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
         
         return script

@@ -130,7 +130,7 @@ class Module:
             script += " -RevToSelf"
         elif self.options['WhoAmI']['Value'].lower() == "true":
             script += " -WhoAmI"
-        elif self.options['WhoAmI']['Value'].lower() == "true":
+        elif self.options['ShowAll']['Value'].lower() == "true":
             script += " -ShowAll | Out-String"
         else:
 

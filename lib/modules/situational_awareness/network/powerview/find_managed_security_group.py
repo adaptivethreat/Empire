@@ -5,13 +5,13 @@ class Module:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Find-ManagedSecurityGroups',
+            'Name': 'Find-ManagedSecurityGroup',
 
             'Author': ['@ukstufus'],
 
             'Description': ('This function retrieves all security groups in the domain and identifies ones that '
                             'have a manager set. It also determines whether the manager has the ability to add '
-                            'or remove members from the group.'),
+                            'or remove members from the group. Part of PowerView.'),
 
             'Background' : True,
 

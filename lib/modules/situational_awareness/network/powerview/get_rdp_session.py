@@ -5,11 +5,12 @@ class Module:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Get-NetGroupMember',
+            'Name': 'Get-NetRDPSession',
 
             'Author': ['@harmj0y'],
 
-            'Description': ('Returns the members of a given group, with the option to "Recurse" to find all effective group members. Part of PowerView.'),
+            'Description': ("Query a given RDP remote service for active sessions and originating IPs (replacement for qwinsta). "
+                            "Note: needs admin rights on the remote server you're querying"),
 
             'Background' : True,
 
@@ -35,45 +36,10 @@ class Module:
                 'Required'      :   True,
                 'Value'         :   ''
             },
-            'GroupName' : {
-                'Description'   :   'The group name to query for users.',
+            'ComputerName' : {
+                'Description'   :   'The hostname to query for active RDP sessions.',
                 'Required'      :   True,
-                'Value'         :   '"Domain Admins"'
-            },
-            'SID' : {
-                'Description'   :   'The Group SID to query for users.',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'Filter' : {
-                'Description'   :   'A customized ldap filter string to use, e.g. "(description=*admin*)"',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'Domain' : {
-                'Description'   :   'The domain to use for the query, defaults to the current domain.',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'DomainController' : {
-                'Description'   :   'Domain controller to reflect LDAP queries through.',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'FullData' : {
-                'Description'   :   'Return full group objects instead of just object names (the default).',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'Recurse' : {
-                'Description'   :   'Switch. If the group member is a group, recursively try to query its members as well.',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'UseMatchingRule' : {
-                'Description'   :   'Switch. Use LDAP_MATCHING_RULE_IN_CHAIN in the LDAP search query when -Recurse is specified.',
-                'Required'      :   False,
-                'Value'         :   ''
+                'Value'         :   'localhost'
             }
         }
 
@@ -119,5 +85,5 @@ class Module:
                         script += " -" + str(option) + " " + str(values['Value']) 
 
         script += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
-        
+
         return script

@@ -65,6 +65,11 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   ''
             },
+            'Unconstrained' : {
+                'Description'   :   "Switch. Return computer objects that have unconstrained delegation.",
+                'Required'      :   False,
+                'Value'         :   ''
+            },
             'FullData' : {
                 'Description'   :   "Switch. Return full computer objects instead of just system names (the default).",
                 'Required'      :   False,

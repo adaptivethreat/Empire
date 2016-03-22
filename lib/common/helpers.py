@@ -7,18 +7,9 @@ randomized stagers.
 
 """
 
+import re, string, commands, base64, binascii, sys, os, socket, sqlite3, iptools
 from time import localtime, strftime
 from Crypto.Random import random
-import re
-import string
-import commands
-import base64
-import binascii
-import sys
-import os
-import socket
-import sqlite3
-import iptools
 
 
 ###############################################################
@@ -224,7 +215,7 @@ def get_dependent_functions(code, functionNames):
         if re.search("[^A-Za-z']+"+functionName+"[^A-Za-z']+", code, re.IGNORECASE):
             dependentFunctions.add(functionName)
 
-    if re.search("\$Netapi32|\$Advapi32|\$Kernel32\$Wtsapi32", code, re.IGNORECASE):
+    if re.search("\$Netapi32|\$Advapi32|\$Kernel32|\$Wtsapi32", code, re.IGNORECASE):
         dependentFunctions |= set(["New-InMemoryModule", "func", "Add-Win32Type", "psenum", "struct"])
 
     return dependentFunctions
@@ -269,11 +260,11 @@ def find_all_dependent_functions(functions, functionsToProcess, resultFunctions=
     return resultFunctions
 
 
-def generate_dynamic_powershell_script(script, functionName):
+def generate_dynamic_powershell_script(script, functionNames):
     """
-    Takes a PowerShell script and a function name, generates a dictionary
-    of "[functionName] -> functionCode", and recurisvely maps all 
-    dependent functions for the specified function name.
+    Takes a PowerShell script and a function name (or array of function names,
+    generates a dictionary of "[functionNames] -> functionCode", and recursively 
+    maps all dependent functions for the specified function name.
 
     A script is returned with only the code necessary for the given
     functionName, stripped of comments and whitespace.
@@ -285,9 +276,13 @@ def generate_dynamic_powershell_script(script, functionName):
     newScript = ""
     psreflect_functions = ["New-InMemoryModule", "func", "Add-Win32Type", "psenum", "struct"]
 
+    if type(functionNames) is not list:
+        functionNames = [functionNames]
+
     # build a mapping of functionNames -> stripped function code
     functions = {}
-    pattern = re.compile(r'\nfunction.*?{.*?\n}\n', re.DOTALL)
+    # pattern = re.compile(r'\nfunction.*?{.*?\n}\n', re.DOTALL)
+    pattern = re.compile(r'\n(?:function|filter).*?{.*?\n}\n', re.DOTALL)
 
     for match in pattern.findall(script):
         name = match[:40].split()[1]
@@ -295,7 +290,11 @@ def generate_dynamic_powershell_script(script, functionName):
 
     # recursively enumerate all possible function dependencies and
     #   start building the new result script
-    functionDependencies = find_all_dependent_functions(functions, functionName, [])
+    functionDependencies = []
+
+    for functionName in functionNames:        
+        functionDependencies += find_all_dependent_functions(functions, functionName, [])
+        functionDependencies = unique(functionDependencies)
 
     for functionDependency in functionDependencies:
         try:
@@ -493,7 +492,7 @@ def get_config(fields):
     conn.isolation_level = None
 
     cur = conn.cursor()
-    cur.execute("SELECT "+fields+" FROM config")
+    cur.execute("SELECT %s FROM config" %(fields))
     results = cur.fetchone()
     cur.close()
     conn.close()
@@ -612,14 +611,6 @@ def uniquify_tuples(tuples):
     # cred format- (credType, domain, username, password, hostname, sid)
     seen = set()
     return [item for item in tuples if "%s%s%s%s"%(item[0],item[1],item[2],item[3]) not in seen and not seen.add("%s%s%s%s"%(item[0],item[1],item[2],item[3]))]
-
-
-def urldecode(url):
-    """
-    URL decode a string.
-    """
-    rex=re.compile('%([0-9a-hA-H][0-9a-hA-H])',re.M)
-    return rex.sub(htc,url)
 
 
 def decode_base64(data):

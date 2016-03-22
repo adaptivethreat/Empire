@@ -9,7 +9,8 @@ class Module:
 
             'Author': ['@harmj0y', '@pyrotek3'],
 
-            'Description': ('Returns the ACLs associated with a specific active directory object. Part of PowerView.'),
+            'Description': ('Returns the ACLs associated with a specific active directory object. Part of PowerView. '
+                'WARNING: specify a specific object, otherwise a huge amount of data will be returned.'),
 
             'Background' : True,
 

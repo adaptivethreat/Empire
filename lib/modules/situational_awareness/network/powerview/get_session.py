@@ -9,7 +9,7 @@ class Module:
 
             'Author': ['@harmj0y'],
 
-            'Description': ('Execute the NetSessionEnum Win32API call to query a given host for active sessions on the host.'),
+            'Description': ('Execute the NetSessionEnum Win32API call to query a given host for active sessions on the host. Part of PowerView.'),
 
             'Background' : True,
 

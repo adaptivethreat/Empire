@@ -1,13 +1,704 @@
 #!/usr/bin/python
 
-import sqlite3, argparse
+import sqlite3, argparse, sys, argparse, logging, json, string, os, re, time, signal
+from flask import Flask, request, jsonify, make_response, abort
+from time import localtime, strftime
+from OpenSSL import SSL
+from Crypto.Random import random
 
 # Empire imports
 from lib.common import empire
-from lib.common import listeners
-from lib.common import http
-from lib.common import packets
-from lib.common import messages
+
+
+#####################################################
+#
+# Database interaction methods for the RESTful API
+#
+#####################################################
+
+def database_connect():
+    """
+    Connect with the backend ./empire.db sqlite database and return the
+    connection object.
+    """
+    try:
+        # set the database connectiont to autocommit w/ isolation level
+        conn = sqlite3.connect('./data/empire.db', check_same_thread=False)
+        conn.text_factory = str
+        conn.isolation_level = None
+        return conn
+
+    except Exception as e:
+        print helpers.color("[!] Could not connect to database")
+        print helpers.color("[!] Please run database_setup.py")
+        sys.exit()
+
+
+def execute_db_query(conn, query, args=None):
+    """
+    Execute the supplied query on the provided db conn object
+    with optional args for a paramaterized query.
+    """
+    cur = conn.cursor()
+    if(args):
+        cur.execute(query, args)
+    else:
+        cur.execute(query)
+    results = cur.fetchall()
+    cur.close()
+    return results    
+
+
+def refresh_api_token(conn):
+    """
+    Generates a randomized RESTful API token and updates the value
+    in the config stored in the backend database.
+    """
+
+    # generate a randomized API token
+    apiToken = ''.join(random.choice(string.ascii_lowercase + string.digits) for x in range(40))
+
+    execute_db_query(conn, "UPDATE config SET api_current_token=?", [apiToken])
+
+    return apiToken
+
+
+def get_permanent_token(conn):
+    """
+    Returns the permanent API token stored in empire.db.
+
+    If one doesn't exist, it will generate one and store it before returning.
+    """
+
+    permanentToken = execute_db_query(conn, "SELECT api_permanent_token FROM config")[0]
+    if not permanentToken[0]:
+        permanentToken = ''.join(random.choice(string.ascii_lowercase + string.digits) for x in range(40))
+        execute_db_query(conn, "UPDATE config SET api_permanent_token=?", [permanentToken])
+
+    return permanentToken[0]
+
+
+####################################################################
+#
+# The Empire RESTful API.
+# 
+# Adapted from http://blog.miguelgrinberg.com/post/designing-a-restful-api-with-python-and-flask
+#   example code at https://gist.github.com/miguelgrinberg/5614326
+#
+#    Verb    URI                                                 Action
+#    ----    ---                                                 ------
+#    GET     http://localhost:1337/empire/api/version            return the current Empire version
+#    
+#    GET     http://localhost:1337/empire/api/config             return the current default config
+#
+#    GET     http://localhost:1337/empire/api/stagers            return all current stagers
+#    GET     http://localhost:1337/empire/api/stagers/X          return the stager with name X
+#    POST    http://localhost:1337/empire/api/stagers            generate a stager given supplied options (need to implement)
+#
+#    GET     http://localhost:1337/empire/api/modules            return all current modules
+#
+#    GET     http://localhost:1337/empire/api/listeners          return all current listeners
+#    GET     http://localhost:1337/empire/api/listeners/Y        return the listener with id Y
+#    GET     http://localhost:1337/empire/api/listeners/options  return all listener options
+#    POST    http://localhost:1337/empire/api/listeners          starts a new listener with the specified options
+#    DELETE  http://localhost:1337/empire/api/listeners/Y        kills listener Y
+#
+#    GET     http://localhost:1337/empire/api/agents             return all current agents
+#    GET     http://localhost:1337/empire/api/agents/Y           return the agent with name Y
+#    GET     http://localhost:1337/empire/api/agents/Y/results   return tasking results for the agent with name Y
+#    POST    http://localhost:1337/empire/api/agents/Y           modify or task agent with Y
+#    DELETE  http://localhost:1337/empire/api/agents/Y           removes agent Y from the database
+#    DELETE  http://localhost:1337/empire/api/agents/stale       removes stale agents from the database
+#
+#    GET     http://localhost:1337/empire/api/reporting          return all logged events
+#    GET     http://localhost:1337/empire/api/reporting/agent/X  return all logged events for the given agent name X
+#    GET     http://localhost:1337/empire/api/reporting/type/Y   return all logged events of type Y (checkin, task, result, rename)
+#    GET     http://localhost:1337/empire/api/reporting/msg/Z    return all logged events matching message Z, wildcards accepted
+#
+#    GET     http://localhost:1337/empire/api/admin/shutdown     shutdown the RESTful API
+#    GET     http://localhost:1337/empire/api/admin/login        retrieve the API token given the correct username and password
+#    GET     http://localhost:1337/empire/api/admin/permanenttoken retrieve the permanent API token, generating/storing one if it doesn't already exist
+#    
+####################################################################
+
+def start_restful_api(startEmpire=False, suppress=False, username=None, password=None, port=1337):
+    """
+    Kick off the RESTful API with the given parameters.
+
+    startEmpire -   start a complete Empire server in the backend as well
+    suppress    -   suppress most console output
+    username    -   optional username to use for the API, otherwise pulls from the empire.db config
+    password    -   optional password to use for the API, otherwise pulls from the empire.db config
+    port        -   port to start the API on, defaults to 1337 ;)
+    """
+
+    app = Flask(__name__)
+
+    conn = database_connect()
+
+    # if a username/password were not supplied, use the creds stored in the db
+    (dbUsername, dbPassword) = execute_db_query(conn, "SELECT api_username, api_password FROM config")[0]
+
+    if not username:
+        username = dbUsername
+
+    if not password:
+        password = dbPassword
+
+
+    class Namespace:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+    # instantiate an Empire instance in case we need to interact with stagers or listeners
+    args = Namespace(debug=None, listener=None, stager=None, stager_options=None, version=False)
+
+    print ""
+
+    if startEmpire:
+        # if we want to start a full-running empire instance
+        print " * Starting a full Empire instance"
+        main = empire.MainMenu(args=args)
+    else:
+        # if we just want the RESTful API, i.e. no listener/etc. startup
+        main = empire.MainMenu(args=args, restAPI=True)
+
+
+    print " * Starting Empire RESTful API on port: %s" %(port)
+
+    # refresh the token for the RESTful API
+    apiToken = refresh_api_token(conn)
+    print " * RESTful API token: %s" %(apiToken)
+
+    permanentApiToken = get_permanent_token(conn)
+    tokenAllowed = re.compile("^[0-9a-z]{40}")
+
+    oldStdout = sys.stdout
+    if suppress:
+        # suppress the normal Flask output
+        log = logging.getLogger('werkzeug')
+        log.setLevel(logging.ERROR)   
+
+        # suppress all stdout and don't initiate the main cmdloop
+        sys.stdout = open(os.devnull, 'w')
+
+
+    # validate API token before every request except for the login URI
+    @app.before_request
+    def check_token():
+        if request.path != '/empire/api/admin/login':
+            token = request.args.get('token')
+            if (not token) or (not tokenAllowed.match(token)):
+                return make_response('', 403)
+            if (token != apiToken) and (token != permanentApiToken):
+                return make_response('', 403)
+
+
+    @app.errorhandler(Exception)
+    def exception_handler(error):
+        return repr(error)
+
+
+    @app.errorhandler(404)
+    def not_found(error):
+        return make_response(jsonify( { 'error': 'Not found' } ), 404)
+
+
+    @app.route('/empire/api/version', methods=['GET'])
+    def get_version():
+        """
+        Returns the current Empire version.
+        """
+        return jsonify({'version': empire.VERSION})
+
+
+    @app.route('/empire/api/config', methods=['GET'])
+    def get_config():
+        """
+        Returns JSON of the current Empire config.
+        """
+        configRaw = execute_db_query(conn, 'SELECT * FROM config')
+
+        [staging_key, stage0_uri, stage1_uri, stage2_uri, default_delay, default_jitter, default_profile, default_cert_path, default_port, install_path, server_version, ip_whitelist, ip_blacklist, default_lost_limit, autorun_command, autorun_data, current_api_token, permanent_api_token] = configRaw[0]
+        config = {"version":empire.VERSION, "staging_key":staging_key, "stage0_uri":stage0_uri, "stage1_uri":stage1_uri, "stage2_uri":stage2_uri, "default_delay":default_delay, "default_jitter":default_jitter, "default_profile":default_profile, "default_cert_path":default_cert_path, "default_port":default_port, "install_path":install_path, "server_version":server_version, "ip_whitelist":ip_whitelist, "ip_blacklist":ip_blacklist, "default_lost_limit":default_lost_limit, "autorun_command":autorun_command, "autorun_data":autorun_data, "current_api_token":current_api_token, "permanent_api_token":permanent_api_token}
+        return jsonify({'config': config})
+
+
+    @app.route('/empire/api/stagers', methods=['GET'])
+    def get_stagers():
+        """
+        Returns JSON describing all stagers.
+        """
+        stagerInfo = {}
+        for stagerName,stager in main.stagers.stagers.iteritems():
+            info = stager.info
+            info['options'] = stager.options
+            stagerInfo[stagerName] = info
+
+        return jsonify({'stagers': stagerInfo})
+
+
+    @app.route('/empire/api/stagers/<string:stager_name>', methods=['GET'])
+    def get_stagers_name(stager_name):
+        """
+        Returns JSON describing the specified stager_name passed.
+        """
+        stagerInfo = {}
+        for stagerName,stager in main.stagers.stagers.iteritems():
+            if(stagerName == stager_name):
+                info = stager.info
+                info['options'] = stager.options
+                stagerInfo[stagerName] = info
+
+        return jsonify({'stagers': stagerInfo})
+
+
+    @app.route('/empire/api/stagers', methods=['POST'])
+    def generate_stager():
+        """
+        Generates a stager with the supplied config and returns JSON information
+        describing the generated stager, with 'Output' being the stager output.
+
+        Required JSON args:
+            StagerName      -   the stager name to generate
+            Listener        -   the Listener name to use for the stager
+        """
+        if not request.json or not 'StagerName' in request.json or not 'Listener' in request.json:
+            abort(400)
+        
+        stagerName = request.json['StagerName']
+        listener = request.json['Listener']
+
+        if stagerName not in main.stagers.stagers:
+            return jsonify({'error': 'StagerName invalid'})
+
+        if not main.listeners.is_listener_valid(listener):
+            return jsonify({'error': 'invalid listener ID or name'})
+
+        stager = main.stagers.stagers[stagerName]
+        
+        # set all passed options
+        for option,values in request.json.iteritems():
+            if option != 'StagerName':
+                if(option not in stager.options):
+                    return jsonify({'error': 'Invalid option %s, check capitalization.' %(option)})
+                stager.options[option]['Value'] = values
+
+        # validate stager options
+        for option,values in stager.options.iteritems():
+            if values['Required'] and ((not values['Value']) or (values['Value'] == '')):
+                return jsonify({'error': 'required stager options missing'})
+
+        stagerOut = stager.options
+        stagerOut['Output'] = stager.generate()
+
+        return jsonify({stagerName: stagerOut})
+
+
+    @app.route('/empire/api/modules', methods=['GET'])
+    def get_modules():
+        """
+        Returns JSON describing all currently loaded modules.
+        """
+        moduleInfo = {}
+        for moduleName,module in main.modules.modules.iteritems():
+            info = module.info
+            info['options'] = module.options
+            moduleInfo[moduleName] = info
+
+        return jsonify({'modules': moduleInfo})
+
+
+    @app.route('/empire/api/listeners', methods=['GET'])
+    def get_listeners():
+        """
+        Returns JSON describing all currently registered listeners.
+        """
+        activeListenersRaw = execute_db_query(conn, 'SELECT * FROM listeners')
+        activeListeners = {}
+
+        for activeListener in activeListenersRaw:
+            [ID,name,host,port,cert_path,staging_key,default_delay,default_jitter,default_profile,kill_date,working_hours,listener_type,redirect_target,default_lost_limit] = activeListener
+            activeListeners[name] = {'ID':ID, 'name':name, 'host':host, 'port':port, 'cert_path':cert_path, 'staging_key':staging_key, 'default_delay':default_delay, 'default_jitter':default_jitter, 'default_profile':default_profile, 'kill_date':kill_date, 'working_hours':working_hours, 'listener_type':listener_type, 'redirect_target':redirect_target, 'default_lost_limit':default_lost_limit}
+
+        return jsonify({'listeners' : activeListeners})
+
+
+    @app.route('/empire/api/listeners/<string:listener_name>', methods=['GET'])
+    def get_listener_name(listener_name):
+        """
+        Returns JSON describing the listener specified by listener_name.
+        """
+        activeListenersRaw = execute_db_query(conn, 'SELECT * FROM listeners')
+        activeListeners = {}
+
+        for activeListener in activeListenersRaw:
+            [ID,name,host,port,cert_path,staging_key,default_delay,default_jitter,default_profile,kill_date,working_hours,listener_type,redirect_target,default_lost_limit] = activeListener
+            if name == listener_name:
+                activeListeners[name] = {'ID':ID, 'name':name, 'host':host, 'port':port, 'cert_path':cert_path, 'staging_key':staging_key, 'default_delay':default_delay, 'default_jitter':default_jitter, 'default_profile':default_profile, 'kill_date':kill_date, 'working_hours':working_hours, 'listener_type':listener_type, 'redirect_target':redirect_target, 'default_lost_limit':default_lost_limit}
+
+        return jsonify({'listeners' : activeListeners})
+
+
+    @app.route('/empire/api/listeners/<string:listener_name>', methods=['DELETE'])
+    def kill_listener(listener_name):
+        """
+        Kills the listener specified by listener_name.
+        """
+
+        if listener_name.lower() == "all":
+            activeListenersRaw = execute_db_query(conn, 'SELECT * FROM listeners')
+            for activeListener in activeListenersRaw:
+                [ID,name,host,port,cert_path,staging_key,default_delay,default_jitter,default_profile,kill_date,working_hours,listener_type,redirect_target,default_lost_limit] = activeListener
+                main.listeners.shutdown_listener(name)
+                main.listeners.delete_listener(name)
+
+            return jsonify({'result': True})
+        else:
+            if listener_name != "" and main.listeners.is_listener_valid(listener_name):
+                main.listeners.shutdown_listener(listener_name)
+                main.listeners.delete_listener(listener_name)
+                return jsonify({'result': True})
+            else:
+                return jsonify({'error': 'invalid listener name: %s' %(listener_name)})
+
+
+    @app.route('/empire/api/listeners/options', methods=['GET'])
+    def get_listener_options():
+        """
+        Returns JSON describing the current listener options.
+        """
+        return jsonify({'ListenerOptions' : main.listeners.options})
+
+
+    @app.route('/empire/api/listeners', methods=['POST'])
+    def start_listener():
+        """
+        Starts a listener with options supplied in the POST.
+        """
+
+        # set all passed options
+        for option,values in request.json.iteritems():
+            returnVal = main.listeners.set_listener_option(option, values)
+            if not returnVal:
+                return jsonify({'error': 'Error setting listener value %s with option %s' %(option, values)})
+
+        valid = main.listeners.validate_listener_options()
+        if not valid:
+            return jsonify({'error': 'Error validating listener options'})
+
+        main.listeners.add_listener_from_config()
+        return jsonify({'result': True})
+
+
+    @app.route('/empire/api/agents', methods=['GET'])
+    def get_agents():
+        """
+        Returns JSON describing all currently registered agents.
+        """
+        activeAgentsRaw = execute_db_query(conn, 'SELECT * FROM agents')
+        activeAgents = {}
+        
+        for activeAgent in activeAgentsRaw:
+            [ID, sessionID, listener, name, delay, jitter, external_ip, internal_ip, username, high_integrity, process_name, process_id, hostname, os_details, session_key, checkin_time, lastseen_time, parent, children, servers, uris, old_uris, user_agent, headers, functions, kill_date, working_hours, ps_version, lost_limit, taskings, results] = activeAgent
+            activeAgents[name] = {"ID":ID, "sessionID":sessionID, "listener":listener, "name":name, "delay":delay, "jitter":jitter, "external_ip":external_ip, "internal_ip":internal_ip, "username":username, "high_integrity":high_integrity, "process_name":process_name, "process_id":process_id, "hostname":hostname, "os_details":os_details, "session_key":session_key, "checkin_time":checkin_time, "lastseen_time":lastseen_time, "parent":parent, "children":children, "servers":servers, "uris":uris, "old_uris":old_uris, "user_agent":user_agent, "headers":headers, "functions":functions, "kill_date":kill_date, "working_hours":working_hours, "ps_version":ps_version, "lost_limit":lost_limit, "taskings":taskings, "results":results}
+
+        return jsonify({'agents' : activeAgents})
+
+
+    @app.route('/empire/api/agents/<string:agent_name>', methods=['GET'])
+    def get_agents_name(agent_name):
+        """
+        Returns JSON describing the agent specified by agent_name.
+        """
+        activeAgentsRaw = execute_db_query(conn, 'SELECT * FROM agents WHERE name=? OR session_id=?', [agent_name, agent_name])
+        activeAgents = {}
+        
+        for activeAgent in activeAgentsRaw:
+            [ID, sessionID, listener, name, delay, jitter, external_ip, internal_ip, username, high_integrity, process_name, process_id, hostname, os_details, session_key, checkin_time, lastseen_time, parent, children, servers, uris, old_uris, user_agent, headers, functions, kill_date, working_hours, ps_version, lost_limit, taskings, results] = activeAgent
+            activeAgents[name] = {"ID":ID, "sessionID":sessionID, "listener":listener, "name":name, "delay":delay, "jitter":jitter, "external_ip":external_ip, "internal_ip":internal_ip, "username":username, "high_integrity":high_integrity, "process_name":process_name, "process_id":process_id, "hostname":hostname, "os_details":os_details, "session_key":session_key, "checkin_time":checkin_time, "lastseen_time":lastseen_time, "parent":parent, "children":children, "servers":servers, "uris":uris, "old_uris":old_uris, "user_agent":user_agent, "headers":headers, "functions":functions, "kill_date":kill_date, "working_hours":working_hours, "ps_version":ps_version, "lost_limit":lost_limit, "taskings":taskings, "results":results}
+
+        return jsonify({'agents' : activeAgents})
+
+
+    @app.route('/empire/api/agents/<string:agent_name>/results', methods=['GET'])
+    def get_agent_results(agent_name):
+        """
+        Returns JSON describing the agent's results and removes the result field
+        from the backend database.
+        """
+
+        agentResults = execute_db_query(conn, 'SELECT results FROM agents WHERE name=? OR session_id=?', [agent_name, agent_name])[0]
+
+        if agentResults and agentResults[0] and agentResults[0] != '':
+            out = json.loads(agentResults[0])
+            if(out):
+                agentResults = "\n".join(out)
+            else:
+                agentResults = ''
+        else:
+            agentResults = ''
+
+        execute_db_query(conn, 'UPDATE agents SET results=? WHERE name=? OR session_id=?', ['', agent_name, agent_name])
+
+        return jsonify({agent_name : {'Results': agentResults}})
+
+
+    # TODO: add get /name/results to get/clear results from DB
+    @app.route('/empire/api/agents/<string:agent_name>', methods=['POST'])
+    def modify_agent(agent_name):
+        """
+        Modifies an agent with name agent_name.
+        Used for tasking, clearing tasking, setting sleep, renaming, and killing.
+        """
+
+        if 'Task' in request.json.keys():
+
+            if agent_name.lower() == "all":
+                agent_name = '%'
+
+            taskName = request.json['Task']['TaskName']
+            task = request.json['Task']['Task']
+
+            # get existing agent taskings
+            agentTasks = execute_db_query(conn, 'SELECT taskings FROM agents WHERE name like ? OR session_id like ?', [agent_name, agent_name])[0]
+
+            if(agentTasks and agentTasks[0]):
+                agentTasks = json.loads(agentTasks[0])
+            else:
+                agentTasks = []
+
+            # append our new json-ified task and update the backend
+            agentTasks.append([taskName, task])
+            execute_db_query(conn, "UPDATE agents SET taskings=? WHERE name=? OR session_id=?", [json.dumps(agentTasks), agent_name, agent_name])
+
+            timeStamp = strftime("%Y-%m-%d %H:%M:%S", localtime())
+            execute_db_query(conn, "INSERT INTO reporting (name,event_type,message,time_stamp) VALUES (?,?,?,?)", (agent_name,"task",taskName + " - " + task[0:50], timeStamp ))
+            return jsonify({'AgentName':agent_name, 'TaskType':'Task', 'TaskName':taskName, 'Task':task})
+
+
+        elif 'Clear' in request.json.keys():
+
+            if agent_name.lower() == "all":
+                agent_name = '%'
+
+            execute_db_query(conn, "UPDATE agents SET taskings=? WHERE name like ? OR session_id like ?", ['', agent_name, agent_name])
+
+            return jsonify({'AgentName':agent_name, 'TaskType':'Clear', 'TaskName':'', 'Task':''})
+
+
+        elif 'Rename' in request.json.keys():
+            oldName = request.json['Rename']['OldName']
+            newName = request.json['Rename']['NewName']
+
+            try:
+                main.agents.rename_agent(oldName, newName)
+                return jsonify({'result': True})
+            except:
+                return jsonify({'error': 'error in renaming %s to %s' %(oldName, newName)})
+            
+
+        return jsonify({'error':'error in tasking agent %s' % (agent_name)})
+
+
+    @app.route('/empire/api/agents/<string:agent_name>', methods=['DELETE'])
+    def remove_agent(agent_name):
+        """
+        Removes an agent from the controller specified by agent_name.
+        WARNING: doesn't kill the agent first! Ensure the agent is dead.
+        """
+        if agent_name.lower() == "all":
+            agent_name = '%'
+
+        agentsRaw = execute_db_query(conn, 'SELECT * FROM agents WHERE name like ? OR session_id like ?', [agent_name, agent_name])
+        removedAgents = {}
+
+        for agent in agentsRaw:
+            [ID, sessionID, listener, name, delay, jitter, external_ip, internal_ip, username, high_integrity, process_name, process_id, hostname, os_details, session_key, checkin_time, lastseen_time, parent, children, servers, uris, old_uris, user_agent, headers, functions, kill_date, working_hours, ps_version, lost_limit, taskings, results] = agent
+            execute_db_query(conn, "DELETE FROM agents WHERE session_id LIKE ?", [sessionID])
+
+            removedAgents[name] = {"ID":ID, "sessionID":sessionID, "listener":listener, "name":name, "delay":delay, "jitter":jitter, "external_ip":external_ip, "internal_ip":internal_ip, "username":username, "high_integrity":high_integrity, "process_name":process_name, "process_id":process_id, "hostname":hostname, "os_details":os_details, "session_key":session_key, "checkin_time":checkin_time, "lastseen_time":lastseen_time, "parent":parent, "children":children, "servers":servers, "uris":uris, "old_uris":old_uris, "user_agent":user_agent, "headers":headers, "functions":functions, "kill_date":kill_date, "working_hours":working_hours, "ps_version":ps_version, "lost_limit":lost_limit, "taskings":taskings, "results":results}
+
+        return jsonify({'RemovedAgents': removedAgents})
+
+
+    @app.route('/empire/api/agents/stale', methods=['DELETE'])
+    def remove_stale_agent():
+        """
+        Removes stale agents from the controller.
+        WARNING: doesn't kill the agent first! Ensure the agent is dead.
+        """
+        agentsRaw = execute_db_query(conn, 'SELECT * FROM agents')
+        removedAgents = {}
+        
+        for agent in agentsRaw:
+            [ID, sessionID, listener, name, delay, jitter, external_ip, internal_ip, username, high_integrity, process_name, process_id, hostname, os_details, session_key, checkin_time, lastseen_time, parent, children, servers, uris, old_uris, user_agent, headers, functions, kill_date, working_hours, ps_version, lost_limit, taskings, results] = agent
+
+            intervalMax = (delay + delay * jitter)+30
+
+            # get the agent last check in time
+            agentTime = time.mktime(time.strptime(lastseen_time, "%Y-%m-%d %H:%M:%S"))
+
+            if agentTime < time.mktime(time.localtime()) - intervalMax:
+                execute_db_query(conn, "DELETE FROM agents WHERE session_id LIKE ?", [sessionID])
+
+                removedAgents[name] = {"ID":ID, "sessionID":sessionID, "listener":listener, "name":name, "delay":delay, "jitter":jitter, "external_ip":external_ip, "internal_ip":internal_ip, "username":username, "high_integrity":high_integrity, "process_name":process_name, "process_id":process_id, "hostname":hostname, "os_details":os_details, "session_key":session_key, "checkin_time":checkin_time, "lastseen_time":lastseen_time, "parent":parent, "children":children, "servers":servers, "uris":uris, "old_uris":old_uris, "user_agent":user_agent, "headers":headers, "functions":functions, "kill_date":kill_date, "working_hours":working_hours, "ps_version":ps_version, "lost_limit":lost_limit, "taskings":taskings, "results":results}
+
+        return jsonify({'RemovedAgents': removedAgents})
+
+
+    @app.route('/empire/api/reporting', methods=['GET'])
+    def get_reporting():
+        """
+        Returns JSON describing the reporting events from the backend database.
+        """
+        reportingRaw = execute_db_query(conn, 'SELECT * FROM reporting')
+        reportingEvents = {}
+        
+        for reportingEvent in reportingRaw:
+            [ID, name, eventType, message, timestamp] = reportingEvent
+            reportingEvents[ID] = {"ID":ID, "name":name, "event_type":eventType, "message":message, "timestamp":timestamp}
+
+        return jsonify({'reporting' : reportingEvents})
+
+
+    @app.route('/empire/api/reporting/agent/<string:reporting_agent>', methods=['GET'])
+    def get_reporting_agent(reporting_agent):
+        """
+        Returns JSON describing the reporting events from the backend database for
+        the agent specified by reporting_agent.
+        """
+
+        # first resolve the supplied name to a sessionID
+        results = execute_db_query(conn, 'SELECT session_id FROM agents WHERE name=?', [reporting_agent])
+        if(results):
+            sessionID = results[0][0]
+        else:
+            return jsonify({'reporting' : ''})
+
+        reportingRaw = execute_db_query(conn, 'SELECT * FROM reporting WHERE name=?', [sessionID])
+        reportingEvents = {}
+        
+        for reportingEvent in reportingRaw:
+            [ID, name, eventType, message, timestamp] = reportingEvent
+            reportingEvents[ID] = {"ID":ID, "name":name, "event_type":eventType, "message":message, "timestamp":timestamp}
+
+        return jsonify({'reporting' : reportingEvents})
+
+
+    @app.route('/empire/api/reporting/type/<string:event_type>', methods=['GET'])
+    def get_reporting_type(event_type):
+        """
+        Returns JSON describing the reporting events from the backend database for
+        the event type specified by event_type.
+        """
+        reportingRaw = execute_db_query(conn, 'SELECT * FROM reporting WHERE event_type=?', [event_type])
+        reportingEvents = {}
+        
+        for reportingEvent in reportingRaw:
+            [ID, name, eventType, message, timestamp] = reportingEvent
+            reportingEvents[ID] = {"ID":ID, "name":name, "event_type":eventType, "message":message, "timestamp":timestamp}
+
+        return jsonify({'reporting' : reportingEvents})
+
+
+    @app.route('/empire/api/reporting/msg/<string:msg>', methods=['GET'])
+    def get_reporting_msg(msg):
+        """
+        Returns JSON describing the reporting events from the backend database for
+        the any messages with *msg* specified by msg.
+        """
+        reportingRaw = execute_db_query(conn, "SELECT * FROM reporting WHERE message like ?", ['%'+msg+'%'])
+        reportingEvents = {}
+        
+        for reportingEvent in reportingRaw:
+            [ID, name, eventType, message, timestamp] = reportingEvent
+            reportingEvents[ID] = {"ID":ID, "name":name, "event_type":eventType, "message":message, "timestamp":timestamp}
+
+        return jsonify({'reporting' : reportingEvents})
+
+
+    @app.route('/empire/api/admin/shutdown', methods=['GET', 'POST', 'PUT'])
+    def shutdown_server():
+        """
+        Signal a shutdown for the Flask server and any Empire server.
+        """
+        shutdown_server()
+        return jsonify({'result': True})
+
+
+    @app.route('/empire/api/admin/login', methods=['POST'])
+    def server_login():
+        """
+        Takes a supplied username and password and returns the current API token
+        if authentication is accepted.
+        """
+
+        if not request.json or not 'username' in request.json or not 'password' in request.json:
+            abort(400)
+
+        suppliedUsername = request.json['username']
+        suppliedPassword = request.json['password']
+
+        # try to prevent some basic bruting
+        time.sleep(2)
+        
+        if suppliedUsername == username and suppliedPassword == password:
+            return jsonify({'token': apiToken})
+        else:
+            return make_response('', 401)
+
+
+    @app.route('/empire/api/admin/permanenttoken', methods=['GET'])
+    def get_server_perm_token():
+        """
+        Returns the 'permanent' API token for the server.
+        """
+        permanentToken = get_permanent_token(conn)
+        return jsonify({'token': permanentToken})
+
+
+    if not os.path.exists('./data/empire.pem'):
+        print "[!] Error: cannot find certificate ./data/empire.pem"
+        sys.exit()
+
+
+    def shutdown_server():
+        """
+        Shut down the Flask server and any Empire server gracefully.
+        """
+        if suppress:
+            # repair stdout
+            sys.stdout.close()
+            sys.stdout = oldStdout
+
+        print "\n[*]Shutting down Empire RESTful API"
+
+        func = request.environ.get('werkzeug.server.shutdown')
+        if func is not None:
+            func()
+
+        if conn: conn.close()
+        
+        if startEmpire:
+            print "Shutting down the Empire instance"
+            main.shutdown()
+
+
+    # override the keyboardinterrupt signal handler so we can gracefully shut everything down
+    def signal_handler(signal, frame):
+        
+        with app.test_request_context():
+            shutdown_server()
+        sys.exit(0)
+    
+
+    signal.signal(signal.SIGINT, signal_handler)
+
+    # wrap the Flask connection in SSL and start it
+    context = ('./data/empire.pem', './data/empire.pem')
+    app.run(host='0.0.0.0', port=port, ssl_context=context, threaded=True)
+
 
 
 if __name__ == '__main__':
@@ -19,11 +710,27 @@ if __name__ == '__main__':
     parser.add_argument('-o', '--stager-options', nargs='*', help="Supply options to set for a stager in OPTION=VALUE format. Lists options if nothing is specified.")
     parser.add_argument('-l', '--listener', nargs='?', const="list", help='Display listener options. Displays all listeners if nothing is specified.')
     parser.add_argument('-v', '--version', action='store_true', help='Display current Empire version.')
+    parser.add_argument('--rest', action='store_true', help='Run the Empire RESTful API.')
+    parser.add_argument('--headless', action='store_true', help='Run Empire and the RESTful API headless without the usual interface.')
+    parser.add_argument('--username', nargs='?', help='Start the RESTful API with the specified username instead of pulling from empire.db')
+    parser.add_argument('--password', nargs='?', help='Start the RESTful API with the specified password instead of pulling from empire.db')
 
     args = parser.parse_args()
 
     if args.version:
         print empire.VERSION
+
+    elif args.rest:
+        # start just the RESTful API
+        start_restful_api(startEmpire=False, suppress=False, username=args.username, password=args.password, port=1337)
+
+    elif args.headless:
+        # start an Empire instance and RESTful API and suppress output
+        start_restful_api(startEmpire=True, suppress=True, username=args.username, password=args.password, port=1337)
+
     else:
+        # normal execution
         main = empire.MainMenu(args=args)
         main.cmdloop()
+
+    sys.exit()

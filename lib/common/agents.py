@@ -12,12 +12,7 @@ the response types are handled as appropriate.
 """
 
 from pydispatch import dispatcher
-import sqlite3
-import pickle
-import base64
-import string
-import os
-import iptools
+import sqlite3, pickle, base64, string, os, iptools, json
 
 # Empire imports
 import encryption
@@ -40,31 +35,28 @@ class Agents:
         self.installPath = self.mainMenu.installPath
 
         self.args = args
-
-        # internal agent dictionary for the client's session key and tasking/result sets
-        #   self.agents[sessionID] = [  clientSessionKey, 
-        #                               [tasking1, tasking2, ...],
-        #                               [results1, results2, ...],
-        #                               [tab-completable function names for a script-import],
-        #                               current URIs,
-        #                               old URIs
-        #                            ]
+        
+        # internal agent dictionary for the client's session key, funcions, and URI sets
+        #   this is done to prevent database reads for extremely common tasks (like checking tasking URI existence)
+        #   self.agents[sessionID] = {  'sessionKey' : clientSessionKey,
+        #                               'functions' : [tab-completable function names for a script-import],
+        #                               'currentURIs' : [current URIs used by the client],
+        #                               'oldURIs' : [old URIs used by the client]
+        #                            }
         self.agents = {}
 
         # reinitialize any agents that already exist in the database
         agentIDs = self.get_agent_ids()
         for agentID in agentIDs:
-            sessionKey = self.get_agent_session_key(agentID)
-            functions = self.get_agent_functions_database(agentID)
+            self.agents[agentID] = {}
+            self.agents[agentID]['sessionKey'] = self.get_agent_session_key(agentID)
+            self.agents[agentID]['functions'] = self.get_agent_functions_database(agentID)
 
             # get the current and previous URIs for tasking
-            uris,old_uris = self.get_agent_uris(agentID)
-            
-            if not old_uris:
-                old_uris = ""
-            
-            # [sessionKey, taskings, results, stored_functions, tasking uris, old uris]
-            self.agents[agentID] = [sessionKey, [], [], functions, uris, old_uris]
+            currentURIs,oldURIs = self.get_agent_uris(agentID)
+            if not oldURIs: oldURIs = ''
+            self.agents[agentID]['currentURIs'] = currentURIs
+            self.agents[agentID]['oldURIs'] = oldURIs
 
         # pull out common configs from the main menu object in empire.py
         self.ipWhiteList = self.mainMenu.ipWhiteList
@@ -92,13 +84,13 @@ class Agents:
         # remove the agent from the internal cache
         self.agents.pop(sessionID, None)
 
-        # remove an agent from the database
+        # remove the agent from the database
         cur = self.conn.cursor()
-        cur.execute("DELETE FROM agents WHERE session_id like ?", [sessionID])
+        cur.execute("DELETE FROM agents WHERE session_id LIKE ?", [sessionID])
         cur.close()
 
 
-    def add_agent(self, sessionID, externalIP, delay, jitter, profile, killDate, workingHours,lostLimit):
+    def add_agent(self, sessionID, externalIP, delay, jitter, profile, killDate, workingHours, lostLimit):
         """
         Add an agent to the internal cache and database.
         """
@@ -133,7 +125,8 @@ class Agents:
         
         # initialize the tasking/result buffers along with the client session key
         sessionKey = self.get_agent_session_key(sessionID)
-        self.agents[sessionID] = [sessionKey, [],[],[], requestUris, ""]
+        # TODO: should oldURIs be a string or list?
+        self.agents[sessionID] = {'sessionKey':sessionKey, 'functions':[], 'currentURIs':requestUris, 'oldURIs': ''}
 
         # report the initial checkin in the reporting database
         cur = self.conn.cursor()
@@ -159,7 +152,7 @@ class Agents:
         """
 
         for option,values in self.agents.iteritems():
-            if resource in values[-1] or resource in values [-2]:
+            if resource in values['currentURIs'] or resource in values['oldURIs']:
                 return True
         return False
 
@@ -283,7 +276,6 @@ class Agents:
     #
     ###############################################################
 
-
     def get_agents(self):
         """
         Return all active agents from the database.
@@ -388,7 +380,7 @@ class Agents:
 
         if ps_version and ps_version != None:
             if type(ps_version) is str:
-                return sessionKey
+                return ps_version
             else:
                 return ps_version[0]
 
@@ -416,7 +408,7 @@ class Agents:
 
     def get_agent_results(self, sessionID):
         """
-        Get the agent's results buffer.
+        Return agent results from the backend database.
         """
 
         agentName = sessionID
@@ -426,11 +418,21 @@ class Agents:
         if nameid : sessionID = nameid
 
         if sessionID not in self.agents:
-            print helpers.color("[!] Agent " + str(agentName) + " not active.")
+            print helpers.color("[!] Agent %s not active." %(agentName))
         else:
-            results = self.agents[sessionID][2]
-            self.agents[sessionID][2] = []
-            return "\n".join(results)
+            cur = self.conn.cursor()
+            cur.execute("SELECT results FROM agents WHERE session_id=?", [sessionID])
+            results = cur.fetchone()
+            
+            cur.execute("UPDATE agents SET results = ? WHERE session_id=?", ['',sessionID])
+
+            if results and results[0] and results[0] != '':
+                out = json.loads(results[0])
+                if(out):
+                    return "\n".join(out)
+            else:
+                return ''
+            cur.close()
 
 
     def get_agent_id(self, name):
@@ -474,6 +476,7 @@ class Agents:
         else:
             return None
 
+
     def get_agent_functions(self, sessionID):
         """
         Get the tab-completable functions for an agent.
@@ -484,7 +487,7 @@ class Agents:
         if nameid : sessionID = nameid
 
         if sessionID in self.agents:
-            return self.agents[sessionID][3]
+            return self.agents[sessionID]['functions']
         else:
             return []
 
@@ -552,6 +555,7 @@ class Agents:
         except:
             pass
 
+
     ###############################################################
     #
     # Methods to update agent information fields.
@@ -568,7 +572,21 @@ class Agents:
         if nameid : sessionID = nameid
 
         if sessionID in self.agents:
-            self.agents[sessionID][2].append(results)
+            cur = self.conn.cursor()
+
+            # get existing agent results
+            cur.execute("SELECT results FROM agents WHERE session_id LIKE ?", [sessionID])
+            agentResults = cur.fetchone()
+
+            if(agentResults and agentResults[0]):
+                agentResults = json.loads(agentResults[0])
+            else:
+                agentResults = []
+
+            agentResults.append(results)
+
+            cur.execute("UPDATE agents SET results = ? WHERE session_id=?", [json.dumps(agentResults),sessionID])
+            cur.close()
         else:
             dispatcher.send("[!] Non-existent agent " + str(sessionID) + " returned results", sender="Agents")
 
@@ -615,8 +633,8 @@ class Agents:
         cur = self.conn.cursor()
 
         # get the existing URIs from the agent and save them to
-        # the old_uris field, so we can ensure that it can check in
-        # to get the new URI tasking... bootstrapping problem :)
+        #   the old_uris field, so we can ensure that it can check in
+        #   to get the new URI tasking... bootstrapping problem :)
         cur.execute("SELECT uris FROM agents WHERE session_id=?", [sessionID])
         oldURIs = cur.fetchone()[0]
 
@@ -624,9 +642,8 @@ class Agents:
             print helpers.color("[!] Agent " + agentName + " not active.")
         else:
             # update the URIs in the cache
-            self.agents[sessionID][-1] = oldURIs
-            # new URIs
-            self.agents[sessionID][-2] = parts[0]
+            self.agents[sessionID]['oldURIs'] = oldURIs
+            self.agents[sessionID]['currentURIs'] = parts[0]
 
         # if no additional headers
         if len(parts) == 2:
@@ -696,7 +713,7 @@ class Agents:
         if nameid : sessionID = nameid
 
         if sessionID in self.agents:
-            self.agents[sessionID][3] = functions
+            self.agents[sessionID]['functions'] = functions
     
         functions = ",".join(functions)
 
@@ -756,8 +773,22 @@ class Agents:
             print helpers.color("[!] Agent " + str(agentName) + " not active.")
         else:
             if sessionID:
+
                 dispatcher.send("[*] Tasked " + str(sessionID) + " to run " + str(taskName), sender="Agents")
-                self.agents[sessionID][1].append([taskName, task])
+
+                # get existing agent taskings
+                cur = self.conn.cursor()
+                cur.execute("SELECT taskings FROM agents WHERE session_id=?", [sessionID])
+                agentTasks = cur.fetchone()
+
+                if(agentTasks and agentTasks[0]):
+                    agentTasks = json.loads(agentTasks[0])
+                else:
+                    agentTasks = []
+
+                # append our new json-ified task and update the backend
+                agentTasks.append([taskName, task])
+                cur.execute("UPDATE agents SET taskings=? WHERE session_id=?", [json.dumps(agentTasks),sessionID])
 
                 # write out the last tasked script to "LastTask.ps1" if in debug mode
                 if self.args and self.args.debug:
@@ -766,8 +797,7 @@ class Agents:
                     f.close()
 
                 # report the agent tasking in the reporting database
-                cur = self.conn.cursor()
-                cur.execute("INSERT INTO reporting (name,event_type,message,time_stamp) VALUES (?,?,?,?)", (sessionID,"task",taskName + " - " + task[0:30],helpers.get_datetime()))
+                cur.execute("INSERT INTO reporting (name,event_type,message,time_stamp) VALUES (?,?,?,?)", (sessionID,"task",taskName + " - " + task[0:50],helpers.get_datetime()))
                 cur.close()
 
 
@@ -786,47 +816,37 @@ class Agents:
             print helpers.color("[!] Agent " + str(agentName) + " not active.")
             return []
         else:
-            tasks = self.agents[sessionID][1]
-            # clear the taskings out
-            self.agents[sessionID][1] = []
+
+            cur = self.conn.cursor()
+            cur.execute("SELECT taskings FROM agents WHERE session_id=?", [sessionID])
+            tasks = cur.fetchone()
+
+            if(tasks and tasks[0]):
+                tasks = json.loads(tasks[0])
+
+                # clear the taskings out
+                cur.execute("UPDATE agents SET taskings=? WHERE session_id=?", ['', sessionID])
+            else:
+                tasks = []
+
+            cur.close()
+
             return tasks
-
-
-    def get_agent_task(self, sessionID):
-        """
-        Pop off the agent's top task.
-        """
-
-        # see if we were passed a name instead of an ID
-        nameid = self.get_agent_id(sessionID)
-        if nameid : sessionID = nameid
-
-        try:
-            # pop the first task off the front of the stack
-            return self.agents[sessionID][1].pop(0)
-        except:
-            []
 
 
     def clear_agent_tasks(self, sessionID):
         """
-        Clear out the agent's task buffer.
+        Clear out one (or all) agent's task buffer.
         """
 
         agentName = sessionID
 
         if sessionID.lower() == "all":
-            for option,values in self.agents.iteritems():
-                self.agents[option][1] = []
-        else:
-            # see if we were passed a name instead of an ID
-            nameid = self.get_agent_id(sessionID)
-            if nameid : sessionID = nameid
+            sessionID = '%'
 
-            if sessionID not in self.agents:
-                print helpers.color("[!] Agent " + agentName + " not active.")
-            else:
-                self.agents[sessionID][1] = []
+        cur = self.conn.cursor()
+        cur.execute("UPDATE agents SET taskings=? WHERE session_id LIKE ?", ['', sessionID])
+        cur.close()
 
 
     def handle_agent_response(self, sessionID, responseName, data):
@@ -1122,7 +1142,7 @@ class Agents:
                         allTaskPackets += taskPacket
 
                     # get the session key for the agent
-                    sessionKey = self.agents[sessionID][0]
+                    sessionKey = self.agents[sessionID]['sessionKey']
 
                     # encrypt the tasking packets with the agent's session key
                     encryptedData = encryption.aes_encrypt_then_mac(sessionKey, allTaskPackets)
@@ -1199,7 +1219,7 @@ class Agents:
             else:
 
                 # extract the agent's session key
-                sessionKey = self.agents[sessionID][0]
+                sessionKey = self.agents[sessionID]['sessionKey']
 
                 try:
                     # verify, decrypt and depad the packet
@@ -1241,7 +1261,7 @@ class Agents:
                         return (404, "")
 
                 except Exception as e:
-                    dispatcher.send("[!] Error processing result packet from "+str(sessionID), sender="Agents")
+                    dispatcher.send("[!] Error processing result packet from %s : %s" %(str(sessionID),e), sender="Agents")
                     return (404, "")
 
 
@@ -1330,7 +1350,7 @@ class Agents:
                 lostLimit = config[11]
 
                 # get the session key for the agent
-                sessionKey = self.agents[sessionID][0]
+                sessionKey = self.agents[sessionID]['sessionKey']
 
                 try:
                     # decrypt and parse the agent's sysinfo checkin
@@ -1344,6 +1364,8 @@ class Agents:
                         # remove the agent from the cache/database
                         self.remove_agent(sessionID)
                         return (404, "")
+
+                    dispatcher.send("[!] Agent %s posted valid sysinfo checkin format: %s" %(sessionID, data), sender="Agents")
 
                     listener = parts[0].encode('ascii','ignore')
                     domainname = parts[1].encode('ascii','ignore')

@@ -48,9 +48,14 @@ class Module:
                 'Description'   :   'Switch. List all the local groups instead of their members.',
                 'Required'      :   False,
                 'Value'         :   ''
-            },            
+            },
             'Recurse' : {
                 'Description'   :   'Switch. If the local member member is a domain group, recursively try to resolve its members to get a list of domain users who can access this machine.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'API' : {
+                'Description'   :   'Switch. Use API calls instead of the WinNT service provider. Less information, but the results are faster.',
                 'Required'      :   False,
                 'Value'         :   ''
             }

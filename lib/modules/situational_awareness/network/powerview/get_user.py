@@ -55,6 +55,11 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   ''
             },
+            'AdminCount' : {
+                'Description'   :   'Switch. Return users with adminCount=1 (i.e. privileged users).',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
             'Filter' : {
                 'Description'   :   'A customized ldap filter string to use, e.g. "(description=*admin*)"',
                 'Required'      :   False,
@@ -62,6 +67,11 @@ class Module:
             },
             'SPN' : {
                 'Description'   :   'Switch. Only return user objects with non-null service principal names.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'AllowDelegation' : {
+                'Description'   :   "Switch. Return user accounts that are not marked as 'sensitive and not allowed for delegation'.",
                 'Required'      :   False,
                 'Value'         :   ''
             }

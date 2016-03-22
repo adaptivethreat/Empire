@@ -124,7 +124,7 @@ def agent_print (agents):
     print "  ---------          -----------     ------------    ---------           -------             -----    --------------------"
 
     for agent in agents:
-        [ID, sessionID, listener, name, delay, jitter, external_ip, internal_ip, username, high_integrity, process_name, process_id, hostname, os_details, session_key, checkin_time, lastseen_time, parent, children, servers, uris, old_uris, user_agent, headers, functions, kill_date, working_hours, ps_version, lost_limit] = agent
+        [ID, sessionID, listener, name, delay, jitter, external_ip, internal_ip, username, high_integrity, process_name, process_id, hostname, os_details, session_key, checkin_time, lastseen_time, parent, children, servers, uris, old_uris, user_agent, headers, functions, kill_date, working_hours, ps_version, lost_limit, taskings, results] = agent
         if str(high_integrity) == "1":
             # add a * to the username if it's high integrity 
             username = "*" + username
@@ -160,7 +160,7 @@ def display_agent(agent):
     """
 
     # extract out database fields.
-    keys = ["ID", "sessionID", "listener", "name", "delay", "jitter", "external_ip", "internal_ip", "username", "high_integrity", "process_name", "process_id", "hostname", "os_details", "session_key", "checkin_time", "lastseen_time", "parent", "children", "servers", "uris", "old_uris", "user_agent", "headers", "functions", "kill_date", "working_hours", "ps_version", "lost_limit"]
+    keys = ["ID", "sessionID", "listener", "name", "delay", "jitter", "external_ip", "internal_ip", "username", "high_integrity", "process_name", "process_id", "hostname", "os_details", "session_key", "checkin_time", "lastseen_time", "parent", "children", "servers", "uris", "old_uris", "user_agent", "headers", "functions", "kill_date", "working_hours", "ps_version", "lost_limit", "takings", "results"]
 
     print helpers.color("\n[*] Agent info:\n")
 
@@ -168,7 +168,7 @@ def display_agent(agent):
     agentInfo = dict(zip(keys, agent))
 
     for key in agentInfo:
-        if key != "functions":
+        if key != "functions" and key != "takings" and key != "results":
             print "\t%s\t%s" % (helpers.color('{0: <16}'.format(key), "blue"), wrap_string(agentInfo[key], width=70))
     print ""
 

@@ -11,7 +11,7 @@ class Module:
 
             'Description': ('Takes a SID, name, or SamAccountName to query for a specified '
                             'domain object, and then sets a specified "PropertyName" to a '
-                            'specified "PropertyValue"'),
+                            'specified "PropertyValue". Part of PowerView.'),
 
             'Background' : True,
 
@@ -33,6 +33,11 @@ class Module:
             'Agent' : {
                 'Description'   :   'Agent to run module on.',
                 'Required'      :   True,
+                'Value'         :   ''
+            },
+            'SID' : {
+                'Description'   :   "The SID of the domain object you're querying for.",
+                'Required'      :   False,
                 'Value'         :   ''
             },
             'Name' : {

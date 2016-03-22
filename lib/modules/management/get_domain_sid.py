@@ -5,11 +5,11 @@ class Module:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Get-NetGroupMember',
+            'Name': 'Get-DomainSID',
 
             'Author': ['@harmj0y'],
 
-            'Description': ('Returns the members of a given group, with the option to "Recurse" to find all effective group members. Part of PowerView.'),
+            'Description': ('Returns the SID for the current of specified domain.'),
 
             'Background' : True,
 
@@ -21,9 +21,7 @@ class Module:
             
             'MinPSVersion' : '2',
             
-            'Comments': [
-                'https://github.com/PowerShellEmpire/PowerTools/tree/master/PowerView'
-            ]
+            'Comments': [ ]
         }
 
         # any options needed by the module, settable during runtime
@@ -35,43 +33,8 @@ class Module:
                 'Required'      :   True,
                 'Value'         :   ''
             },
-            'GroupName' : {
-                'Description'   :   'The group name to query for users.',
-                'Required'      :   True,
-                'Value'         :   '"Domain Admins"'
-            },
-            'SID' : {
-                'Description'   :   'The Group SID to query for users.',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'Filter' : {
-                'Description'   :   'A customized ldap filter string to use, e.g. "(description=*admin*)"',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
             'Domain' : {
-                'Description'   :   'The domain to use for the query, defaults to the current domain.',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'DomainController' : {
-                'Description'   :   'Domain controller to reflect LDAP queries through.',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'FullData' : {
-                'Description'   :   'Return full group objects instead of just object names (the default).',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'Recurse' : {
-                'Description'   :   'Switch. If the group member is a group, recursively try to query its members as well.',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'UseMatchingRule' : {
-                'Description'   :   'Switch. Use LDAP_MATCHING_RULE_IN_CHAIN in the LDAP search query when -Recurse is specified.',
+                'Description'   :   'Domain to resolve SID for, defaults to the current domain.',
                 'Required'      :   False,
                 'Value'         :   ''
             }
@@ -80,7 +43,7 @@ class Module:
         # save off a copy of the mainMenu object to access external functionality
         #   like listeners/agent handlers/etc.
         self.mainMenu = mainMenu
-
+        
         for param in params:
             # parameter format is [Name, Value]
             option, value = param
@@ -89,7 +52,7 @@ class Module:
 
 
     def generate(self):
-        
+
         moduleName = self.info["Name"]
         
         # read in the common powerview.ps1 module source code
@@ -119,5 +82,5 @@ class Module:
                         script += " -" + str(option) + " " + str(values['Value']) 
 
         script += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
-        
+
         return script

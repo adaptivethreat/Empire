@@ -5,11 +5,11 @@ class Module:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Get-NetGroupMember',
+            'Name': 'Get-GPOComputer',
 
             'Author': ['@harmj0y'],
 
-            'Description': ('Returns the members of a given group, with the option to "Recurse" to find all effective group members. Part of PowerView.'),
+            'Description': ('Takes a GPO GUID and returns the computers the GPO is applied to. Part of PowerView.'),
 
             'Background' : True,
 
@@ -35,19 +35,9 @@ class Module:
                 'Required'      :   True,
                 'Value'         :   ''
             },
-            'GroupName' : {
-                'Description'   :   'The group name to query for users.',
+            'GUID' : {
+                'Description'   :   'The GUID of the GPO to enumerate.',
                 'Required'      :   True,
-                'Value'         :   '"Domain Admins"'
-            },
-            'SID' : {
-                'Description'   :   'The Group SID to query for users.',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'Filter' : {
-                'Description'   :   'A customized ldap filter string to use, e.g. "(description=*admin*)"',
-                'Required'      :   False,
                 'Value'         :   ''
             },
             'Domain' : {
@@ -57,21 +47,6 @@ class Module:
             },
             'DomainController' : {
                 'Description'   :   'Domain controller to reflect LDAP queries through.',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'FullData' : {
-                'Description'   :   'Return full group objects instead of just object names (the default).',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'Recurse' : {
-                'Description'   :   'Switch. If the group member is a group, recursively try to query its members as well.',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'UseMatchingRule' : {
-                'Description'   :   'Switch. Use LDAP_MATCHING_RULE_IN_CHAIN in the LDAP search query when -Recurse is specified.',
                 'Required'      :   False,
                 'Value'         :   ''
             }
@@ -105,9 +80,9 @@ class Module:
         f.close()
 
         # get just the code needed for the specified function
-        script = helpers.generate_dynamic_powershell_script(moduleCode, moduleName)
+        script = helpers.generate_dynamic_powershell_script(moduleCode, ['Get-NetOU', 'Get-NetComputer'])
 
-        script += moduleName + " "
+        script += "Get-NetOU "
 
         for option,values in self.options.iteritems():
             if option.lower() != "agent":
@@ -117,7 +92,19 @@ class Module:
                         script += " -" + str(option)
                     else:
                         script += " -" + str(option) + " " + str(values['Value']) 
-
-        script += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
         
+        script += " | %{ Get-NetComputer -ADSPath $_"
+
+        for option,values in self.options.iteritems():
+            if option.lower() != "agent" and option.lower() != "guid":
+                if values['Value'] and values['Value'] != '':
+                    if values['Value'].lower() == "true":
+                        # if we're just adding a switch
+                        script += " -" + str(option)
+                    else:
+                        script += " -" + str(option) + " " + str(values['Value']) 
+        
+
+        script += '} | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
+
         return script

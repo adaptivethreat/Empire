@@ -5,11 +5,11 @@ class Module:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Get-NetGroupMember',
+            'Name': 'Get-DomainPolicy',
 
             'Author': ['@harmj0y'],
 
-            'Description': ('Returns the members of a given group, with the option to "Recurse" to find all effective group members. Part of PowerView.'),
+            'Description': ('Returns the default domain or DC policy for a given domain or domain controller. Part of PowerView.'),
 
             'Background' : True,
 
@@ -35,23 +35,13 @@ class Module:
                 'Required'      :   True,
                 'Value'         :   ''
             },
-            'GroupName' : {
-                'Description'   :   'The group name to query for users.',
+            'Source' : {
+                'Description'   :   'Extract Domain or DC (domain controller) policies.',
                 'Required'      :   True,
-                'Value'         :   '"Domain Admins"'
-            },
-            'SID' : {
-                'Description'   :   'The Group SID to query for users.',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'Filter' : {
-                'Description'   :   'A customized ldap filter string to use, e.g. "(description=*admin*)"',
-                'Required'      :   False,
-                'Value'         :   ''
+                'Value'         :   'Domain'
             },
             'Domain' : {
-                'Description'   :   'The domain to use for the query, defaults to the current domain.',
+                'Description'   :   'The domain to query for default policies, defaults to the current domain.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
@@ -60,18 +50,13 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   ''
             },
+            'ResolveSids' : {
+                'Description'   :   'Switch. Resolve Sids from a DC policy to object names.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
             'FullData' : {
-                'Description'   :   'Return full group objects instead of just object names (the default).',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'Recurse' : {
-                'Description'   :   'Switch. If the group member is a group, recursively try to query its members as well.',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'UseMatchingRule' : {
-                'Description'   :   'Switch. Use LDAP_MATCHING_RULE_IN_CHAIN in the LDAP search query when -Recurse is specified.',
+                'Description'   :   'Switch. Return full subnet objects instead of just object names (the default).',
                 'Required'      :   False,
                 'Value'         :   ''
             }
@@ -118,6 +103,6 @@ class Module:
                     else:
                         script += " -" + str(option) + " " + str(values['Value']) 
 
-        script += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
-        
+        script += ' | fl | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
+
         return script
