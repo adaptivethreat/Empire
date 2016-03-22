@@ -9,6 +9,7 @@ randomized stagers.
 
 from time import localtime, strftime
 from Crypto.Random import random
+from os.path import expanduser
 import re
 import string
 import commands
@@ -497,7 +498,7 @@ def get_config(fields):
         i.e. 'version,install_path'
     """
 
-    conn = sqlite3.connect('./data/empire.db', check_same_thread=False)
+    conn = sqlite3.connect(expanduser("~") + '/.powershell-empire/empire.db', check_same_thread=False)
     conn.isolation_level = None
 
     cur = conn.cursor()

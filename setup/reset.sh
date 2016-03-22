@@ -8,7 +8,7 @@ then
 fi
 
 # reset the database
-rm ../data/empire.db
+rm ~/.powershell-empire/empire.db
 ./setup_database.py
 cd ..
 

@@ -1,8 +1,8 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 
 import sqlite3, os, string, hashlib
 from Crypto.Random import random
-
+from os.path import expanduser
 
 ###################################################
 #
@@ -74,6 +74,7 @@ DEFAULT_LOST_LIMIT = 60
 
 
 
+
 ###################################################
 #
 # Database setup.
@@ -81,7 +82,7 @@ DEFAULT_LOST_LIMIT = 60
 ###################################################
 
 
-conn = sqlite3.connect('../data/empire.db')
+conn = sqlite3.connect(expanduser("~") + '/.powershell-empire/empire.db')
 
 c = conn.cursor()
 
