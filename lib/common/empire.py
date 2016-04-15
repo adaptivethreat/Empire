@@ -1181,6 +1181,14 @@ class AgentsMenu(cmd.Cmd):
         offs = len(mline) - len(text)
         return [s[offs:] for s in names if s.startswith(mline)]
 
+    def complete_list(self, text, line, begidx, endidx):
+        "Tab-complete a list command"
+
+        options = ["stale"]
+        mline = line.partition(' ')[2]
+        offs = len(mline) - len(text)
+        return [s[offs:] for s in options if s.startswith(mline)]
+
 
     def complete_kill(self, text, line, begidx, endidx):
         "Tab-complete a kill command"
