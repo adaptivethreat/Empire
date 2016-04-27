@@ -24,6 +24,7 @@ class Module:
             'MinPSVersion' : '2',
             
             'Comments': [
+                'https://github.com/PowerShellMafia/PowerSploit/blob/dev/Recon/'
                 'https://github.com/PowerShellEmpire/Empire/pull/119'
             ]
         }

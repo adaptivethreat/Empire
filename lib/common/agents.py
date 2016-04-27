@@ -54,9 +54,12 @@ class Agents:
 
             # get the current and previous URIs for tasking
             currentURIs,oldURIs = self.get_agent_uris(agentID)
-            if not oldURIs: oldURIs = ''
-            self.agents[agentID]['currentURIs'] = currentURIs
-            self.agents[agentID]['oldURIs'] = oldURIs
+            self.agents[agentID]['currentURIs'] = currentURIs.split(',')
+
+            if not oldURIs:
+                self.agents[agentID]['oldURIs'] = []
+            else:
+                self.agents[agentID]['oldURIs'] = oldURIs.split(',')
 
         # pull out common configs from the main menu object in empire.py
         self.ipWhiteList = self.mainMenu.ipWhiteList
@@ -125,8 +128,8 @@ class Agents:
         
         # initialize the tasking/result buffers along with the client session key
         sessionKey = self.get_agent_session_key(sessionID)
-        # TODO: should oldURIs be a string or list?
-        self.agents[sessionID] = {'sessionKey':sessionKey, 'functions':[], 'currentURIs':requestUris, 'oldURIs': ''}
+
+        self.agents[sessionID] = {'sessionKey':sessionKey, 'functions':[], 'currentURIs':requestUris.split(','), 'oldURIs': []}
 
         # report the initial checkin in the reporting database
         cur = self.conn.cursor()
@@ -642,8 +645,8 @@ class Agents:
             print helpers.color("[!] Agent " + agentName + " not active.")
         else:
             # update the URIs in the cache
-            self.agents[sessionID]['oldURIs'] = oldURIs
-            self.agents[sessionID]['currentURIs'] = parts[0]
+            self.agents[sessionID]['oldURIs'] = oldURIs.split(',')
+            self.agents[sessionID]['currentURIs'] = parts[0].split(',')
 
         # if no additional headers
         if len(parts) == 2:

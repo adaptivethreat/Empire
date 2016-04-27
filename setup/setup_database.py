@@ -56,17 +56,27 @@ DEFAULT_CERT_PATH = ''
 DEFAULT_PORT = 8080
 
 # the installation path for Empire, defaults to auto-calculating it
-INSTALL_PATH = "/".join(os.getcwd().split("/")[0:-1])+"/"
+#   set manually if issues arise
+currentPath = os.path.dirname(os.path.realpath(__file__))
+empireIndex = currentPath.rfind("Empire")
+if empireIndex < 0:
+    empireIndex = currentPath.rfind("empire")
+if empireIndex < 0:
+    INSTALL_PATH = "/".join(os.getcwd().split("/")[0:-1])+"/"
+else:
+    endIndex = currentPath.find("/", empireIndex)
+    endIndex = None if endIndex < 0 else endIndex
+    INSTALL_PATH = currentPath[0:endIndex] + "/"
 
 # the version version to appear as
 SERVER_VERSION = "Microsoft-IIS/7.5"
 
 # an IP white list to ONLY accept clients from
-#   format is 192.168.1.1,192.168.1.10-192.168.1.100,10.0.0.0/8
+#   format is "192.168.1.1,192.168.1.10-192.168.1.100,10.0.0.0/8"
 IP_WHITELIST = ""
 
 # an IP black list to reject accept clients from
-#   format is 192.168.1.1,192.168.1.10-192.168.1.100,10.0.0.0/8
+#   format is "192.168.1.1,192.168.1.10-192.168.1.100,10.0.0.0/8"
 IP_BLACKLIST = ""
 
 # number of times an agent will call back without an answer prior to exiting
@@ -86,8 +96,8 @@ API_PERMANENT_TOKEN = ''.join(random.choice(string.ascii_lowercase + string.digi
 #
 ###################################################
 
-
-conn = sqlite3.connect('../data/empire.db')
+dbPath = INSTALL_PATH + "data/empire.db"
+conn = sqlite3.connect(dbPath)
 
 c = conn.cursor()
 

@@ -1,3 +1,18 @@
+4/24/2016
+---------
+-Added credentials/get_spn_tickets to request SPN tickets.
+-Added credentials/mimikatz/extract_tickets
+
+4/21/2016
+---------
+-Merged @Subtee's regsvc32 (sct) stager
+
+4/1/2016
+---------
+-listener starting now returns more verbose errors on failure in console and API
+-merge of @mynameisiv's .jpg screenshot PR
+-Fix for path errors in some cases for ./setup/setup_database.py
+
 ============
 3/31/2015 - RELEASE 1.5
 ============
