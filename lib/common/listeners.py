@@ -135,13 +135,14 @@ class Listeners:
                 self.listeners[result[0]] = None
 
             else:
-                port = result[3]
-
+                lhost = http.host2lhost(result[2])
+		port = result[3]
+		
                 # if cert_path is empty, no ssl is used
                 cert_path = result[4]
 
                 # build the handler server and kick if off
-                server = http.EmpireServer(self.agents, port=port, cert=cert_path)
+                server = http.EmpireServer(self.agents, lhost=lhost, port=port, cert=cert_path)
 
                 # check if the listener started correctly
                 if server.success:
@@ -540,8 +541,7 @@ class Listeners:
                     if not self.is_listener_valid(name):
                         break
             if self.is_listener_valid(name):
-                print helpers.color("[!] Listener name already used.")
-                return False
+                return (False, "Listener name already used.")
 
             # don't actually start a pivot/hop listener, foreign listeners, or meter listeners
             if listenerType == "pivot" or listenerType == "hop" or listenerType == "foreign" or listenerType == "meter":
@@ -550,7 +550,7 @@ class Listeners:
                 if listenerType == "hop" and not host.endswith(".php"):
                     choice = raw_input(helpers.color("[!] Host does not end with .php continue? [y/N] "))
                     if choice.lower() == "" or choice.lower()[0] == "n":
-                        return False
+                        return (False, "")
 
                 cur = self.conn.cursor()
                 results = cur.execute("INSERT INTO listeners (name, host, port, cert_path, staging_key, default_delay, default_jitter, default_profile, kill_date, working_hours, listener_type, redirect_target,default_lost_limit) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", [name, host, port, certPath, stagingKey, defaultDelay, defaultJitter, defaultProfile, killDate, workingHours, listenerType, redirectTarget,defaultLostLimit] )
@@ -561,11 +561,12 @@ class Listeners:
                 cur.close()
 
                 self.listeners[result[0]] = None
-                return True
+                return (True, name)
 
             else:
+		lhost = http.host2lhost(host)
                 # start up the server object
-                server = http.EmpireServer(self.agents, port=port, cert=certPath)
+                server = http.EmpireServer(self.agents, lhost=lhost, port=port, cert=certPath)
 
                 # check if the listener started correctly
                 if server.success:
@@ -585,17 +586,15 @@ class Listeners:
                         # store off this server in the "[id] : server" object array
                         #   only if the server starts up correctly
                         self.listeners[result[0]] = server
-                        return True
+                        return (True, name)
                     else:
-                        return False
+                        return (False, "Misc. error starting listener")
 
                 else:
-                    print helpers.color("[!] Error starting listener on port %s" %(port))
-                    return False
+                    return (False, "Error starting listener on port %s, port likely already in use." %(port))
 
         else:
-            print helpers.color("[!] Required listener option missing.")
-            return False
+            return (False, "Required listener option missing.")
 
 
     def add_pivot_listener(self, listenerName, sessionID, listenPort):

@@ -8,15 +8,25 @@ then
 fi
 
 # reset the database
-rm ../data/empire.db
+if [ -e ../data/empire.db ]
+then
+	rm ../data/empire.db
+fi
+
 ./setup_database.py
 cd ..
 
 # remove the debug file if it exists
-rm empire.debug
+if [ -e empire.debug ]
+then
+	rm empire.debug
+fi
 
 # remove the download folders
-rm -rf ./downloads/
+if [ -d ./downloads/ ]
+then
+	rm -rf ./downloads/
+fi
 
 # start up Empire
 ./empire

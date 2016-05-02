@@ -209,9 +209,9 @@ def start_restful_api(startEmpire=False, suppress=False, username=None, password
         if request.path != '/api/admin/login':
             token = request.args.get('token')
             if (not token) or (not tokenAllowed.match(token)):
-                return make_response('', 403)
+                return make_response('', 401)
             if (token != apiToken) and (token != permanentApiToken):
-                return make_response('', 403)
+                return make_response('', 401)
 
 
     @app.errorhandler(Exception)
@@ -683,8 +683,11 @@ def start_restful_api(startEmpire=False, suppress=False, username=None, password
         if not valid:
             return make_response(jsonify({'error': 'error validating listener options'}), 400)
 
-        success = main.listeners.add_listener_from_config()
-        return jsonify({'success': success})
+        (success, message) = main.listeners.add_listener_from_config()
+        if success:
+            return jsonify({'success': success, 'msg' : "listener '%s' successfully started." %(message)})
+        else:
+            return jsonify({'success': success, 'msg' : message})
 
 
     @app.route('/api/agents', methods=['GET'])
@@ -1167,22 +1170,30 @@ def start_restful_api(startEmpire=False, suppress=False, username=None, password
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--debug', nargs='?', const='1', help='Debug level for output (default of 1).')
 
-    parser.add_argument('-s', '--stager', nargs='?', const="list", help='Specify a stager to generate. Lists all stagers if none is specified.')
-    parser.add_argument('-o', '--stager-options', nargs='*', help="Supply options to set for a stager in OPTION=VALUE format. Lists options if nothing is specified.")
-    parser.add_argument('-l', '--listener', nargs='?', const="list", help='Display listener options. Displays all listeners if nothing is specified.')
-    parser.add_argument('-v', '--version', action='store_true', help='Display current Empire version.')
-    parser.add_argument('--rest', action='store_true', help='Run the Empire RESTful API.')
-    parser.add_argument('--restport', nargs='?', help='Port to run the Empire RESTful API on.')
-    parser.add_argument('--headless', action='store_true', help='Run Empire and the RESTful API headless without the usual interface.')
-    parser.add_argument('--username', nargs='?', help='Start the RESTful API with the specified username instead of pulling from empire.db')
-    parser.add_argument('--password', nargs='?', help='Start the RESTful API with the specified password instead of pulling from empire.db')
+    generalGroup = parser.add_argument_group('General Options')
+    generalGroup.add_argument('--debug', nargs='?', const='1', help='Debug level for output (default of 1, 2 for msg display).')
+    generalGroup.add_argument('-v', '--version', action='store_true', help='Display current Empire version.')
+
+    cliGroup = parser.add_argument_group('CLI Payload Options')
+    cliGroup.add_argument('-l', '--listener', nargs='?', const="list", help='Display listener options. Displays all listeners if nothing is specified.')
+    cliGroup.add_argument('-s', '--stager', nargs='?', const="list", help='Specify a stager to generate. Lists all stagers if none is specified.')
+    cliGroup.add_argument('-o', '--stager-options', nargs='*', help="Supply options to set for a stager in OPTION=VALUE format. Lists options if nothing is specified.")
+    
+    restGroup = parser.add_argument_group('RESTful API Options')
+    launchGroup = restGroup.add_mutually_exclusive_group()
+    launchGroup.add_argument('--rest', action='store_true', help='Run the Empire RESTful API.')
+    launchGroup.add_argument('--headless', action='store_true', help='Run Empire and the RESTful API headless without the usual interface.')
+    restGroup.add_argument('--restport', type=int, nargs=1, help='Port to run the Empire RESTful API on.')
+    restGroup.add_argument('--username', nargs=1, help='Start the RESTful API with the specified username instead of pulling from empire.db')
+    restGroup.add_argument('--password', nargs=1, help='Start the RESTful API with the specified password instead of pulling from empire.db')
 
     args = parser.parse_args()
 
     if not args.restport:
         args.restport = '1337'
+    else:
+        args.restport = args.restport[0]
 
     if args.version:
         print empire.VERSION

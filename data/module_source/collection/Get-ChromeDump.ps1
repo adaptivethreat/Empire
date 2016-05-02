@@ -121,7 +121,7 @@ Function Get-ChromeDump{
     if(!($NoPasswords)){ 
 
       #Parse the login data DB
-      $connStr = "Data Source=$loginDatadb; Version=3;"
+      $connStr = "Data Source=$loginDatadb; Read Only=True; Version=3;"
 
       $connection = New-Object System.Data.SQLite.SQLiteConnection($connStr)
 

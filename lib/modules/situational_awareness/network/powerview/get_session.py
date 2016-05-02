@@ -21,7 +21,9 @@ class Module:
             
             'MinPSVersion' : '2',
             
-            'Comments': [ ]
+            'Comments': [
+                'https://github.com/PowerShellMafia/PowerSploit/blob/dev/Recon/'
+            ]
         }
 
         # any options needed by the module, settable during runtime
