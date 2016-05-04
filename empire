@@ -321,6 +321,8 @@ def start_restful_api(startEmpire=False, suppress=False, username=None, password
         if ('OutFile' in stagerOut) and (stagerOut['OutFile']['Value'] != ''):
             # if the output was intended for a file, return the base64 encoded text
             stagerOut['Output'] = base64.b64encode(stager.generate())
+            f = open(stagerOut['OutFile']['Value'],"w")
+            f.write(stager.generate())
         else:
             # otherwise return the text of the stager generation
             stagerOut['Output'] = stager.generate()
