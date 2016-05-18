@@ -20,7 +20,7 @@ import helpers
 import http
 import packets
 import messages
-
+import mailer
 
 class Agents:
 
@@ -1409,6 +1409,8 @@ class Agents:
                 encryptedAgent = encryption.aes_encrypt(sessionKey, agentCode)
 
                 # signal everyone that this agent is now active
+                if mailer.ENABLED:
+                    mailer.notify("[+] Agent " + str(sessionID) + " now active:\n")
                 dispatcher.send("[+] Initial agent "+str(sessionID)+" from "+str(clientIP) + " now active", sender="Agents")
                 output =  "[+] Agent " + str(sessionID) + " now active:\n"
 
