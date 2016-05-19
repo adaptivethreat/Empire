@@ -1425,7 +1425,10 @@ class Agents:
 			# Send the message via our own SMTP server, but don't include the
 			# envelope header.
 			s = smtplib.SMTP(str(self.mainMenu.smtpServer))
-			s.sendmail("assureit@synercomm.com", str(self.mainMenu.smtpRecipient), msg.as_string())
+			if self.mainMenu.smtpSender:
+			    s.sendmail(str(self.mainMenu.smtpSender), str(self.mainMenu.smtpRecipient), msg.as_string())
+			else:
+			    s.sendmail("EmpireServer@" + str(helpers.lhost()), str(self.mainMenu.smtpRecipient), msg.as_string())
 			s.quit()
 
                 # set basic initial information to display for the agent
