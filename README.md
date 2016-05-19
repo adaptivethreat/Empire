@@ -15,6 +15,7 @@ This section details some commands that we added to the Empire agent (agent.ps1)
 The idea is to never expose the IP address of the C&C server used and therefore minimize the impact of a server being blacklisted. The use of proxies thus became paramount in order to only expose spécifics reserved IP addresses.
 
 The following diagram highlights the servers architecture used on our red Team assignment :
+![servers architecture](/servers-architecture.jpg)
 
 ### Changes made to the Empire agent
 
