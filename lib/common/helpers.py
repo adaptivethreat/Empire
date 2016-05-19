@@ -43,6 +43,16 @@ def validate_ntlm(data):
     else:
         return False
 
+def validate_email(address):
+    """
+    Tries to validate email address format
+    """
+    if len(address) > 255: return False
+    allowed = re.compile("^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$", re.IGNORECASE)
+    if allowed.match(address):
+	return True
+    else:
+	return False
 
 def generate_ip_list(s):
     """

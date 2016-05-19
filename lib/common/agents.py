@@ -12,7 +12,8 @@ the response types are handled as appropriate.
 """
 
 from pydispatch import dispatcher
-import sqlite3, pickle, base64, string, os, iptools, json
+from email.mime.text import MIMEText
+import sqlite3, pickle, base64, string, os, iptools, json, smtplib
 
 # Empire imports
 import encryption
@@ -20,7 +21,6 @@ import helpers
 import http
 import packets
 import messages
-
 
 class Agents:
 
@@ -1411,6 +1411,22 @@ class Agents:
                 # signal everyone that this agent is now active
                 dispatcher.send("[+] Initial agent "+str(sessionID)+" from "+str(clientIP) + " now active", sender="Agents")
                 output =  "[+] Agent " + str(sessionID) + " now active:\n"
+
+		if self.mainMenu.agentNotify == "true":
+	
+			msg = MIMEText("New Empire Agent " + str(sessionID) + " from " + str(clientIP))
+			msg['Subject'] = "New Empire Agent from " + str(clientIP) + " on " + str(helpers.lhost())
+			if self.mainMenu.smtpSender:
+			    msg['From'] = str(self.mainMenu.smtpSender)
+			else:
+			    msg['From'] = "EmpireServer@" + str(helpers.lhost())
+			msg['To'] = self.mainMenu.smtpRecipient
+
+			# Send the message via our own SMTP server, but don't include the
+			# envelope header.
+			s = smtplib.SMTP(str(self.mainMenu.smtpServer))
+			s.sendmail("assureit@synercomm.com", str(self.mainMenu.smtpRecipient), msg.as_string())
+			s.quit()
 
                 # set basic initial information to display for the agent
                 agent = self.mainMenu.agents.get_agent(sessionID)

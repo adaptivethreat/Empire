@@ -114,11 +114,15 @@ c.execute('''CREATE TABLE config (
     "api_username" text,
     "api_password" text,
     "api_current_token" text,
-    "api_permanent_token" text
+    "api_permanent_token" text,
+    "smtp_server" text,
+    "smtp_sender" text,
+    "smtp_recipient" text,
+    "agent_notify" text
     )''')
 
 # kick off the config component of the database
-c.execute("INSERT INTO config VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (STAGING_KEY,STAGE0_URI,STAGE1_URI,STAGE2_URI,DEFAULT_DELAY,DEFAULT_JITTER,DEFAULT_PROFILE,DEFAULT_CERT_PATH,DEFAULT_PORT,INSTALL_PATH,SERVER_VERSION,IP_WHITELIST,IP_BLACKLIST, DEFAULT_LOST_LIMIT, "", "", API_USERNAME, API_PASSWORD, "", API_PERMANENT_TOKEN))
+c.execute("INSERT INTO config VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (STAGING_KEY,STAGE0_URI,STAGE1_URI,STAGE2_URI,DEFAULT_DELAY,DEFAULT_JITTER,DEFAULT_PROFILE,DEFAULT_CERT_PATH,DEFAULT_PORT,INSTALL_PATH,SERVER_VERSION,IP_WHITELIST,IP_BLACKLIST, DEFAULT_LOST_LIMIT, "", "", API_USERNAME, API_PASSWORD, "", API_PERMANENT_TOKEN, "", "", "", ""))
 
 c.execute('''CREATE TABLE "agents" (
     "id" integer PRIMARY KEY,
