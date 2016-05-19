@@ -9,7 +9,7 @@ class Stager:
 
             'Author': ['@harmj0y'],
 
-            'Description': ('Generates a ducky script that runes a one-liner stage0 launcher for Empire.'),
+            'Description': ('Generates a ducky script that runs a one-liner stage0 launcher for Empire.'),
 
             'Comments': [
                 ''
