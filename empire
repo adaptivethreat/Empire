@@ -325,6 +325,31 @@ def start_restful_api(startEmpire=False, suppress=False, username=None, password
             # otherwise return the text of the stager generation
             stagerOut['Output'] = stager.generate()
 
+	stagerOutput = stagerOut['Output']
+        savePath = ''
+        if 'OutFile' in stager.options:
+            savePath = stager.options['OutFile']['Value']
+
+        if savePath != '':
+            # make the base directory if it doesn't exist
+            if not os.path.exists(os.path.dirname(savePath)) and os.path.dirname(savePath) != '':
+                os.makedirs(os.path.dirname(savePath))
+
+            # if we need to write binary output for a .dll
+            if ".dll" in savePath:
+                f = open(savePath, 'wb')
+                f.write(bytearray(stagerOutput))
+                f.close()
+            else:
+                # otherwise normal output
+                f = open(savePath, 'w')
+                f.write(stagerOutput)
+                f.close()
+
+            # if this is a bash script, make it executable
+            if ".sh" in savePath:
+                os.chmod(savePath, 777)
+
         return jsonify({stagerName: stagerOut})
 
 
@@ -1160,7 +1185,7 @@ def start_restful_api(startEmpire=False, suppress=False, username=None, password
 
     # wrap the Flask connection in SSL and start it
     context = ('./data/empire.pem', './data/empire.pem')
-    app.run(host='0.0.0.0', port=port, ssl_context=context, threaded=True)
+    app.run(host='0.0.0.0', port=int(port), ssl_context=context, threaded=True)
 
 
 
