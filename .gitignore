@@ -3,3 +3,5 @@ data/empire.db
 empire.debug
 *.pyc
 downloads/*
+
+data/empire.pem
