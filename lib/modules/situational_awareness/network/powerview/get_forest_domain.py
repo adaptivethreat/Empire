@@ -22,7 +22,7 @@ class Module:
             'MinPSVersion' : '2',
             
             'Comments': [
-                'https://github.com/PowerShellEmpire/PowerTools/tree/master/PowerView'
+                'https://github.com/PowerShellMafia/PowerSploit/blob/dev/Recon/'
             ]
         }
 

@@ -327,7 +327,7 @@ class Stagers:
                     stager += helpers.randomize_capitalization("$wc.Proxy = [System.Net.WebRequest]::DefaultWebProxy;")
                 else:
                     # TODO: implement form for other proxy
-		    stager += helpers.randomize_capitalization("$proxy = new-object net.WebProxy;")
+                    stager += helpers.randomize_capitalization("$proxy = new-object net.WebProxy;")
                     stager += helpers.randomize_capitalization("$proxy.Address = '"+ proxy.lower() +"';")
                     stager += helpers.randomize_capitalization("$wc.Proxy = $proxy;")
                 if proxyCreds.lower() == "default":

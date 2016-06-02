@@ -1262,6 +1262,54 @@ filter Get-Proxy {
 }
 
 
+function Request-SPNTicket {
+<#
+    .SYNOPSIS
+    
+        Request the kerberos ticket for a specified service principal name (SPN).
+    
+    .PARAMETER SPN
+
+        The service principal name to request the ticket for. Required.
+
+    .EXAMPLE
+
+        PS C:\> Request-SPNTicket -SPN "HTTP/web.testlab.local"
+    
+        Request a kerberos service ticket for the specified SPN.
+
+    .EXAMPLE
+
+        PS C:\> "HTTP/web1.testlab.local","HTTP/web2.testlab.local" | Request-SPNTicket
+
+        Request kerberos service tickets for all SPNs passed on the pipeline.
+
+    .EXAMPLE
+
+        PS C:\> Get-NetUser -SPN | Request-SPNTicket
+
+        Request kerberos service tickets for all users with non-null SPNs.
+#>
+
+    [CmdletBinding()]
+    Param (
+        [Parameter(Mandatory=$True, ValueFromPipelineByPropertyName = $True)]
+        [Alias('ServicePrincipalName')]
+        [String[]]
+        $SPN
+    )
+
+    begin {
+        Add-Type -AssemblyName System.IdentityModel
+    }
+
+    process {
+        Write-Verbose "Requesting ticket for: $SPN"
+        New-Object System.IdentityModel.Tokens.KerberosRequestorSecurityToken -ArgumentList $SPN
+    }
+}
+
+
 function Get-PathAcl {
 <#
     .SYNOPSIS
@@ -1678,6 +1726,7 @@ filter Get-DomainSearcher {
     }
 
     $Searcher.PageSize = $PageSize
+    $Searcher.CacheResults = $False
     $Searcher
 }
 
@@ -2126,10 +2175,13 @@ function Get-NetUser {
                 $UserSearcher.filter="(&(samAccountType=805306368)$Filter)"
             }
 
-            $UserSearcher.FindAll() | Where-Object {$_} | ForEach-Object {
+            $Results = $UserSearcher.FindAll()
+            $Results | Where-Object {$_} | ForEach-Object {
                 # convert/process the LDAP fields for each result
                 Convert-LDAPProperty -Properties $_.Properties
             }
+            $Results.dispose()
+            $UserSearcher.dispose()
         }
     }
 }
@@ -2857,7 +2909,8 @@ function Get-ObjectAcl {
             }
   
             try {
-                $Searcher.FindAll() | Where-Object {$_} | ForEach-Object {
+                $Results = $Searcher.FindAll()
+                $Results | Where-Object {$_} | ForEach-Object {
                     $Object = [adsi]($_.path)
 
                     if($Object.distinguishedname) {
@@ -2909,6 +2962,8 @@ function Get-ObjectAcl {
                     }
                     else { $_ }
                 }
+                $Results.dispose()
+                $Searcher.dispose()
             }
             catch {
                 Write-Warning $_
@@ -3080,7 +3135,9 @@ function Add-ObjectAcl {
             }
   
             try {
-                $Searcher.FindAll() | Where-Object {$_} | ForEach-Object {
+                $Results = $Searcher.FindAll()
+                $Results | Where-Object {$_} | ForEach-Object {
+
                     # adapted from https://social.technet.microsoft.com/Forums/windowsserver/en-US/df3bfd33-c070-4a9c-be98-c4da6e591a0a/forum-faq-using-powershell-to-assign-permissions-on-active-directory-objects
 
                     $TargetDN = $_.Properties.distinguishedname
@@ -3135,6 +3192,8 @@ function Add-ObjectAcl {
                         Write-Warning "Error granting principal $PrincipalSID '$Rights' on $TargetDN : $_"
                     }
                 }
+                $Results.dispose()
+                $Searcher.dispose()
             }
             catch {
                 Write-Warning "Error: $_"
@@ -3303,10 +3362,13 @@ filter Get-GUIDMap {
     if($SchemaSearcher) {
         $SchemaSearcher.filter = "(schemaIDGUID=*)"
         try {
-            $SchemaSearcher.FindAll() | Where-Object {$_} | ForEach-Object {
+            $Results = $SchemaSearcher.FindAll()
+            $Results | Where-Object {$_} | ForEach-Object {
                 # convert the GUID
                 $GUIDs[(New-Object Guid (,$_.properties.schemaidguid[0])).Guid] = $_.properties.name[0]
             }
+            $Results.dispose()
+            $SchemaSearcher.dispose()
         }
         catch {
             Write-Debug "Error in building GUID map: $_"
@@ -3317,10 +3379,13 @@ filter Get-GUIDMap {
     if ($RightsSearcher) {
         $RightsSearcher.filter = "(objectClass=controlAccessRight)"
         try {
-            $RightsSearcher.FindAll() | Where-Object {$_} | ForEach-Object {
+            $Results = $RightsSearcher.FindAll()
+            $Results | Where-Object {$_} | ForEach-Object {
                 # convert the GUID
                 $GUIDs[$_.properties.rightsguid[0].toString()] = $_.properties.name[0]
             }
+            $Results.dispose()
+            $RightsSearcher.dispose()
         }
         catch {
             Write-Debug "Error in building GUID map: $_"
@@ -3520,8 +3585,8 @@ function Get-NetComputer {
             $CompSearcher.filter = $CompFilter
 
             try {
-
-                $CompSearcher.FindAll() | Where-Object {$_} | ForEach-Object {
+                $Results = $CompSearcher.FindAll()
+                $Results | Where-Object {$_} | ForEach-Object {
                     $Up = $True
                     if($Ping) {
                         # TODO: how can these results be piped to ping for a speedup?
@@ -3539,6 +3604,8 @@ function Get-NetComputer {
                         }
                     }
                 }
+                $Results.dispose()
+                $CompSearcher.dispose()
             }
             catch {
                 Write-Warning "Error: $_"
@@ -3680,7 +3747,8 @@ function Get-ADObject {
                 $ObjectSearcher.filter = "(&(samAccountName=$SamAccountName)$Filter)"
             }
 
-            $ObjectSearcher.FindAll() | Where-Object {$_} | ForEach-Object {
+            $Results = $ObjectSearcher.FindAll()
+            $Results | Where-Object {$_} | ForEach-Object {
                 if($ReturnRaw) {
                     $_
                 }
@@ -3689,6 +3757,8 @@ function Get-ADObject {
                     Convert-LDAPProperty -Properties $_.Properties
                 }
             }
+            $Results.dispose()
+            $ObjectSearcher.dispose()
         }
     }
 }
@@ -4233,7 +4303,8 @@ function Get-NetOU {
             }
 
             try {
-                $OUSearcher.FindAll() | Where-Object {$_} | ForEach-Object {
+                $Results = $OUSearcher.FindAll()
+                $Results | Where-Object {$_} | ForEach-Object {
                     if ($FullData) {
                         # convert/process the LDAP fields for each result
                         Convert-LDAPProperty -Properties $_.Properties
@@ -4243,6 +4314,8 @@ function Get-NetOU {
                         $_.properties.adspath
                     }
                 }
+                $Results.dispose()
+                $OUSearcher.dispose()
             }
             catch {
                 Write-Warning $_
@@ -4346,7 +4419,8 @@ function Get-NetSite {
             }
             
             try {
-                $SiteSearcher.FindAll() | Where-Object {$_} | ForEach-Object {
+                $Results = $SiteSearcher.FindAll()
+                $Results | Where-Object {$_} | ForEach-Object {
                     if ($FullData) {
                         # convert/process the LDAP fields for each result
                         Convert-LDAPProperty -Properties $_.Properties
@@ -4356,6 +4430,8 @@ function Get-NetSite {
                         $_.properties.name
                     }
                 }
+                $Results.dispose()
+                $SiteSearcher.dispose()
             }
             catch {
                 Write-Warning $_
@@ -4453,7 +4529,8 @@ function Get-NetSubnet {
             $SubnetSearcher.filter="(&(objectCategory=subnet))"
 
             try {
-                $SubnetSearcher.FindAll() | Where-Object {$_} | ForEach-Object {
+                $Results = $SubnetSearcher.FindAll()
+                $Results | Where-Object {$_} | ForEach-Object {
                     if ($FullData) {
                         # convert/process the LDAP fields for each result
                         Convert-LDAPProperty -Properties $_.Properties | Where-Object { $_.siteobject -match "CN=$SiteName" }
@@ -4476,6 +4553,8 @@ function Get-NetSubnet {
                         }
                     }
                 }
+                $Results.dispose()
+                $SubnetSearcher.dispose()
             }
             catch {
                 Write-Warning $_
@@ -4686,8 +4765,9 @@ function Get-NetGroup {
                 else {
                     $GroupSearcher.filter = "(&(objectCategory=group)(name=$GroupName)$Filter)"
                 }
-            
-                $GroupSearcher.FindAll() | Where-Object {$_} | ForEach-Object {
+                
+                $Results = $GroupSearcher.FindAll()
+                $Results | Where-Object {$_} | ForEach-Object {
                     # if we're returning full data objects
                     if ($FullData) {
                         # convert/process the LDAP fields for each result
@@ -4698,6 +4778,8 @@ function Get-NetGroup {
                         $_.properties.samaccountname
                     }
                 }
+                $Results.dispose()
+                $GroupSearcher.dispose()
             }
         }
     }
@@ -4869,7 +4951,8 @@ function Get-NetGroupMember {
                     $GroupSearcher.filter = "(&(objectCategory=group)(objectSID=$SID)$Filter)"
                 }
 
-                $GroupSearcher.FindAll() | ForEach-Object {
+                $Results = $GroupSearcher.FindAll()
+                $Results | ForEach-Object {
                     try {
                         if (!($_) -or !($_.properties) -or !($_.properties.name)) { continue }
 
@@ -4917,6 +5000,8 @@ function Get-NetGroupMember {
                         Write-Verbose $_
                     }
                 }
+                $Results.dispose()
+                $GroupSearcher.dispose()
             }
 
             $Members | Where-Object {$_} | ForEach-Object {
@@ -5377,7 +5462,8 @@ function Get-DFSshare {
             $DFSsearcher.filter = "(&(objectClass=fTDfs))"
 
             try {
-                $DFSSearcher.FindAll() | Where-Object {$_} | ForEach-Object {
+                $Results = $DFSSearcher.FindAll()
+                $Results | Where-Object {$_} | ForEach-Object {
                     $Properties = $_.Properties
                     $RemoteNames = $Properties.remoteservername
                     $Pkt = $Properties.pkt
@@ -5393,6 +5479,8 @@ function Get-DFSshare {
                         }
                     }
                 }
+                $Results.dispose()
+                $DFSSearcher.dispose()
 
                 if($pkt -and $pkt[0]) {
                     Parse-Pkt $pkt[0] | ForEach-Object {
@@ -5442,7 +5530,8 @@ function Get-DFSshare {
             $DFSSearcher.PropertiesToLoad.AddRange(('msdfs-linkpathv2','msDFS-TargetListv2'))
 
             try {
-                $DFSSearcher.FindAll() | Where-Object {$_} | ForEach-Object {
+                $Results = $DFSSearcher.FindAll()
+                $Results | Where-Object {$_} | ForEach-Object {
                     $Properties = $_.Properties
                     $target_list = $Properties.'msdfs-targetlistv2'[0]
                     $xml = [xml][System.Text.Encoding]::Unicode.GetString($target_list[2..($target_list.Length-1)])
@@ -5460,6 +5549,8 @@ function Get-DFSshare {
                         }
                     }
                 }
+                $Results.dispose()
+                $DFSSearcher.dispose()
             }
             catch {
                 Write-Warning "Get-DFSshareV2 error : $_"
@@ -5633,7 +5724,7 @@ function Get-GroupsXML {
             $FolderPath = $Parts[0..($Parts.length-2)] -join '\'
             $FilePath = $Parts[-1]
             $RandDrive = ("abcdefghijklmnopqrstuvwxyz".ToCharArray() | Get-Random -Count 7) -join ''
-            
+
             Write-Verbose "Mounting path $GroupsXMLPath using a temp PSDrive at $RandDrive"
 
             try {
@@ -5655,7 +5746,7 @@ function Get-GroupsXML {
             [xml] $GroupsXMLcontent = Get-Content $GroupsXMLPath -ErrorAction Stop
 
             # process all group properties in the XML
-            $GroupsXMLcontent | Select-Xml "//Group" | Select-Object -ExpandProperty node | ForEach-Object {
+            $GroupsXMLcontent | Select-Xml "//Groups" | Select-Object -ExpandProperty node | ForEach-Object {
 
                 $Members = @()
                 $MemberOf = @()
@@ -5873,11 +5964,14 @@ function Get-NetGPO {
                     $GPOSearcher.filter="(&(objectCategory=groupPolicyContainer)(name=$GPOname))"
 
                     try {
-                        $GPOSearcher.FindAll() | Where-Object {$_} | ForEach-Object {
+                        $Results = $GPOSearcher.FindAll()
+                        $Results | Where-Object {$_} | ForEach-Object {
                             $Out = Convert-LDAPProperty -Properties $_.Properties
                             $Out | Add-Member Noteproperty 'ComputerName' $ComputerName
                             $Out
                         }
+                        $Results.dispose()
+                        $GPOSearcher.dispose()
                     }
                     catch {
                         Write-Warning $_
@@ -5894,10 +5988,13 @@ function Get-NetGPO {
                 }
 
                 try {
-                    $GPOSearcher.FindAll() | Where-Object {$_} | ForEach-Object {
+                    $Results = $GPOSearcher.FindAll()
+                    $Results | Where-Object {$_} | ForEach-Object {
                         # convert/process the LDAP fields for each result
                         Convert-LDAPProperty -Properties $_.Properties
                     }
+                    $Results.dispose()
+                    $GPOSearcher.dispose()
                 }
                 catch {
                     Write-Warning $_
@@ -7014,7 +7111,7 @@ function Get-NetLocalGroup {
         [Parameter(ParameterSetName = 'WinNT', Position=0, ValueFromPipeline=$True)]
         [Alias('HostName')]
         [String[]]
-        $ComputerName = 'localhost',
+        $ComputerName = "$($env:COMPUTERNAMECOMPUTERNAME)",
 
         [Parameter(ParameterSetName = 'WinNT')]
         [Parameter(ParameterSetName = 'API')]
@@ -11762,7 +11859,8 @@ function Get-NetDomainTrust {
 
                 $TrustSearcher.filter = '(&(objectClass=trustedDomain))'
 
-                $TrustSearcher.FindAll() | Where-Object {$_} | ForEach-Object {
+                $Results = $TrustSearcher.FindAll()
+                $Results | Where-Object {$_} | ForEach-Object {
                     $Props = $_.Properties
                     $DomainTrust = New-Object PSObject
                     $TrustAttrib = Switch ($Props.trustattributes)
@@ -11795,6 +11893,8 @@ function Get-NetDomainTrust {
                     $DomainTrust | Add-Member Noteproperty 'TrustDirection' "$Direction"
                     $DomainTrust
                 }
+                $Results.dispose()
+                $TrustSearcher.dispose()
             }
         }
 
@@ -12124,7 +12224,7 @@ function Find-ForeignGroup {
 }
 
 
-function Find-ManagedSecurityGroup {
+function Find-ManagedSecurityGroups {
 <#
     .SYNOPSIS
 
@@ -12137,7 +12237,7 @@ function Find-ManagedSecurityGroup {
 
     .EXAMPLE
 
-        PS C:\> Find-ManagedSecurityGroup | Export-PowerViewCSV -NoTypeInformation group-managers.csv
+        PS C:\> Find-ManagedSecurityGroups | Export-PowerViewCSV -NoTypeInformation group-managers.csv
 
         Store a list of all security groups with managers in group-managers.csv
 

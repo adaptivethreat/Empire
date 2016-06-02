@@ -23,7 +23,7 @@ class Module:
             
             'Comments': [
                 'http://obscuresecurity.blogspot.com/2014/04/ADSISearcher.html',
-                'https://github.com/PowerShellEmpire/PowerTools/tree/master/PowerView'
+                'https://github.com/PowerShellMafia/PowerSploit/blob/dev/Recon/'
             ]
         }
 
