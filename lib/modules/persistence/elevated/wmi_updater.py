@@ -141,22 +141,11 @@ class Module:
                 return ""
 
         else:
-            if listenerName == "":
-                print helpers.color("[!] Either an ExtFile or a Listener must be specified")
-                return ""
-
-            # if an external file isn't specified, use a listener
-            elif not self.mainMenu.listeners.is_listener_valid(listenerName):
-                # not a valid listener, return nothing for the script
-                print helpers.color("[!] Invalid listener: " + listenerName)
-                return ""
-
-            else:
-                # generate the PowerShell one-liner with all of the proper options set
-                launcher = self.mainMenu.stagers.generate_launcher_fetcher(encode=True)
-                
-                encScript = launcher.split(" ")[-1]
-                statusMsg += "using launcher_fetcher"
+            # generate the PowerShell one-liner with all of the proper options set
+            launcher = self.mainMenu.stagers.generate_launcher_fetcher(encode=True)
+            
+            encScript = launcher.split(" ")[-1]
+            statusMsg += "using launcher_fetcher"
 
         # sanity check to make sure we haven't exceeded the powershell -enc 8190 char max
         if len(encScript) > 8190:
