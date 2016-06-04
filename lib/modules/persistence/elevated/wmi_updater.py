@@ -96,7 +96,7 @@ class Module:
 
     def generate(self):
         
-        listenerName = self.options['Listener']['Value']
+#        listenerName = self.options['Listener']['Value']
         
         # trigger options
         dailyTime = self.options['DailyTime']['Value']
