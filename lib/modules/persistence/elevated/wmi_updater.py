@@ -66,7 +66,6 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            },
             'WebFile' : {
                 'Description'   :   'The location of the launcher.bat file to fetch over the network/web',
                 'Required'      :   True,
