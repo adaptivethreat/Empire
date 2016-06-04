@@ -54,7 +54,7 @@ class Module:
             'SubName' : {
                 'Description'   :   'Name to use for the event subscription.',
                 'Required'      :   True,
-                'Value'         :   'Updater'
+                'Value'         :   'AutoUpdater'
             },                      
             'ExtFile' : {
                 'Description'   :   'Use an external file for the payload instead of a stager.',
