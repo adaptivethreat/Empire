@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 import sqlite3, argparse, sys, argparse, logging, json, string, os, re, time, signal, copy, base64
-from flask import Flask, request, jsonify, make_response, abort
+from flask import Flask, request, jsonify, make_response, abort, url_for
 from time import localtime, strftime
 from OpenSSL import SSL
 from Crypto.Random import random
@@ -231,7 +231,29 @@ def start_restful_api(startEmpire=False, suppress=False, username=None, password
         """
         return jsonify({'version': empire.VERSION})
 
+    @app.route('/api/map', methods=['GET'])
+    def list_routes():
+        import urllib
+        output = []
+        for rule in app.url_map.iter_rules():
 
+            options = {}
+            for arg in rule.arguments:
+                options[arg] = "[{0}]".format(arg)
+
+            methods = ','.join(rule.methods)
+            url = url_for(rule.endpoint, **options)
+            line = urllib.unquote("[ { '" + rule.endpoint + "': [ { 'methods': '" + methods + "', 'url': '" + url + "' } ] } ]")
+            output.append(line)
+    
+        res = ''
+        for line in sorted(output):
+            res = res + ',' + line
+        return jsonify({'Routes':res})
+        res = ''
+        for line in sorted(output):
+            res = res + '\r\n' + line
+        return jsonify({'Routes':res})
     @app.route('/api/config', methods=['GET'])
     def get_config():
         """
@@ -1097,6 +1119,7 @@ def start_restful_api(startEmpire=False, suppress=False, username=None, password
         shutdown_server()
         return jsonify({'success': True})
 
+    print app.route('/api/admin/shutdown')
 
     if not os.path.exists('./data/empire.pem'):
         print "[!] Error: cannot find certificate ./data/empire.pem"
