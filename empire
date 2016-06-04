@@ -243,17 +243,15 @@ def start_restful_api(startEmpire=False, suppress=False, username=None, password
 
             methods = ','.join(rule.methods)
             url = url_for(rule.endpoint, **options)
-            line = urllib.unquote("[ { '" + rule.endpoint + "': [ { 'methods': '" + methods + "', 'url': '" + url + "' } ] } ]")
+            line = [{ urllib.unquote(rule.endpoint) : [{ 'methods' : urllib.unquote(methods), 'url': urllib.unquote(url) }] }]
             output.append(line)
-    
-        res = ''
+
+        res = []
         for line in sorted(output):
-            res = res + ',' + line
-        return jsonify({'Routes':res})
-        res = ''
-        for line in sorted(output):
-            res = res + '\r\n' + line
-        return jsonify({'Routes':res})
+                res.append(line)
+
+        return jsonify({ 'Routes' : res })
+
     @app.route('/api/config', methods=['GET'])
     def get_config():
         """
