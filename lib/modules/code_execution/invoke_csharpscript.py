@@ -84,12 +84,20 @@ class Module:
             with open(file, 'r') as f:
                 script += ' @"\n' + str(f.read()).replace('\\n','\n').replace('\\t','\t') + '"@ | Out-File "$env:TEMP\\' + tail + '";'
 
-        script += ' csharpscript "$env:TEMP\\' + mainProgram + '" ' + args
+        script += ' csharpscript "$env:TEMP\\' + mainProgram + '" ' + args + "; echo $global:outputVar"
 
         return script
 
     def get_command(self):
-        return '''function csharpscript
+        return '''$outputVar=""; function writetohost
+{
+    $global:outputVar = $global:outputVar + $args[0]
+    write-host $args[0] -NoNewline
+}; function writetoerror
+{
+    $global:outputVar = $global:outputVar + "`nError: " + $args[0]
+    writetoerror $args[0]
+}; function csharpscript
 {
 <#################################################################################>
 <##                                                                             ##>
@@ -119,8 +127,8 @@ if( $CSprogram.StartsWith("*") ) {
     $CSprogram = $CSprogram.Remove(0,1)
     $noheader = $true
 } else {
-    Write-Host "C#Script v0.1 by Ingo Karstein (http://blog.karstein-consulting.com)"
-    Write-Host ""
+    writetohost "C#Script v0.1 by Ingo Karstein (http://blog.karstein-consulting.com)`n"
+    writetohost "`n"
     $noheader = $false
 }
 
@@ -140,7 +148,7 @@ $CSprogram = (new-object System.IO.FileInfo($CSprogram)).FullName
 
 #test C# program file exists
 if( !(Test-Path $CSprogram -PathType Leaf) ) {
-    Write-Host "SCRIPT NOT FOUND! ($CSprogram)"
+    writetohost "SCRIPT NOT FOUND! ($CSprogram)`n"
     return -1
 }
 
@@ -197,7 +205,7 @@ try {
 }
 
 if( $CSprogramConfig -eq $null ) {
-    Write-Host "CONFIG XML AT THE BEGINNING OF THE C# FILE IS INVALID OR MISSING!"
+    writetohost "CONFIG XML AT THE BEGINNING OF THE C# FILE IS INVALID OR MISSING!`n"
     return -1
 }
 
@@ -248,7 +256,7 @@ $referenceConfig | % {
     }
     
     if( $a -eq $null ) {
-        write-host "CANNOT LOCATE ASSEMBLY ""$po""."
+        writetohost "CANNOT LOCATE ASSEMBLY ""$po"".`n"
         return -1
     }
 
@@ -282,28 +290,28 @@ if( [System.IntPtr]::Size -eq 4 ) {
 
 if( $CSprogramConfig.csscript.requiredframework -ne $null ) {
     if( $CSprogramConfig.csscript.requiredframework -ne $runtime ) {
-        Write-Host "THIS PROGRAM REQUIRES FRAMEWORK VERSION ""$($CSprogramConfig.csscript.requiredframework)""."
+        writetohost "THIS PROGRAM REQUIRES FRAMEWORK VERSION ""$($CSprogramConfig.csscript.requiredframework)"".`n"
         return -1
     }
 }
 
 if( $CSprogramConfig.csscript.requiredplatform -ne $null ) {
     if( $CSprogramConfig.csscript.requiredplatform -ne $platform ) {
-        Write-Host "THIS PROGRAM REQUIRES PLATFORM ""$($CSprogramConfig.csscript.requiredplatform)""."
+        writetohost "THIS PROGRAM REQUIRES PLATFORM ""$($CSprogramConfig.csscript.requiredplatform)"".`n"
         return -1
     }
 }
 
 if( !$noheader ) {
-    Write-Host "Framework: $($runtime), Platform: $($platform)"
-    Write-Host ""
+    writetohost "Framework: $($runtime), Platform: $($platform)`n"
+    writetohost "`n"
 }
 
 $noconsole = $false
 if( $CSprogramConfig.csscript.mode -ne $null) {
     $n = $CSprogramConfig.csscript.mode
     if( $n -ne "exe" -and $n -ne "winexe" ) {
-        Write-Host "UNKNOWN ""MODE"" IN CONFIG XML INSIDE C# FILE."
+        writetohost "UNKNOWN ""MODE"" IN CONFIG XML INSIDE C# FILE.`n"
     }
     $noconsole = $n -eq "winexe"
 }
@@ -324,7 +332,7 @@ try {
 } catch {$compilerOptions = $null }
 
 if( $compilerOptions -eq $null ) {
-    Write-Host "CANNOT CALL COMPILER. PLEASE CHECK THE 'frameworkversion' SETTINGS."
+    writetohost "CANNOT CALL COMPILER. PLEASE CHECK THE 'frameworkversion' SETTINGS.`n"
     return -1
 }
 
@@ -370,7 +378,7 @@ try {
         return -1
     }
 } catch {
-    Write-Host "CANNOT COMPILE. PLEASE CHECK THE FRAMEWORK VERSION SETTINGS."
+    writetohost "CANNOT COMPILE. PLEASE CHECK THE FRAMEWORK VERSION SETTINGS.`n"
     return -1
 }
 
@@ -870,7 +878,7 @@ try {
     $types = Add-Type -CompilerParameters $cp2 -Language CSharp -ErrorVariable "compilerResultsErrOut" -TypeDefinition $typedef -PassThru
 
     if( $types -eq $null ) {
-        Write-Host "HELPER CLASS NOT FOUND!"
+        writetohost "HELPER CLASS NOT FOUND!`n"
     }
 } catch {
 }
@@ -878,7 +886,7 @@ try {
 #stop if compilation of helper class failed
 if( $compilerResultsErrOut -ne $null  ){
     $compilerResultsErrOut
-    Write-Host "CANNOT COMPILE HELPER CLASS."
+    writetohost "CANNOT COMPILE HELPER CLASS.`n"
     return -1
 }
 
@@ -898,26 +906,27 @@ $errOut.IsErrorReceiver = $true
 [System.Console]::SetOut($stdOut)
 [System.Console]::SetError($errOut)
 
+$global:outputVar = ""
+
 # event handler for console output
 $stdOut.add_WriteEvent( {
     param($sender, $parameter)
-
-    write-host "$($parameter.Value)" -NoNewline 
+    writetohost "$($parameter.Value)"
 });
 
 $stdOut.add_WriteLineEvent( {
     param($sender, $parameter)
-    write-host ""
+    writetohost "`n"
 });
 
 $errOut.add_WriteEvent( {
     param($sender, $parameter)
-
-    Write-Error "$($parameter.Value)"
+    writetoerror "$($parameter.Value)"
 });
 
 $errOut.add_WriteLineEvent( { 
     param($sender, $parameter)
+    writetoerror ""
 });
 
 
@@ -926,7 +935,7 @@ try {
     $helper.Start($m, $hp, [Object[]]$params, $host.Runspace)
 
     while( !($helper.mre.WaitOne(100)) ) {
-        #Write-Host "Wait..."
+        #writetohost "Wait..."
     }
 } finally {
     $helper.Stop()
