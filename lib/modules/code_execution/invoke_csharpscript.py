@@ -96,7 +96,7 @@ class Module:
 }; function writetoerror
 {
     $global:outputVar = $global:outputVar + "`nError: " + $args[0]
-    writetoerror $args[0]
+    Write-Error $args[0]
 }; function csharpscript
 {
 <#################################################################################>
