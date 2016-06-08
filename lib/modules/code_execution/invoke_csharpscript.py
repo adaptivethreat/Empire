@@ -11,7 +11,7 @@ class Module:
             'Author': ['@tristandostaler'],
 
             'Description': ("Uses PowerShell to execute provided CSharp script in memory. "
-                            "Big thanks to https://gallery.technet.microsoft.com/C-Script-Execute-plain-a9eae961"
+                            "Big thanks to https://gallery.technet.microsoft.com/C-Script-Execute-plain-a9eae961 "
                             "The info to build the script must be put in an XML block. See website for more info."),
 
             'Background' : True,
