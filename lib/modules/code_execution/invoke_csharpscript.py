@@ -11,9 +11,9 @@ class Module:
             'Author': ['@tristandostaler'],
 
             'Description': ("Uses PowerShell to execute provided CSharp script. "
-                            "It first writes the provided scripts on $env:/TEMP/scriptName.cs and then compile it. "
+                            "It first writes the provided scripts to variable in memory and then compile it. "
                             "Big thanks to https://gallery.technet.microsoft.com/C-Script-Execute-plain-a9eae961"
-                            "The info to build the script must be put in an XML block. See website for more info."),
+                            "I've got rid of the mandatory XML block. Enjoy!"),
 
             'Background' : True,
 
@@ -44,15 +44,20 @@ class Module:
                 'Required'      :   True,
                 'Value'         :   '/tmp/'
             },
-            'MainProgramName' : {
-                'Description'   :   'The name of the main program to execute. It is this one that must define the XML block.',
-                'Required'      :   True,
-                'Value'         :   'Program.cs'
-            },
             'Args' : {
                 'Description'   :   'Arguments to give to the CSharp script. Space separated. Can be between \"\" if needed.',
                 'Required'      :   False,
                 'Value'         :   ''
+            },
+            'ConsoleMode' : {
+                'Description'   :   'Switch. If True, the program compiles as a console application. If false, like a WinForm application.',
+                'Required'      :   False,
+                'Value'         :   'True'
+            },
+            'Debug' : {
+                'Description'   :   'Switch. WARNING! If True, not OpsecSafe! If True, the compiled program will open a window to enable debugging.',
+                'Required'      :   False,
+                'Value'         :   'False'
             }
         }
 
@@ -76,9 +81,11 @@ class Module:
         filenames = []
 
         directory = self.options['ScriptsDir']['Value']
-        mainProgram = self.options['MainProgramName']['Value']
-        mainProgramWithoutExt = os.path.splitext(mainProgram)[0]
         args = self.options['Args']['Value']
+        isConsoleMode = self.options['ConsoleMode']['Value'].lower() == 'true'
+        debugMode = self.options['Debug']['Value'].lower() == 'true'
+
+        references = []
 
         for file in glob.glob(directory + "/*.cs"):
             head, tail = os.path.split(file)
@@ -86,14 +93,19 @@ class Module:
             with open(file, 'r') as f:
                 filenames.append(os.path.splitext(tail)[0])
                 script += ' $' + os.path.splitext(tail)[0] + ' = @"\n' + str(f.read()).replace('\\n','\n').replace('\\t','\t') + '"@;'
+                for l in f.readlines():
+                    if re.match('^using[\s]+([a-zA-Z]+);',l):
+                        references.append(l.replace('using', '').replace(';','').strip())
+                    elif re.match('^namespace',l):
+                        break;
 
-        script += self.get_command(mainProgramWithoutExt, filenames)
+        script += self.get_command(filenames, isConsoleMode, debugMode, references)
 
         script += ' csharpscript ' + args + "; echo $global:outputVar"
 
         return script
 
-    def get_command(self, mainProgramWithoutExt='Program', filenames=[]):
+    def get_command(self, filenames=[], isConsoleMode=True, debugMode=False, references=[]):
         command = '''$outputVar=""; function writetohost
 {
     $global:outputVar = $global:outputVar + $args[0]
@@ -128,51 +140,14 @@ $params = $args
 #get script path for later use
 $csscriptPath = Split-Path (Get-Item -Path ".\" -Verbose).FullName
 
-#$debug=$true
+$CSprogramConfigXML = "<csscript><references>";
+        '''
+        for r in references:
+            command += '$CSprogramConfigXML += "<reference>' + r + '</reference>";'
+        
+        command += '$CSprogramConfigXML += "</references></csscript>";'
 
-#load C# program 
-$CSprogramContent = $''' + mainProgramWithoutExt + ''';
-
-
-#load config xml at the beginning of the C# program
-<# sample:
-//<csscript>
-//  <nodebug/>                                 <!--optional--> 
-//  <references>
-//    <reference>System</reference>
-//    <reference>System.Core</reference>
-//    <reference>System.Data</reference>
-//    <reference>System.Data.DataSetExtensions</reference>
-//    <reference>System.Xml</reference>
-//    <reference>System.Xml.Linq</reference>
-//    <reference>System.Windows.Forms</reference>
-//  </references>
-//  <mode>winexe</mode>
-//  <requiredframework>4.0</requiredframework> <!--optional-->
-//  <requiredplatform>x64</requiredplatform>   <!--optional-->
-//  <files>
-//      <file>Form1.cs</file>
-//      <file>Form1.Designer.cs</file>
-////      <file>Test</file>                    <!--comment!!-->
-//  </files>
-//</csscript>
-
-#4 slash characters means "comment" => line not used.
-#In "reference" you can use also full paths. There is no relative path support at the moment.
-#mode = winexe / exe 
-#"files" can be relative to the C# program file.
-#>
-
-$CSprogramConfigXML = "";
-foreach($l in $CSprogramContent.Split("`n")) {
-    if( !([string]::IsNullOrEmpty($l.Trim())) -and $l -notlike "//*" ) { break }
-    
-    if( $l -notlike "////*") {
-        if( !([string]::IsNullOrEmpty($l.Trim())) ) {
-            $CSprogramConfigXML += $l.remove(0,2) + "`n"
-        }
-    }
-}
+        command += '''
 
 $CSprogramConfig = $null
 try {
@@ -284,16 +259,9 @@ if( !$noheader ) {
     writetohost "`n"
 }
 
-$noconsole = $false
-if( $CSprogramConfig.csscript.mode -ne $null) {
-    $n = $CSprogramConfig.csscript.mode
-    if( $n -ne "exe" -and $n -ne "winexe" ) {
-        writetohost "UNKNOWN ""MODE"" IN CONFIG XML INSIDE C# FILE.`n"
-    }
-    $noconsole = $n -eq "winexe"
-}
+$noconsole = $''' + str(isConsoleMode).lower() + '''
 
-$debug = ( $CSprogramConfig.csscript.debug -ne $null) 
+$debug = $''' + str(debugMode).lower() + '''
 
 $compilerCreateOptions = New-Object 'System.Collections.Generic.Dictionary`2[System.string, System.string]'
 
@@ -322,14 +290,13 @@ if( $debug ) {
 }    
 
 $allCSsourceFiles = @()
-$allCSsourceFiles += [string]::Join("`n", $CSprogramContent)
 
         '''
         for f in filenames:
-            if not f == mainProgramWithoutExt:
-                command += '\n$allCSsourceFiles += $' + f + ';'
+            command += '\n$allCSsourceFiles += $' + f + ';'
 
         command += '''
+
 try {
     $compilerResults = $compilerOptions.CompileAssemblyFromSource($cp, [String[]]$allCSsourceFiles)
     if( $compilerResults.Errors.Count -gt 0 ) {
