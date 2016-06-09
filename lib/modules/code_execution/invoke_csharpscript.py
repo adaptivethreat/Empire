@@ -21,7 +21,7 @@ class Module:
 
             'NeedsAdmin' : False,
 
-            'OpsecSafe' : False,
+            'OpsecSafe' : True,
 
             'MinPSVersion' : '2',
 
@@ -72,24 +72,29 @@ class Module:
         import os
         import glob
 
-        script = self.get_command()
+        script = ""
+        filenames = []
 
         directory = self.options['ScriptsDir']['Value']
         mainProgram = self.options['MainProgramName']['Value']
+        mainProgramWithoutExt = os.path.splitext(mainProgram)[0]
         args = self.options['Args']['Value']
 
         for file in glob.glob(directory + "/*.cs"):
             head, tail = os.path.split(file)
 
             with open(file, 'r') as f:
-                script += ' @"\n' + str(f.read()).replace('\\n','\n').replace('\\t','\t') + '"@ | Out-File "$env:TEMP\\' + tail + '";'
+                filenames.append(os.path.splitext(tail)[0])
+                script += ' $' + os.path.splitext(tail)[0] + ' = @"\n' + str(f.read()).replace('\\n','\n').replace('\\t','\t') + '"@;'
 
-        script += ' csharpscript "$env:TEMP\\' + mainProgram + '" ' + args + "; echo $global:outputVar"
+        script += self.get_command(mainProgramWithoutExt, filenames)
+
+        script += ' csharpscript ' + args + "; echo $global:outputVar"
 
         return script
 
-    def get_command(self):
-        return '''$outputVar=""; function writetohost
+    def get_command(self, mainProgramWithoutExt='Program', filenames=[]):
+        command = '''$outputVar=""; function writetohost
 {
     $global:outputVar = $global:outputVar + $args[0]
     write-host $args[0] -NoNewline
@@ -118,43 +123,15 @@ class Module:
 <##                                                                             ##>
 <#################################################################################>
 
-#get C# program filename
-#  when starting the path with "*" no C#Script headers will be printed.
-$CSprogram = $args[0]
-
-#toggle "quiet" mode
-if( $CSprogram.StartsWith("*") ) {
-    $CSprogram = $CSprogram.Remove(0,1)
-    $noheader = $true
-} else {
-    writetohost "C#Script v0.1 by Ingo Karstein (http://blog.karstein-consulting.com)`n"
-    writetohost "`n"
-    $noheader = $false
-}
-
-#get all other parameters
-$params = $args | select -Skip 1
+$params = $args
 
 #get script path for later use
 $csscriptPath = Split-Path (Get-Item -Path ".\" -Verbose).FullName
 
-##Used through development
-#$CSprogram="c:\source2\csscript\testwin\testwin\program.cs" 
-#$CSprogram="c:\source2\csscript\test\test\program.cs" 
 #$debug=$true
 
-#get full name of C# program file
-$CSprogram = (new-object System.IO.FileInfo($CSprogram)).FullName
-
-#test C# program file exists
-if( !(Test-Path $CSprogram -PathType Leaf) ) {
-    writetohost "SCRIPT NOT FOUND! ($CSprogram)`n"
-    return -1
-}
-
-
-#load C# program
-$CSprogramContent = Get-Content $CSprogram
+#load C# program 
+$CSprogramContent = $''' + mainProgramWithoutExt + ''';
 
 
 #load config xml at the beginning of the C# program
@@ -187,12 +164,12 @@ $CSprogramContent = Get-Content $CSprogram
 #>
 
 $CSprogramConfigXML = "";
-foreach($l in $CSprogramContent) {
+foreach($l in $CSprogramContent.Split("`n")) {
     if( !([string]::IsNullOrEmpty($l.Trim())) -and $l -notlike "//*" ) { break }
     
     if( $l -notlike "////*") {
         if( !([string]::IsNullOrEmpty($l.Trim())) ) {
-            $CSprogramConfigXML += $l.remove(0,2)
+            $CSprogramConfigXML += $l.remove(0,2) + "`n"
         }
     }
 }
@@ -318,9 +295,6 @@ if( $CSprogramConfig.csscript.mode -ne $null) {
 
 $debug = ( $CSprogramConfig.csscript.debug -ne $null) 
 
-#$type = ('System.Collections.Generic.Dictionary`2') -as "Type"
-#$type = $type.MakeGenericType( @( ("System.String" -as "Type"), ("system.string" -as "Type") ) )
-#$compilerCreateOptions = [Activator]::CreateInstance($type)
 $compilerCreateOptions = New-Object 'System.Collections.Generic.Dictionary`2[System.string, System.string]'
 
 if( $runtime -notlike "v*") { $runtime = "v$($runtime)" }
@@ -350,27 +324,12 @@ if( $debug ) {
 $allCSsourceFiles = @()
 $allCSsourceFiles += [string]::Join("`n", $CSprogramContent)
 
-try {
-    Push-Location
-    
-    Set-Location (Split-Path $CSprogram)
-    [System.Environment]::CurrentDirectory = Get-Location
-    
-    if( $CSprogramConfig.csscript.files.file -ne $null ) {
-        $CSprogramConfig.csscript.files.file | % {
-            $p = $_
-            $p = (new-object System.IO.FileInfo($p)).FullName
+        '''
+        for f in filenames:
+            if not f == mainProgramWithoutExt:
+                command += '\n$allCSsourceFiles += $' + f + ';'
 
-            if( Test-Path $p -PathType Leaf ) {
-                $allCSsourceFiles += [System.IO.File]::ReadAllText($p)
-            }
-        }
-    }
-} finally {
-    Pop-Location
-    [System.Environment]::CurrentDirectory = Get-Location
-}
-
+        command += '''
 try {
     $compilerResults = $compilerOptions.CompileAssemblyFromSource($cp, [String[]]$allCSsourceFiles)
     if( $compilerResults.Errors.Count -gt 0 ) {
@@ -942,4 +901,5 @@ try {
 }
 };
         '''
+        return command
 
