@@ -50,7 +50,7 @@ class Module:
                 'Value'         :   'Program.cs'
             },
             'Args' : {
-                'Description'   :   'Arguments to give to the CSharp script. Space separated and between \"\"',
+                'Description'   :   'Arguments to give to the CSharp script. Space separated. Can be between \"\" if needed.',
                 'Required'      :   False,
                 'Value'         :   ''
             }
