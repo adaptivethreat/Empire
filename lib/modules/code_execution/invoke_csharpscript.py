@@ -40,7 +40,7 @@ class Module:
                 'Value'         :   ''
             },
             'ScriptsDir' : {
-                'Description'   :   'CSharp scripts directory location.',
+                'Description'   :   'CSharp scripts directory location. All .cs files must be here; not in subdirectory!',
                 'Required'      :   True,
                 'Value'         :   '/tmp/'
             },
@@ -91,17 +91,18 @@ class Module:
             head, tail = os.path.split(file)
 
             with open(file, 'r') as f:
-                filenames.append(os.path.splitext(tail)[0])
-                script += ' $' + os.path.splitext(tail)[0] + ' = @"\n' + str(f.read()).replace('\\n','\n').replace('\\t','\t') + '"@;'
+                filenames.append(tail.replace('.','_'))
+                script += ' $' + tail.replace('.','_') + ' = @"\n' + str(f.read()).replace('\\n','\n').replace('\\t','\t') + '"@;'
+            with open(file, 'r') as f:
                 for l in f.readlines():
-                    if re.match('^using[\s]+([a-zA-Z]+);',l):
+                    if re.match('^using[\s]+([.a-zA-Z]+);[\s]+',l.replace('\\n','').replace('\\t','')):
                         references.append(l.replace('using', '').replace(';','').strip())
                     elif re.match('^namespace',l):
                         break;
 
         script += self.get_command(filenames, isConsoleMode, debugMode, references)
 
-        script += ' csharpscript ' + args + "; echo $global:outputVar"
+        script += ' csharpscript ' + args + '; echo $global:outputVar'
 
         return script
 
@@ -145,9 +146,8 @@ $CSprogramConfigXML = "<csscript><references>";
         for r in references:
             command += '$CSprogramConfigXML += "<reference>' + r + '</reference>";'
         
-        command += '$CSprogramConfigXML += "</references></csscript>";'
-
         command += '''
+$CSprogramConfigXML += "</references></csscript>";
 
 $CSprogramConfig = $null
 try {
