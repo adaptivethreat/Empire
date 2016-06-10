@@ -12,7 +12,7 @@ class Module:
 
             'Description': ("Uses PowerShell to execute provided CSharp script. "
                             "It first writes the provided scripts to variable in memory and then compile it. "
-                            "Big thanks to https://gallery.technet.microsoft.com/C-Script-Execute-plain-a9eae961"
+                            "Big thanks to https://gallery.technet.microsoft.com/C-Script-Execute-plain-a9eae961 "
                             "I've got rid of the mandatory XML block. Enjoy!"),
 
             'Background' : True,
