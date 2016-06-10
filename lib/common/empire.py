@@ -1247,7 +1247,7 @@ class AgentMenu(cmd.Cmd):
         self.prompt = '(Empire: '+helpers.color(name, 'red')+') > '
 
         # agent commands that have opsec-safe alises in the agent code
-        self.agentCommands = ["ls","dir","rm","del","cp","copy","pwd","cat","cd","mkdir","rmdir","mv","move","ipconfig","ifconfig","route","reboot","restart","shutdown","ps","tasklist","getpid","whoami","getuid","hostname"]
+        self.agentCommands = ["ls","dir","rm","del","cp","copy","pwd","cat","cd","mkdir","rmdir","mv","move","ipconfig","ifconfig","route","reboot","restart","shutdown","ps","tasklist","getpid","whoami","getuid","hostname","switch","sget","skill","sadd","sinfo","sfix","srandom","askcreds","start-process"]
 
         # listen for messages from this specific agent
         dispatcher.connect( self.handle_agent_event, sender=dispatcher.Any)
