@@ -88,7 +88,7 @@ class Module:
 
         self.references = []
 
-        self.recursive_directory_search(self.directory)
+        self.recursive_directory_search(self.directory, [])
 
         self.script += self.get_command(self.filenames, self.isConsoleMode, self.debugMode, self.references)
 
@@ -96,16 +96,22 @@ class Module:
 
         return self.script
 
-    def recursive_directory_search(self, directory):
+    def recursive_directory_search(self, directory, darray):
         for d in os.listdir(directory):
             if not isfile(os.path.join(directory,d)):
-                self.recursive_directory_search(os.path.join(directory,d))
+                newlist = darray[:]
+                newlist.append(d)
+                self.recursive_directory_search(os.path.join(directory,d), newlist)
         for file in glob.glob(directory + "/*.cs"):
             head, tail = os.path.split(file)
 
             with open(file, 'r') as f:
-                self.filenames.append(tail.replace('.','_'))
-                self.script += ' $' + tail.replace('.','_') + ' = @"\n' + str(f.read()).replace('\\n','\n').replace('\\t','\t') + '"@;'
+                filename = ""
+                for a in darray:
+                    filename += a + "_"
+                filename += tail.replace('.','_')
+                self.filenames.append(filename)
+                self.script += ' $' + filename + ' = @"\n' + str(f.read()).replace('\\n','\n').replace('\\t','\t') + '"@;'
             with open(file, 'r') as f:
                 for l in f.readlines():
                     if re.match('^using[\s]+([.a-zA-Z]+);[\s]+',l.replace('\\n','').replace('\\t','')):
