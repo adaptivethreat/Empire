@@ -355,7 +355,7 @@ $cp2 = New-Object System.CodeDom.Compiler.CompilerParameters($referenceAssembies
 $cp2.GenerateInMemory = $true
 $cp2.GenerateExecutable = $false
 $cp2.IncludeDebugInformation = $debug
-$cp2.TempFiles.KeepFiles = $true
+$cp2.TempFiles.KeepFiles = $false
 
 Remove-Variable "compilerResultsErrOut" -Force -Confirm:$false -ErrorAction 0
 
