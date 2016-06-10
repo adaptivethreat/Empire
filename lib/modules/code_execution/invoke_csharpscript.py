@@ -1,5 +1,9 @@
 import re
 from lib.common import helpers
+import os
+import glob
+from os.path import isfile
+
 
 class Module:
 
@@ -74,37 +78,40 @@ class Module:
 
     def generate(self):
 
-        import os
-        import glob
+        self.script = ""
+        self.filenames = []
 
-        script = ""
-        filenames = []
+        self.directory = self.options['ScriptsDir']['Value']
+        self.args = self.options['Args']['Value']
+        self.isConsoleMode = self.options['ConsoleMode']['Value'].lower() == 'true'
+        self.debugMode = self.options['Debug']['Value'].lower() == 'true'
 
-        directory = self.options['ScriptsDir']['Value']
-        args = self.options['Args']['Value']
-        isConsoleMode = self.options['ConsoleMode']['Value'].lower() == 'true'
-        debugMode = self.options['Debug']['Value'].lower() == 'true'
+        self.references = []
 
-        references = []
+        self.recursive_directory_search(self.directory)
 
+        self.script += self.get_command(self.filenames, self.isConsoleMode, self.debugMode, self.references)
+
+        self.script += ' csharpscript ' + self.args + '; echo $global:outputVar'
+
+        return self.script
+
+    def recursive_directory_search(self, directory):
+        for d in os.listdir(directory):
+            if not isfile(os.path.join(directory,d)):
+                self.recursive_directory_search(os.path.join(directory,d))
         for file in glob.glob(directory + "/*.cs"):
             head, tail = os.path.split(file)
 
             with open(file, 'r') as f:
-                filenames.append(tail.replace('.','_'))
-                script += ' $' + tail.replace('.','_') + ' = @"\n' + str(f.read()).replace('\\n','\n').replace('\\t','\t') + '"@;'
+                self.filenames.append(tail.replace('.','_'))
+                self.script += ' $' + tail.replace('.','_') + ' = @"\n' + str(f.read()).replace('\\n','\n').replace('\\t','\t') + '"@;'
             with open(file, 'r') as f:
                 for l in f.readlines():
                     if re.match('^using[\s]+([.a-zA-Z]+);[\s]+',l.replace('\\n','').replace('\\t','')):
-                        references.append(l.replace('using', '').replace(';','').strip())
+                        self.references.append(l.replace('using', '').replace(';','').strip())
                     elif re.match('^namespace',l):
                         break;
-
-        script += self.get_command(filenames, isConsoleMode, debugMode, references)
-
-        script += ' csharpscript ' + args + '; echo $global:outputVar'
-
-        return script
 
     def get_command(self, filenames=[], isConsoleMode=True, debugMode=False, references=[]):
         command = '''$outputVar=""; function writetohost
