@@ -114,6 +114,7 @@ class Module:
 }; function writetoerror
 {
     $global:outputVar = $global:outputVar + "`nError: " + $args[0]
+    write-host "Error: " + $args[0]
     Write-Error $args[0]
 }; function csharpscript
 {
@@ -158,7 +159,7 @@ try {
 
 if( $CSprogramConfig -eq $null ) {
     writetohost "CONFIG XML AT THE BEGINNING OF THE C# FILE IS INVALID OR MISSING!`n"
-    return -1
+    return "-1: CONFIG XML AT THE BEGINNING OF THE C# FILE IS INVALID OR MISSING!`n"
 }
 
 $referenceAssembies = @()
@@ -209,7 +210,7 @@ $referenceConfig | % {
     
     if( $a -eq $null ) {
         writetohost "CANNOT LOCATE ASSEMBLY ""$po"".`n"
-        return -1
+        return "-1: CANNOT LOCATE ASSEMBLY ""$po"".`n"
     }
 
     $p = $a.Location
@@ -243,14 +244,14 @@ if( [System.IntPtr]::Size -eq 4 ) {
 if( $CSprogramConfig.csscript.requiredframework -ne $null ) {
     if( $CSprogramConfig.csscript.requiredframework -ne $runtime ) {
         writetohost "THIS PROGRAM REQUIRES FRAMEWORK VERSION ""$($CSprogramConfig.csscript.requiredframework)"".`n"
-        return -1
+        return "-1: THIS PROGRAM REQUIRES FRAMEWORK VERSION ""$($CSprogramConfig.csscript.requiredframework)"".`n"
     }
 }
 
 if( $CSprogramConfig.csscript.requiredplatform -ne $null ) {
     if( $CSprogramConfig.csscript.requiredplatform -ne $platform ) {
         writetohost "THIS PROGRAM REQUIRES PLATFORM ""$($CSprogramConfig.csscript.requiredplatform)"".`n"
-        return -1
+        return "-1: THIS PROGRAM REQUIRES PLATFORM ""$($CSprogramConfig.csscript.requiredplatform)"".`n"
     }
 }
 
@@ -275,7 +276,7 @@ try {
 
 if( $compilerOptions -eq $null ) {
     writetohost "CANNOT CALL COMPILER. PLEASE CHECK THE 'frameworkversion' SETTINGS.`n"
-    return -1
+    return "-1: CANNOT CALL COMPILER. PLEASE CHECK THE 'frameworkversion' SETTINGS.`n"
 }
 
 $cp = New-Object System.CodeDom.Compiler.CompilerParameters($referenceAssembies, $null)
@@ -301,11 +302,11 @@ try {
     $compilerResults = $compilerOptions.CompileAssemblyFromSource($cp, [String[]]$allCSsourceFiles)
     if( $compilerResults.Errors.Count -gt 0 ) {
         $compilerResults.Errors
-        return -1
+        return "-1: " + $compilerResults.Errors
     }
 } catch {
     writetohost "CANNOT COMPILE. PLEASE CHECK THE FRAMEWORK VERSION SETTINGS.`n"
-    return -1
+    return "-1: CANNOT COMPILE. PLEASE CHECK THE FRAMEWORK VERSION SETTINGS.`n"
 }
 
 $ts = $compilerResults.CompiledAssembly.GetTypes()
@@ -813,7 +814,7 @@ try {
 if( $compilerResultsErrOut -ne $null  ){
     $compilerResultsErrOut
     writetohost "CANNOT COMPILE HELPER CLASS.`n"
-    return -1
+    return "-1: CANNOT COMPILE HELPER CLASS.`n"
 }
 
 
