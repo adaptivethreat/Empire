@@ -1,8 +1,12 @@
+from __future__ import with_statement
 import re
 from lib.common import helpers
 import os
 import glob
 from os.path import isfile
+import sys
+import codecs
+from chardet.universaldetector import UniversalDetector
 
 
 class Module:
@@ -62,6 +66,11 @@ class Module:
                 'Description'   :   'Switch. WARNING! If True, not OpsecSafe! If True, the compiled program will open a window to enable debugging.',
                 'Required'      :   False,
                 'Value'         :   'False'
+            },
+            'Convert' : {
+                'Description'   :   'Switch. Convert windows encoding file to UTF-8 encoding. Needed when the script files are uploaded directly from Windows.',
+                'Required'      :   False,
+                'Value'         :   'False'
             }
         }
 
@@ -78,6 +87,9 @@ class Module:
 
     def generate(self):
 
+        self.targetFormat = 'utf-8'
+        self.detector = UniversalDetector()
+
         self.script = ""
         self.filenames = []
 
@@ -85,6 +97,7 @@ class Module:
         self.args = self.options['Args']['Value']
         self.isConsoleMode = self.options['ConsoleMode']['Value'].lower() == 'true'
         self.debugMode = self.options['Debug']['Value'].lower() == 'true'
+        self.needConvert = self.options['Convert']['Value'].lower() == 'true'
 
         self.references = []
 
@@ -101,23 +114,62 @@ class Module:
             if not isfile(os.path.join(directory,d)):
                 newlist = darray[:]
                 newlist.append(d)
-                self.recursive_directory_search(os.path.join(directory,d), newlist)
+                self.recursive_directory_search(os.path.join(directory, d), newlist)
         for file in glob.glob(directory + "/*.cs"):
             head, tail = os.path.split(file)
-
+            if self.needConvert:
+                self.convertFileWithDetection(file)
             with open(file, 'r') as f:
                 filename = ""
                 for a in darray:
                     filename += a + "_"
                 filename += tail.replace('.','_')
                 self.filenames.append(filename)
-                self.script += ' $' + filename + ' = @"\n' + str(f.read()).replace('\\n','\n').replace('\\t','\t') + '"@;'
+                self.script += ' $' + filename + ' = @"\n' + str(f.read()).replace('\\n','\n').replace('\\t','\t') + '\n"@;'
             with open(file, 'r') as f:
                 for l in f.readlines():
                     if re.match('^using[\s]+([.a-zA-Z]+);[\s]+',l.replace('\\n','').replace('\\t','')):
                         self.references.append(l.replace('using', '').replace(';','').strip())
                     elif re.match('^namespace',l):
                         break;
+
+    def get_encoding_type(self, current_file):
+        self.detector.reset()
+        for line in file(current_file):
+            self.detector.feed(line)
+            if self.detector.done: break
+        self.detector.close()
+        return self.detector.result['encoding']
+
+    def convertFileBestGuess(self, filename):
+        sourceFormats = ['ascii', 'iso-8859-1']
+        for format in sourceFormats:
+            try:
+                with codecs.open(fileName, 'rU', format) as sourceFile:
+                    writeConversion(sourceFile)
+                    print('Done.')
+                    return
+            except UnicodeDecodeError:
+                pass
+
+    def convertFileWithDetection(self, fileName):
+        print("Converting '" + fileName + "'...")
+        format=self.get_encoding_type(fileName)
+        try:
+            with codecs.open(fileName, 'rU', format) as sourceFile:
+                self.writeConversion(sourceFile.readlines(), fileName)
+                print('Done.')
+                return
+        except UnicodeDecodeError:
+            pass
+
+        print("Error: failed to convert '" + fileName + "'.")
+
+
+    def writeConversion(self, file, fileName):
+        with codecs.open(fileName, 'w', self.targetFormat) as targetFile:
+            for line in file:
+                targetFile.write(line)
 
     def get_command(self, filenames=[], isConsoleMode=True, debugMode=False, references=[]):
         command = '''$outputVar=""; function writetohost
@@ -155,10 +207,10 @@ $params = $args
 #get script path for later use
 $csscriptPath = Split-Path (Get-Item -Path ".\" -Verbose).FullName
 
-$CSprogramConfigXML = "<csscript><references>";
-        '''
+$CSprogramConfigXML = "<csscript><references>";'''
+        
         for r in references:
-            command += '$CSprogramConfigXML += "<reference>' + r + '</reference>";'
+            command += '$CSprogramConfigXML += "<reference>' + r + '</reference>";\n'
         
         command += '''
 $CSprogramConfigXML += "</references></csscript>";
