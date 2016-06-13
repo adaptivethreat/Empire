@@ -666,7 +666,7 @@ function Write-CMDServiceBinary {
 
     try {
         # write the binary array out to the specified path
-        Set-Content -Balue $Binary -Encoding Byte -Path $Path
+        Set-Content -Value $Binary -Encoding Byte -Path $Path
         "[*] Binary for service '$ServiceName' with custom command '$CMD' written to '$Path'"
     }
     catch {
