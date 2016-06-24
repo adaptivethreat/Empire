@@ -92,7 +92,7 @@ class Module:
         script += "Invoke-DCSync -PWDumpFormat "
 
         if self.options["Domain"]['Value'] != '':
-            script += " -Domain " + self.options['domain']['Value']
+            script += " -Domain " + self.options['Domain']['Value']
 
         if self.options["Forest"]['Value'] != '':
             script += " -DumpForest "
