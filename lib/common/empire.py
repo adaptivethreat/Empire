@@ -50,7 +50,7 @@ class MainMenu(cmd.Cmd):
         self.conn = self.database_connect()
 
         # pull out some common configuration information
-        (self.installPath, self.stage0, self.stage1, self.stage2, self.ipWhiteList, self.ipBlackList) = helpers.get_config('install_path,stage0_uri,stage1_uri,stage2_uri,ip_whitelist,ip_blacklist')
+        (self.installPath, self.stage0, self.stage1, self.stage2, self.ipWhiteList, self.ipBlackList, self.smtpServer, self.smtpSender, self.smtpRecipient, self.agentNotify) = helpers.get_config('install_path,stage0_uri,stage1_uri,stage2_uri,ip_whitelist,ip_blacklist,smtp_server,smtp_sender,smtp_recipient,agent_notify')
 
         # instantiate the agents, listeners, and stagers objects
         self.agents = agents.Agents(self, args=args)
@@ -506,7 +506,7 @@ class MainMenu(cmd.Cmd):
         "Set a global option (e.g. IP whitelists)."
 
         parts = line.split(" ")
-        if len(parts) == 1:
+        if len(parts) == 1 and (parts[0].lower() == 'ip_whitelist' or parts[0].lower() == 'ip_blacklist'):
             print helpers.color("[!] Please enter 'IP,IP-IP,IP/CIDR' or a file path.")
         else:
             if parts[0].lower() == "ip_whitelist":
@@ -531,8 +531,36 @@ class MainMenu(cmd.Cmd):
                         print helpers.color("[!] Error opening ip file %s" %(parts[1]))
                 else:
                     self.agents.ipBlackList = helpers.generate_ip_list(",".join(parts[1:]))
-            else:
-                print helpers.color("[!] Please choose 'ip_whitelist' or 'ip_blacklist'")
+            elif parts[0].lower() == "smtp_server":
+		if parts[1] != "" and (helpers.validate_ip(parts[1]) or helpers.validate_hostname(parts[1])):
+		    self.smtpServer = parts[1] 
+		else:
+		    print helpers.color("[!] No or invalid IP/Host specified.")
+	    elif parts[0].lower() == "smtp_recipient":
+                if parts[1] != "" and helpers.validate_email(parts[1]):
+                    self.smtpRecipient = parts[1]
+                else:
+                    print helpers.color("[!] No or invalid email address specified.")
+	    elif parts[0].lower() == "smtp_sender":
+                if parts[1] != "" and helpers.validate_email(parts[1]):
+                   self.smtpSender = parts[1]
+                else:
+                    print helpers.color("[!] No or invalid sender email address specified")
+	    elif parts[0].lower() == "agent_notify":
+                if parts[1] != "" and (parts[1].lower() == "true" or parts[1].lower() == "false"):
+                    self.agentNotify = parts[1].lower()
+		    
+		    # Check to see if other values have been set
+		    if not self.smtpServer:
+			print helpers.color("[!] Warning! smtp_server (required) has not been set.")
+		    if not self.smtpRecipient:
+			print helpers.color("[!] Warning! smtp_recipient (required) has not been set.")
+		    if not self.smtpSender:
+			print helpers.color("[!] Warning! smtp_sender (optional) has not been set.")
+                else:
+                    print helpers.color("[!] Value must be true or false.")
+	    else:
+                print helpers.color("[!] Please choose 'ip_whitelist', 'ip_blacklist', 'smtp_server', 'smtp_sender', 'smtp_recipient' or 'agent_notify'")
 
 
     def do_reset(self, line):
@@ -542,7 +570,14 @@ class MainMenu(cmd.Cmd):
             self.agents.ipWhiteList = None
         if line.strip().lower() == "ip_blacklist":
             self.agents.ipBlackList = None
-
+	if line.strip().lower() == "smtp_server":
+	    self.smtpServer = None
+	if line.strip().lower() == "smtp_sender":
+	    self.smtpSender = None
+	if line.strip().lower() == "smtp_recipient":
+	    self.smtpRecipient = None
+	if line.strip().lower() == "agent_notify":
+	    self.agentNotify = None
 
     def do_show(self, line):
         "Show a global option (e.g. IP whitelists)."
@@ -551,7 +586,14 @@ class MainMenu(cmd.Cmd):
             print self.agents.ipWhiteList
         if line.strip().lower() == "ip_blacklist":
             print self.agents.ipBlackList
-
+	if line.strip().lower() == "smtp_server":
+            print self.smtpServer
+        if line.strip().lower() == "smtp_sender":
+            print self.smtpSender
+        if line.strip().lower() == "smtp_recipient":
+            print self.smtpRecipient
+        if line.strip().lower() == "agent_notify":
+	    print self.agetnNotify
 
     def do_load(self, line):
         "Loads Empire modules from a non-standard folder."
