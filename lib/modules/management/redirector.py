@@ -135,7 +135,11 @@ function Invoke-Redirector {
                 $ConnectPort = $parts[2]
             }
             if($ConnectPort -ne ""){
-            
+           	if ((Get-Service iphlpsvc).Status -ne "Running")
+		{
+			Set-Service iphlpsvc -StartupType manual
+			Start-Service iphlpsvc
+		} 
                 $out = netsh interface portproxy add v4tov4 listenport=$ListenPort connectaddress=$ConnectAddress connectport=$ConnectPort protocol=tcp
                 if($out){
                     $out
