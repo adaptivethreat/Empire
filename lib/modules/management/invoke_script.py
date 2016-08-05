@@ -17,7 +17,7 @@ class Module:
             
             'NeedsAdmin' : False,
 
-            'OpsecSafe' : False,
+            'OpsecSafe' : True,
 
             'MinPSVersion' : '2',
             
@@ -35,7 +35,7 @@ class Module:
             },
             'ScriptPath' : {
                 'Description'   :   'Full path to the PowerShell script.ps1 to run (on attacker machine)',
-                'Required'      :   True,
+                'Required'      :   False,
                 'Value'         :   ''
             },
             'ScriptCmd' : {
@@ -60,16 +60,19 @@ class Module:
         
         scriptPath = self.options['ScriptPath']['Value']
         scriptCmd = self.options['ScriptCmd']['Value']
+        script = ''
 
-        try:
-            f = open(scriptPath, 'r')
-        except:
-            print helpers.color("[!] Could not read script source path at: " + str(scriptPath))
-            return ""
+        if(scriptPath != ''):
+            try:
+                f = open(scriptPath, 'r')
+            except:
+                print helpers.color("[!] Could not read script source path at: " + str(scriptPath))
+                return ""
 
-        script = f.read()
-        f.close()
+            script = f.read()
+            f.close()
+            script += '\n'
 
-        script += "\n%s" %(scriptCmd)
+        script += "%s" %(scriptCmd)
 
         return script

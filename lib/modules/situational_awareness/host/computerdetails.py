@@ -87,25 +87,35 @@ class Module:
         moduleCode = f.read()
         f.close()
 
-        script = moduleCode
+        script = moduleCode + "\n\n"
 
         for option,values in self.options.iteritems():
             if option.lower() != "agent":
                 if values['Value'] and values['Value'] != '':
-                    if option == "4648":
-                        script += "$SecurityLog = Get-EventLog -LogName Security;$Filtered4624 = Find-4624Logons $SecurityLog;Write-Output $Filtered4624.Values | Format-List"
-                        return script
                     if option == "4624":
-                        script += "$SecurityLog = Get-EventLog -LogName Security;$Filtered4648 = Find-4648Logons $SecurityLog;Write-Output $Filtered4648.Values | Format-List"
+                        script += "$SecurityLog = Get-EventLog -LogName Security; $Filtered4624 = Find-4624Logons $SecurityLog;"
+                        script += 'Write-Output "Event ID 4624 (Logon):`n";'
+                        script += "Write-Output $Filtered4624.Values | Out-String"
+                        return script
+                    if option == "4648":
+                        script += "$SecurityLog = Get-EventLog -LogName Security; $Filtered4648 = Find-4648Logons $SecurityLog;"
+                        script += 'Write-Output "Event ID 4648 (Explicit Credential Logon):`n";'
+                        script += "Write-Output $Filtered4648.Values | Out-String"
                         return script
                     if option == "AppLocker":
-                        script += "$AppLockerLogs = Find-AppLockerLogs;Write-Output $AppLockerLogs.Values | Format-List"
+                        script += "$AppLockerLogs = Find-AppLockerLogs;"
+                        script += 'Write-Output "AppLocker Process Starts:`n";'
+                        script += "Write-Output $AppLockerLogs.Values | Out-String"
                         return script
                     if option == "PSLogs":
-                        script += "$PSLogs = Find-PSScriptsInPSAppLog;Write-Output $PSLogs.Values | Format-List"
+                        script += "$PSLogs = Find-PSScriptsInPSAppLog;"
+                        script += 'Write-Output "PowerShell Script Executions:`n";'
+                        script += "Write-Output $PSLogs.Values | Out-String"
                         return script
                     if option == "SavedRDP":
-                        script += "$RdpClientData = Find-RDPClientConnections;Write-Output $RdpClientData.Values | Format-List"
+                        script += "$RdpClientData = Find-RDPClientConnections;"
+                        script += 'Write-Output "RDP Client Data:`n";'
+                        script += "Write-Output $RdpClientData.Values | Out-String"
                         return script
 
         # if we get to this point, no switched were specified

@@ -16,13 +16,13 @@ class Module:
             'Background' : True,
 
             'OutputExtension' : None,
-            
+
             'NeedsAdmin' : False,
 
             'OpsecSafe' : True,
 
             'MinPSVersion' : '2',
-            
+
             'Comments': [
                 'https://github.com/Kevin-Robertson/Inveigh' 
             ]
@@ -42,12 +42,12 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   ''
             },
-			'SpooferTarget' : {
+            'SpooferTarget' : {
                 'Description'   :   'IP address to target for brute force NBNS spoofing.',
                 'Required'      :   True,
                 'Value'         :   ''
             },
-			'Hostname' : {
+            'Hostname' : {
                 'Description'   :   'Hostname to spoof with NBNS spoofing.',
                 'Required'      :   False,
                 'Value'         :   'WPAD'
@@ -57,12 +57,12 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   'Y'
             },
-			'NBNSPause' : {
+            'NBNSPause' : {
                 'Description'   :   'Number of seconds the NBNS brute force spoofer will stop spoofing after an incoming HTTP request is received.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-			'NBNSTTL' : {
+            'NBNSTTL' : {
                 'Description'   :   'Custom NBNS TTL in seconds for the response packet.',
                 'Required'      :   False,
                 'Value'         :   ''
@@ -72,37 +72,37 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   'Y'
             },
-			'HTTPAuth' : {
+            'HTTPAuth' : {
                 'Description'   :   'HTTP server authentication type. This setting does not apply to wpad.dat requests (Anonymous,Basic,NTLM).',
                 'Required'      :   False,
                 'Value'         :   'NTLM'
             },
-			'HTTPBasicRealm' : {
+            'HTTPBasicRealm' : {
                 'Description'   :   'Realm name for Basic authentication. This parameter applies to both HTTPAuth and WPADAuth.',
                 'Required'      :   False,
                 'Value'         :   'IIS'
             },
-			'HTTPResponse' : {
+            'HTTPResponse' : {
                 'Description'   :   'String or HTML to serve as the default HTTP response. This response will not be used for wpad.dat requests. Do not wrap in quotes and use PowerShell character escapes where necessary.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-			'WPADAuth' : {
+            'WPADAuth' : {
                 'Description'   :   'HTTP server authentication type for wpad.dat requests. Setting to Anonymous can prevent browser login prompts (Anonymous,Basic,NTLM).',
                 'Required'      :   False,
                 'Value'         :   'NTLM'
             },
-			'WPADIP' : {
+            'WPADIP' : {
                 'Description'   :   'Proxy server IP to be included in a basic wpad.dat response for WPAD enabled browsers. This parameter must be used with WPADPort.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-			'WPADPort' : {
+            'WPADPort' : {
                 'Description'   :   'Proxy server port to be included in a basic wpad.dat response for WPAD enabled browsers. This parameter must be used with WPADIP.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-			'WPADDirectHosts' : {
+            'WPADDirectHosts' : {
                 'Description'   :   'Comma separated list of hosts to list as direct in the wpad.dat file. Listed hosts will not be routed through the defined proxy. Add the Empire host to avoid catching Empire HTTP traffic.',
                 'Required'      :   False,
                 'Value'         :   ''
@@ -117,7 +117,7 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   'N'
             },
-			'RunCount' : {
+            'RunCount' : {
                 'Description'   :   'Number of captures to perform before auto-exiting.',
                 'Required'      :   False,
                 'Value'         :   ''
@@ -132,7 +132,7 @@ class Module:
         # save off a copy of the mainMenu object to access external functionality
         #   like listeners/agent handlers/etc.
         self.mainMenu = mainMenu
-        
+
         for param in params:
             # parameter format is [Name, Value]
             option, value = param
@@ -141,7 +141,7 @@ class Module:
 
 
     def generate(self):
-        
+
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/collection/Invoke-InveighBruteForce.ps1"
 

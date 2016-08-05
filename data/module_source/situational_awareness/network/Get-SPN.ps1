@@ -192,7 +192,7 @@ function Get-SPN
             $ObjSearcher.FindAll() | ForEach-Object {
 
                 # Fill hash array with results                    
-                $UserProps = [ordered]@{}                    
+                $UserProps = @{}
                 $UserProps.Add('Name', "$($_.properties.name)")
                 $UserProps.Add('SAMAccount', "$($_.properties.samaccountname)")
                 $UserProps.Add('Description', "$($_.properties.description)")

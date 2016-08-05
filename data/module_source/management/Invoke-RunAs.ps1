@@ -35,6 +35,8 @@ Invoke-RunAs -username administrator -password "P@$$word!" -domain CORPA -Cmd no
         ValueFromPipeline=$True)]
         [String]$cmd,
     [Parameter()]
+        [String]$Arguments,
+    [Parameter()]
         [Switch]$ShowWindow
     )
     PROCESS {
@@ -47,6 +49,10 @@ Invoke-RunAs -username administrator -password "P@$$word!" -domain CORPA -Cmd no
             if(-not ($ShowWindow)) {
                 $startinfo.CreateNoWindow = $True
                 $startinfo.WindowStyle = "Hidden"
+            }
+
+            if($Arguments) {
+                $startinfo.Arguments = $Arguments
             }
 
             if($UserName) {

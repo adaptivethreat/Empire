@@ -62,16 +62,16 @@ Github repo: https://github.com/clymb3r/PowerShell
 
     if ($ToString)
     {
-        Write-Output "Event ID 4624 (Logon):"
-        Write-Output $Filtered4624.Values | Format-List
-        Write-Output "Event ID 4648 (Explicit Credential Logon):"
-        Write-Output $Filtered4648.Values | Format-List
-        Write-Output "AppLocker Process Starts:"
-        Write-Output $AppLockerLogs.Values | Format-List
-        Write-Output "PowerShell Script Executions:"
-        Write-Output $PSLogs.Values | Format-List
-        Write-Output "RDP Client Data:"
-        Write-Output $RdpClientData.Values | Format-List
+        Write-Output "Event ID 4624 (Logon):`n"
+        Write-Output $Filtered4624.Values | Out-String
+        Write-Output "Event ID 4648 (Explicit Credential Logon):`n"
+        Write-Output $Filtered4648.Values | Out-String
+        Write-Output "AppLocker Process Starts:`n"
+        Write-Output $AppLockerLogs.Values | Out-String
+        Write-Output "PowerShell Script Executions:`n"
+        Write-Output $PSLogs.Values | Out-String
+        Write-Output "RDP Client Data:`n"
+        Write-Output $RdpClientData.Values | Out-String
     }
     else
     {

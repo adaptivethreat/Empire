@@ -1,3 +1,77 @@
+7/20/2016
+---------
+-Version 1.5.3
+-Fix for issue #273 - added hostnames to raw screenshot output file
+-Fix for issue #285 - credential export supporting commas
+-Start of code standardization/pep8 cleanup - mods to agents.py, empire.py, and credentials.py
+-moved collection/keethief to collection/vaults/keethief
+-added collection/vaults/find_keepass_config to enumerate KeePass configs on a system
+-added collection/vaults/add_keepass_config_trigger to add a trigger backdoor to all reachable KeePass instances
+-added collection/vaults/get_keepass_config_trigger to enumerate all triggers for all reachable KeePass instances
+-added collection/vaults/remove_keepass_config_trigger to remove all triggers for all reachable KeePass instances
+-Misc. bug fixes
+
+7/16/2016
+---------
+-Added collection/keethief module to pilfer KeePass key material from memory
+-"creds X" now searches additional fields for the term (like domain)
+-merged credentials/enum_cred_store from @BeetleChunks
+
+7/15/2016
+---------
+-Merged @rvrsh3ll's collection/browser_data module
+-Merged @curi0usJack's situational_awareness/network/smbautobrute module
+-fix for issue #258 - "interact AGENT" now works globally in every menu except an active agent menu
+-fix for issue #221 - hop listeners
+-fix for issue #252 - management/invoke_script now no longer requires an external script
+-fix for issue #257 - sysinfo now executed after running the steal_token command 
+
+6/24/2016
+---------
+-Updated Invoke-Mimikatz to include a fix for multi-cpu boxes/processor detection
+-Merged @n0clues pull request to change paths from %TEMP% to %PUBLIC% for spawnas module to fix a bug when spawning as a different user.
+-Fixed a typo in the dcsync_hashdump that caused it to crash the Empire server
+-Merged in Inveigh 1.1.1 and current Tater build thanks to @Kevin-Robertson
+-Fixed a bug in the REST API due to the port being a string and not an int
+-Added 417 Expectation failed error bug fix for older proxies (Squid) thanks to @i223t
+
+6/9/2016
+---------
+-Updated SQLite dll for Get-ChromeDump.ps1
+
+5/27/2016
+---------
+-Fixed format issues with Get-ComputerDetails.ps1
+-More verbose output added to PowerUp's Invoke-ServiceCMD 
+-Made Get-SPN PowerShell 2.0 compatible 
+-Updated RunAs to include an argument parameter
+-Merged @tristandostaler's /api/map feature to the Rest API
+-Merged in @andrew-morris's installer update to include -Y switch for apt-get commands
+-Merged in MS16-032 local privesc from @leoloobeek
+
+5/4/2016
+---------
+-Merged @jaredhaight's Invoke-MetasploitModule module
+
+5/2/2016
+---------
+-tightened up argparse validation
+
+4/24/2016
+---------
+-Added credentials/get_spn_tickets to request SPN tickets.
+-Added credentials/mimikatz/extract_tickets
+
+4/21/2016
+---------
+-Merged @Subtee's regsvc32 (sct) stager
+
+4/1/2016
+---------
+-listener starting now returns more verbose errors on failure in console and API
+-merge of @mynameisiv's .jpg screenshot PR
+-Fix for path errors in some cases for ./setup/setup_database.py
+
 ============
 3/31/2015 - RELEASE 1.5
 ============

@@ -4,14 +4,17 @@ Credential handling functionality for Empire.
 
 """
 
-import sqlite3
 import helpers
-
+import os
+# import sqlite3
 
 class Credentials:
-
+    """
+    Class that handles interaction with the backend credential model
+    (adding creds, displaying, etc.).
+    """
     def __init__(self, MainMenu, args=None):
-        
+
         # pull out the controller objects
         self.mainMenu = MainMenu
         self.conn = MainMenu.conn
@@ -53,18 +56,19 @@ class Credentials:
             cur.execute("SELECT * FROM credentials WHERE id=? limit 1", [filterTerm])
 
         # if we're filtering by host/username
-        elif filterTerm and filterTerm != "":
-            cur.execute("SELECT * FROM credentials WHERE LOWER(host) LIKE LOWER(?) or LOWER(username) like LOWER(?)", [filterTerm, filterTerm])
+        elif filterTerm and filterTerm != '':
+            filterTerm = filterTerm.replace('*', '%')
+            cur.execute("SELECT * FROM credentials WHERE LOWER(domain) LIKE LOWER(?) or LOWER(username) like LOWER(?) or LOWER(host) like LOWER(?) or LOWER(password) like LOWER(?)", [filterTerm, filterTerm, filterTerm, filterTerm])
 
         # if we're filtering by credential type (hash, plaintext, token)
-        elif(credtype and credtype != ""):
+        elif credtype and credtype != "":
             cur.execute("SELECT * FROM credentials WHERE LOWER(credtype) LIKE LOWER(?)", [credtype])
 
         # if we're filtering by content in the note field
-        elif(note and note != ""):
+        elif note and note != "":
             cur.execute("SELECT * FROM credentials WHERE LOWER(note) LIKE LOWER(%?%)", [note])
 
-        # otherwise return all credentials            
+        # otherwise return all credentials
         else:
             cur.execute("SELECT * FROM credentials")
 
@@ -85,7 +89,14 @@ class Credentials:
         Add a credential with the specified information to the database.
         """
         cur = self.conn.cursor()
-        cur.execute("INSERT INTO credentials (credtype, domain, username, password, host, sid, notes) VALUES (?,?,?,?,?,?,?)", [credtype, domain, username, password, host, sid, notes] )
+
+        cur.execute("SELECT * FROM credentials WHERE LOWER(credtype) LIKE LOWER(?) AND LOWER(domain) LIKE LOWER(?) AND LOWER(username) LIKE LOWER(?) AND password LIKE ?", [credtype, domain, username, password])
+        results = cur.fetchall()
+
+        if results == []:
+            # only add the credential if the (credtype, domain, username, password) tuple doesn't already exist
+            cur.execute("INSERT INTO credentials (credtype, domain, username, password, host, sid, notes) VALUES (?,?,?,?,?,?,?)", [credtype, domain, username, password, host, sid, notes])
+
         cur.close()
 
 
@@ -94,7 +105,7 @@ class Credentials:
         Update a note to a credential in the database.
         """
         cur = self.conn.cursor()
-        cur.execute("UPDATE credentials SET note = ? WHERE id=?", [note,credentialID])
+        cur.execute("UPDATE credentials SET note = ? WHERE id=?", [note, credentialID])
         cur.close()
 
 
@@ -117,16 +128,36 @@ class Credentials:
         cur.close()
 
 
-    def export_credentials(self, credtype=None):
+    def export_credentials(self, export_path=''):
         """
         Export the credentials in the database to an output file.
         """
-        # TODO: implement lol
-        
-        if(credtype and credtype.lower() == "hash"):
-            # export hashes in user:sid:lm:ntlm format
-            pass
-        else:
-            # export by csv?
-            pass
 
+        if export_path == '':
+            print helpers.color("[!] Export path cannot be ''")
+
+        export_path += ".csv"
+
+        if os.path.exists(export_path):
+            try:
+                choice = raw_input(helpers.color("\n[>] File %s already exists, overwrite? [y/N] " % (export_path), "red"))
+                if choice.lower() != "" and choice.lower()[0] == "y":
+                    pass
+                else:
+                    return
+            except KeyboardInterrupt:
+                return
+
+        creds = self.get_credentials()
+
+        if len(creds) == 0:
+            print helpers.color("[!] No credentials in the database.")
+            return
+
+        output_file = open(export_path, 'w')
+        output_file.write("CredID,CredType,Domain,Username,Password,Host,SID,Notes\n")
+        for cred in creds:
+            output_file.write("\"%s\"\n" % ('","'.join([str(x) for x in cred])))
+
+        print "\n" + helpers.color("[*] Credentials exported to %s\n" % (export_path))
+        output_file.close()

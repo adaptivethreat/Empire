@@ -10,22 +10,22 @@ class Module:
             'Author': ['Kevin Robertson'],
 
             'Description': ('Inveigh\'s SMB relay function. This module can be used to relay '
-							'incoming HTTP NTLMv2 authentication requests to an SMB target. '
-							'If the authentication is successfully relayed and the account is '
-							'a local administrator, a specified command will be executed on the '
-							'target PSExec style. This module works best while also running '
-							'collection/inveigh with HTTP disabled.'),
+                            'incoming HTTP NTLMv2 authentication requests to an SMB target. '
+                            'If the authentication is successfully relayed and the account is '
+                            'a local administrator, a specified command will be executed on the '
+                            'target PSExec style. This module works best while also running '
+                            'collection/inveigh with HTTP disabled.'),
 
             'Background' : True,
 
             'OutputExtension' : None,
-            
+
             'NeedsAdmin' : True,
 
             'OpsecSafe' : False,
 
             'MinPSVersion' : '2',
-            
+
             'Comments': [
                 'https://github.com/Kevin-Robertson/Inveigh'
             ]
@@ -40,17 +40,17 @@ class Module:
                 'Required'        :   True,
                 'Value'           :   ''
             },
-            'SMBRelayTarget'      : {
+            'SMBRelayTarget' : {
                 'Description'     :   'IP address of system to target for SMB relay.',
                 'Required'        :   True,
                 'Value'           :   ''
             },
-            'SMBRelayCommand'     : {
+            'SMBRelayCommand' : {
                 'Description'     :   'Command to execute on SMB relay target. Do not wrap in quotes and use PowerShell character escapes where necessary.',
                 'Required'        :   True,
                 'Value'           :   ''
             },
-			'SMBRelayUsernames'   : {
+            'SMBRelayUsernames' : {
                 'Description'     :   'Comma separated list of usernames to use for relay attacks. Accepts both username and domain\username format.',
                 'Required'        :   False,
                 'Value'           :   ''
@@ -60,17 +60,17 @@ class Module:
                 'Required'        :   False,
                 'Value'           :   'Y'
             },
-			'RunTime' : {
-                'Description'   :   'Run time duration in minutes.',
-                'Required'      :   False,
-                'Value'         :   ''
+            'RunTime' : {
+                'Description'     :   'Run time duration in minutes.',
+                'Required'        :   False,
+                'Value'           :   ''
             }
         }
 
         # save off a copy of the mainMenu object to access external functionality
         #   like listeners/agent handlers/etc.
         self.mainMenu = mainMenu
-        
+
         for param in params:
             # parameter format is [Name, Value]
             option, value = param
@@ -79,7 +79,7 @@ class Module:
 
 
     def generate(self):
-        
+
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/lateral_movement/Invoke-InveighRelay.ps1"
 

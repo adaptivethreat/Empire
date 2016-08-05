@@ -60,6 +60,11 @@ class Module:
                 'Required'      :   True,
                 'Value'         :   'notepad.exe'
             },
+            'Arguments' : {
+                'Description'   :   'Optional arguments for the supplied binary.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
             'ShowWindow' : {
                 'Description'   :   'Switch. Show the window for the created process instead of hiding it.',
                 'Required'      :   False,

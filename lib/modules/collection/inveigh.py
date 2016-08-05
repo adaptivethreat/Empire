@@ -14,13 +14,13 @@ class Module:
             'Background' : True,
 
             'OutputExtension' : None,
-            
+
             'NeedsAdmin' : True,
 
             'OpsecSafe' : True,
 
             'MinPSVersion' : '2',
-            
+
             'Comments': [
                 'https://github.com/Kevin-Robertson/Inveigh'
             ]
@@ -45,27 +45,27 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   ''
             },
-			'SpooferHostsReply' : {
+            'SpooferHostsReply' : {
                 'Description'   :   'Comma separated list of requested hostnames to respond to when spoofing with LLMNR and NBNS.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-			'SpooferHostsIgnore' : {
+            'SpooferHostsIgnore' : {
                 'Description'   :   'Comma separated list of requested hostnames to ignore when spoofing with LLMNR and NBNS.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-			'SpooferIPsReply' : {
+            'SpooferIPsReply' : {
                 'Description'   :   'Comma separated list of source IP addresses to respond to when spoofing with LLMNR and NBNS.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-			'SpooferIPsIgnore' : {
+            'SpooferIPsIgnore' : {
                 'Description'   :   'Comma separated list of source IP addresses to ignore when spoofing with LLMNR and NBNS.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-			'SpooferRepeat' : {
+            'SpooferRepeat' : {
                 'Description'   :   'Enable/Disable repeated LLMNR/NBNS spoofs to a victim system after one user challenge/response has been captured (Y/N).',
                 'Required'      :   False,
                 'Value'         :   'Y'
@@ -75,7 +75,7 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   'Y'
             },
-			'LLMNRTTL' : {
+            'LLMNRTTL' : {
                 'Description'   :   'Custom LLMNR TTL in seconds for the response packet.',
                 'Required'      :   False,
                 'Value'         :   ''
@@ -85,7 +85,7 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   'Y'
             },
-			'NBNSTTL' : {
+            'NBNSTTL' : {
                 'Description'   :   'Custom NBNS TTL in seconds for the response packet.',
                 'Required'      :   False,
                 'Value'         :   ''
@@ -100,37 +100,42 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   'Y'
             },
-			'HTTPAuth' : {
+            'HTTPAuth' : {
                 'Description'   :   'HTTP server authentication type. This setting does not apply to wpad.dat requests (Anonymous,Basic,NTLM).',
                 'Required'      :   False,
                 'Value'         :   'NTLM'
             },
-			'HTTPBasicRealm' : {
+            'HTTPBasicRealm' : {
                 'Description'   :   'Realm name for Basic authentication. This parameter applies to both HTTPAuth and WPADAuth.',
                 'Required'      :   False,
                 'Value'         :   'IIS'
             },
-			'HTTPResponse' : {
+            'HTTPResponse' : {
                 'Description'   :   'String or HTML to serve as the default HTTP response. This response will not be used for wpad.dat requests. Do not wrap in quotes and use PowerShell character escapes where necessary.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-			'WPADAuth' : {
+            'WPADAuth' : {
                 'Description'   :   'HTTP server authentication type for wpad.dat requests. Setting to Anonymous can prevent browser login prompts (Anonymous,Basic,NTLM).',
                 'Required'      :   False,
                 'Value'         :   'NTLM'
             },
-			'WPADIP' : {
+            'WPADEmptyFile' : {
+                'Description'   :   'Enable/Disable serving a proxyless, all direct, wpad.dat file for wpad.dat requests (Y/N).',
+                'Required'      :   False,
+                'Value'         :   'Y'
+            },
+            'WPADIP' : {
                 'Description'   :   'Proxy server IP to be included in a basic wpad.dat response for WPAD enabled browsers. This parameter must be used with WPADPort.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-			'WPADPort' : {
+            'WPADPort' : {
                 'Description'   :   'Proxy server port to be included in a basic wpad.dat response for WPAD enabled browsers. This parameter must be used with WPADIP.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-			'WPADDirectHosts' : {
+            'WPADDirectHosts' : {
                 'Description'   :   'Comma separated list of hosts to list as direct in the wpad.dat file. Listed hosts will not be routed through the defined proxy. Add the Empire host to avoid catching Empire HTTP traffic.',
                 'Required'      :   False,
                 'Value'         :   ''
@@ -150,6 +155,16 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   'N'
             },
+            'ConsoleStatus' : {
+                'Description'   :   'Interval in minutes for auto-displaying all unique captured hashes and credentials. (Y/N)',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'ConsoleUnique' : {
+                'Description'   :   'Enable/Disable displaying challenge/response hashes for only unique IP, domain/hostname, and username combinations.',
+                'Required'      :   False,
+                'Value'         :   'Y'
+            },
             'RunTime' : {
                 'Description'   :   'Run time duration in minutes.',
                 'Required'      :   False,
@@ -160,7 +175,7 @@ class Module:
         # save off a copy of the mainMenu object to access external functionality
         #   like listeners/agent handlers/etc.
         self.mainMenu = mainMenu
-        
+
         for param in params:
             # parameter format is [Name, Value]
             option, value = param
@@ -169,7 +184,7 @@ class Module:
 
 
     def generate(self):
-        
+
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/collection/Invoke-Inveigh.ps1"
 

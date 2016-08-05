@@ -137,7 +137,7 @@ class Module:
         launcherCode = l.generate()
 
         # PowerShell code to write the launcher.bat out
-        script += "$tempLoc = \"$env:temp\debug.bat\""
+        script += "$tempLoc = \"$env:public\debug.bat\""
         script += "\n$batCode = @\"\n" + launcherCode + "\"@\n"
         script += "$batCode | Out-File -Encoding ASCII $tempLoc ;\n"
         script += "\"Launcher bat written to $tempLoc `n\";\n"
@@ -150,6 +150,6 @@ class Module:
         if(domain and domain != ""):
             script += "-Domain %s " %(domain)
 
-        script += "-Cmd \"$env:temp\debug.bat\""
+        script += "-Cmd \"$env:public\debug.bat\""
 
         return script

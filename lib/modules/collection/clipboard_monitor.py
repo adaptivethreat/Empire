@@ -14,13 +14,13 @@ class Module:
             'Background' : True,
 
             'OutputExtension' : None,
-            
+
             'NeedsAdmin' : False,
 
             'OpsecSafe' : True,
 
             'MinPSVersion' : '2',
-            
+
             'Comments': [
                 'http://brianreiter.org/2010/09/03/copy-and-paste-with-clipboard-from-powershell/'
             ]
@@ -50,7 +50,7 @@ class Module:
         # save off a copy of the mainMenu object to access external functionality
         #   like listeners/agent handlers/etc.
         self.mainMenu = mainMenu
-        
+
         for param in params:
             # parameter format is [Name, Value]
             option, value = param
@@ -76,7 +76,7 @@ class Module:
 
         script += "Get-ClipboardContents"
 
-        for option,values in self.options.iteritems():
+        for option, values in self.options.iteritems():
             if option.lower() != "agent":
                 if values['Value'] and values['Value'] != '':
                     if values['Value'].lower() == "true":
