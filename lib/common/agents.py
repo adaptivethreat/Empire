@@ -873,7 +873,7 @@ class Agents:
 
         # TODO: for heavy traffic packets, check these first (i.e. SOCKS?)
         #       so this logic is skipped
-
+        
         if responseName == "ERROR":
             # error code
             dispatcher.send("[!] Received error response from " + str(sessionID), sender="Agents")
@@ -1035,7 +1035,7 @@ class Agents:
             self.update_agent_results(sessionID, data)
             # update the agent log
             self.save_agent_log(sessionID, data)
-            
+
             # TODO: redo this regex for really large AD dumps
             #   so a ton of data isn't kept in memory...?
             parts = data.split("\n")
@@ -1055,6 +1055,19 @@ class Agents:
                             hostname = self.get_agent_hostname(sessionID)
 
                         self.mainMenu.credentials.add_credential(cred[0], cred[1], cred[2], cred[3], hostname, cred[5], time)
+            if parts[0].startswith("The white rabbit found something..."):
+                templist = parts
+		elements = (len(templist) - 1)
+                for part in parts[0:elements]:
+                    nologin = part
+		    lenline = nologin.split(' [===] ')
+		    if len(lenline) > 1:
+                    	login,pwd = part.split(' [===] ')
+			domain,log = login.split('\\')
+                    	username = log
+                    	password = pwd
+                    	domain = domain
+			self.mainMenu.credentials.add_credential("plaintext", domain, username, password, "", "", "")
 
 
         elif responseName == "TASK_CMD_JOB_SAVE":
