@@ -47,11 +47,6 @@ class Module:
                 'Description'   :   'Agent to grab credentials from.',
                 'Required'      :   True,
                 'Value'         :   ''
-            },
-            'Command' : {
-                'Description'   :   'Command to execute',
-                'Required'      :   True,
-                'Value'         :   'test'
             }
         }
 
