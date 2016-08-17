@@ -11,6 +11,7 @@ builds tasking packets and parses result packets
             [4 bytes] - type
             [4 bytes] - counter
             [4 bytes] - length
+            [4 bytes] - task id 
             [X...]    - tasking data
 
 
@@ -89,7 +90,7 @@ def validate_counter(counter):
     return (currentTime-43200) <= counter <= (currentTime+43200)
 
 
-def build_task_packet(taskName, data):
+def build_task_packet(taskName, data, resultID):
     """
     Build a task packet for an agent.
 
@@ -102,8 +103,10 @@ def build_task_packet(taskName, data):
     taskID = struct.pack('=L', PACKET_NAMES[taskName])
     counter = struct.pack('=L', get_counter())
     length = struct.pack('=L',len(data))
+    #TODO this breaks if pk is > 2^32
+    resultID = struct.pack('=L', resultID)
 
-    return taskID + counter + length + data.decode('utf-8').encode('utf-8',errors='ignore')
+    return taskID + counter + length + resultID + data.decode('utf-8').encode('utf-8',errors='ignore')
    
 
 def parse_result_packet(packet, offset=0):
@@ -116,15 +119,16 @@ def parse_result_packet(packet, offset=0):
         responseID = struct.unpack('=L', packet[0+offset:4+offset])[0]
         counter = struct.unpack('=L', packet[4+offset:8+offset])[0]
         length = struct.unpack('=L', packet[8+offset:12+offset])[0]
-        data = base64.b64decode(packet[12+offset:12+offset+length])
+        taskID = struct.unpack('=L', packet[12+offset:16+offset])[0]
+        data = base64.b64decode(packet[16+offset:16+offset+length])
         #if isinstance(data, unicode):
         #    print "UNICODE DATA"
         #elif isinstance(data, str):
         #    print "ASCII / UTF8"
-        remainingData = packet[12+offset+length:]
-        return (PACKET_IDS[responseID], counter, length, data, remainingData)
+        remainingData = packet[16+offset+length:]
+        return (PACKET_IDS[responseID], counter, length, taskID, data, remainingData)
     except:
-        return (None, None, None, None, None)
+        return (None, None, None, None, None, None)
 
 
 def parse_result_packets(packets):
@@ -135,20 +139,20 @@ def parse_result_packets(packets):
     resultPackets = []
 
     # parse the first result packet
-    (responseName, counter, length, data, remainingData) = parse_result_packet(packets)
+    (responseName, counter, length, taskID, data, remainingData) = parse_result_packet(packets)
 
     if responseName and responseName != '':
-        resultPackets.append( (responseName, counter, length, data) )
+        resultPackets.append( (responseName, counter, length, taskID, data) )
 
-    offset = 12 + length
+    offset = 16 + length
     while (remainingData and remainingData != ""):
         # parse any additional result packets
-        (responseName, counter, length, data, remainingData) = parse_result_packet(packets, offset=offset)
+        (responseName, counter, length, taskID, data, remainingData) = parse_result_packet(packets, offset=offset)
 
         if responseName and responseName != '':
-            resultPackets.append( (responseName, counter, length, data) )
+            resultPackets.append( (responseName, counter, length, taskID, data) )
 
-        offset += 12 + length
+        offset += 16 + length
 
     return resultPackets
 

@@ -190,11 +190,16 @@ c.execute('''CREATE TABLE "credentials" (
     "domain" text,
     "username" text,
     "password" text,
-    "host" text, 
+    "host" text,
     "sid" text,
     "notes" text
     )''')
 
+c.execute( '''CREATE TABLE "results" (
+    "id" integer PRIMARY KEY,
+    "result" text,
+    "agent" text
+)''')
 
 # event_types -> checkin, task, result, rename
 c.execute('''CREATE TABLE "reporting" (
@@ -202,7 +207,9 @@ c.execute('''CREATE TABLE "reporting" (
     "name" text,
     "event_type" text,
     "message" text,
-    "time_stamp" text
+    "time_stamp" text,
+    "taskID" integer,
+    foreign key("taskID") references results(id)
     )''')
 
 

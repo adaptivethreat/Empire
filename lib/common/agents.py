@@ -789,7 +789,7 @@ class Agents:
     #
     ###############################################################
 
-    def add_agent_task(self, sessionID, taskName, task=""):
+    def add_agent_task(self, sessionID, taskName, task="" ):
         """
         Add a task to the specified agent's buffer.
         """
@@ -818,8 +818,11 @@ class Agents:
                 else:
                     agent_tasks = []
 
+                #create a new result
+                taskID = cur.execute("INSERT INTO results (agent, result) VALUES(?, '')", [sessionID]).lastrowid
+
                 # append our new json-ified task and update the backend
-                agent_tasks.append([taskName, task])
+                agent_tasks.append([taskName, task, taskID])
                 cur.execute("UPDATE agents SET taskings=? WHERE session_id=?", [json.dumps(agent_tasks), sessionID])
 
                 # write out the last tasked script to "LastTask.ps1" if in debug mode
@@ -828,10 +831,11 @@ class Agents:
                     f.write(task)
                     f.close()
 
-                # report the agent tasking in the reporting database
-                cur.execute("INSERT INTO reporting (name,event_type,message,time_stamp) VALUES (?,?,?,?)", (sessionID, "task", taskName + " - " + task[0:50], helpers.get_datetime()))
-                cur.close()
 
+                # report the agent tasking in the reporting database
+                cur.execute("INSERT INTO reporting (name,event_type,message,time_stamp, taskID) VALUES (?,?,?,?,?)", (sessionID, "task", taskName + " - " + task[0:50], helpers.get_datetime(), taskID))
+                cur.close()
+                return taskID
 
     def get_agent_tasks(self, sessionID):
         """
@@ -880,7 +884,7 @@ class Agents:
         cur.close()
 
 
-    def handle_agent_response(self, sessionID, responseName, data):
+    def handle_agent_response(self, sessionID, responseName, taskID, data):
         """
         Handle the result packet based on sessionID and responseName.
         """
@@ -894,9 +898,17 @@ class Agents:
 
         # report the agent result in the reporting database
         cur = self.conn.cursor()
-        cur.execute("INSERT INTO reporting (name,event_type,message,time_stamp) VALUES (?,?,?,?)", (agentSessionID, "result", responseName, helpers.get_datetime()))
+        cur.execute("INSERT INTO reporting (name,event_type,message,time_stamp, taskID) VALUES (?,?,?,?,?)", (agentSessionID, "result", responseName, helpers.get_datetime(), taskID))
         cur.close()
 
+        #insert task results into the database, ignore agent errors
+        if taskID!=0:
+
+            #if the result isn't a file, insert into the database 
+            if responseName not in ["TASK_DOWNLOAD", "TASK_CMD_JOB_SAVE", "TASK_CMD_WAIT_SAVE"]:
+                cur = self.conn.cursor()
+                cur.execute("UPDATE results set result=result||? where id=?", [data, taskID])
+                cur.close()
 
         # TODO: for heavy traffic packets, check these first (i.e. SOCKS?)
         #       so this logic is skipped
@@ -1168,10 +1180,10 @@ class Agents:
 
                     # build tasking packets for everything we have
                     for tasking in taskings:
-                        task_name, task_data = tasking
+                        task_name, task_data, res_id = tasking
 
                         # if there is tasking, build a tasking packet
-                        all_task_packets += packets.build_task_packet(task_name, task_data)
+                        all_task_packets += packets.build_task_packet(task_name, task_data, res_id)
 
                     # get the session key for the agent
                     session_key = self.agents[sessionID]['sessionKey']
@@ -1275,10 +1287,10 @@ class Agents:
 
                         # process each result packet
                         for response_packet in response_packets:
-                            (response_name, counter, length, data) = response_packet
+                            (response_name, counter, length, taskID, data) = response_packet
 
                             # process the agent's response
-                            self.handle_agent_response(sessionID, response_name, data)
+                            self.handle_agent_response(sessionID, response_name, taskID, data)
 
                         if results:
                             # signal that this agent returned results

