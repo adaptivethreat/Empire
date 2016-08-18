@@ -196,9 +196,10 @@ c.execute('''CREATE TABLE "credentials" (
     )''')
 
 c.execute( '''CREATE TABLE "results" (
-    "id" integer PRIMARY KEY,
+    "id" integer,
     "result" text,
-    "agent" text
+    "agent" text,
+    PRIMARY KEY(id, agent)
 )''')
 
 # event_types -> checkin, task, result, rename

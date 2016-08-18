@@ -819,7 +819,10 @@ class Agents:
                     agent_tasks = []
 
                 #create a new result
-                taskID = cur.execute("INSERT INTO results (agent, result) VALUES(?, '')", [sessionID]).lastrowid
+                pk = cur.execute("select max(id) from results where agent=?", [sessionID]).fetchone()[0];
+                if pk is None:
+                    pk=0
+                taskID = cur.execute("INSERT INTO results (id, agent, result) VALUES(?, ?, '')", [pk+1, sessionID]).lastrowid
 
                 # append our new json-ified task and update the backend
                 agent_tasks.append([taskName, task, taskID])
@@ -901,14 +904,20 @@ class Agents:
         cur.execute("INSERT INTO reporting (name,event_type,message,time_stamp, taskID) VALUES (?,?,?,?,?)", (agentSessionID, "result", responseName, helpers.get_datetime(), taskID))
         cur.close()
 
-        #insert task results into the database, ignore agent errors
-        if taskID!=0:
+        #insert task results into the database, if it's not a file
+        if taskID!=0 and responseName not in ["TASK_DOWNLOAD", "TASK_CMD_JOB_SAVE", "TASK_CMD_WAIT_SAVE"]:
 
-            #if the result isn't a file, insert into the database 
-            if responseName not in ["TASK_DOWNLOAD", "TASK_CMD_JOB_SAVE", "TASK_CMD_WAIT_SAVE"]:
-                cur = self.conn.cursor()
-                cur.execute("UPDATE results set result=result||? where id=?", [data, taskID])
-                cur.close()
+            cur = self.conn.cursor()
+            #if the taskID does not exist for this agent, create it
+            if cur.execute("select * from results where id=? and agent=?", [taskID, sessionID]).fetchone() is None:
+                pk = cur.execute("select max(id) from results where agent=?", [sessionID]).fetchone()[0];
+                if pk is None:
+                    pk=0
+                cur.execute("INSERT INTO results (id, agent, result) VALUES (?,?,?)",(pk+1, sessionID, result))
+            else:
+                cur.execute("UPDATE results set result=result||? where id=? and agent=?", [data, taskID, sessionID])
+
+            cur.close()
 
         # TODO: for heavy traffic packets, check these first (i.e. SOCKS?)
         #       so this logic is skipped

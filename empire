@@ -125,7 +125,7 @@ def get_permanent_token(conn):
 #    GET/POST http://localhost:1337/api/agents/Y/clear       clears the result buffer for agent Y
 #    GET/POST http://localhost:1337/api/agents/Y/kill        kill agent Y
 #
-#    GET      http://localhost:1337/api/results/X            return result X
+#    GET      http://localhost:1337/api/results/agent/X            return result X
 #
 #    GET      http://localhost:1337/api/reporting            return all logged events
 #    GET      http://localhost:1337/api/reporting/X          return logged event for the given ID X
@@ -892,7 +892,10 @@ def start_restful_api(startEmpire=False, suppress=False, username=None, password
 
             #create new result item
             curr = conn.cursor()
-            taskID = curr.execute("INSERT INTO results (agent, result) VALUES(?, '')", [agentSessionID]).lastrowid
+            pk = curr.execute("select max(id) from results where agent=?", [agentSessionID]).fetchone()[0];
+            if pk is None:
+                pk=0
+            taskID = curr.execute("INSERT INTO results (id, agent, result) VALUES(?, ?, '')", [pk+1, agentSessionID]).lastrowid
             curr.close()
 
             # append our new json-ified task and update the backend
@@ -998,12 +1001,14 @@ def start_restful_api(startEmpire=False, suppress=False, username=None, password
 
         return jsonify({'success': True})
 
-    @app.route('/api/results/<int:resultID>', methods=['GET'])
-    def get_result(resultID):
+    @app.route('/api/results/<string:agent_name>/<int:resultID>', methods=['GET'])
+    def get_result(agent_name, resultID):
 
-        agentResult, agentName = execute_db_query(conn, 'SELECT result,agent FROM results WHERE id=?', [resultID])[0]
-
-        return jsonify({'result': agentResult, 'agent': agentName})
+        result = execute_db_query(conn, 'SELECT result FROM results WHERE id=? and agent=?', [resultID, agent_name])
+        if (len(result)):
+            return jsonify({'result': result})
+        else:
+            return jsonify({'result':''})
 
 
     @app.route('/api/creds', methods=['GET'])
