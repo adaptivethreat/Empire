@@ -1087,7 +1087,10 @@ def start_restful_api(startEmpire=False, suppress=False, username=None, password
         # try to prevent some basic bruting
         time.sleep(2)
         
-        if suppliedUsername == username and suppliedPassword == password:
+        username_str = ''.join(username)
+        password_str = ''.join(password)
+        
+        if suppliedUsername == username_str and suppliedPassword == password_str:
             return jsonify({'token': apiToken})
         else:
             return make_response('', 401)
