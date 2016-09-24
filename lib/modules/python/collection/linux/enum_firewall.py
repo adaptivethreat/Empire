@@ -7,13 +7,13 @@ class Module:
         # metadata info about the module, not modified during runtime
         self.info = {
             # name for the module that will appear in module menus
-            'Name': 'Linux Hashdump',
+            'Name': 'Linux Enum IPTABLES',
 
             # list of one or more authors for the module
-            'Author': ['@harmj0y'],
+            'Author': ['@bneg'],
 
             # more verbose multi-line description of the module
-            'Description': ("Extracts the /etc/passwd and /etc/shadow, unshadowing the result."),
+            'Description': ("Print the active IPTABLES rules"),
 
             # True if the module needs to run in the background
             'Background' : False,
@@ -34,7 +34,7 @@ class Module:
             'MinLanguageVersion' : '2.6',
 
             # list of any references/other comments
-            'Comments': []
+            'Comments': ['Executes iptables -S on the host']
         }
 
         # any options needed by the module, settable during runtime
