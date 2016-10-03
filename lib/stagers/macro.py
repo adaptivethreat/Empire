@@ -76,7 +76,7 @@ class Stager:
         proxy = self.options['Proxy']['Value']
         proxyCreds = self.options['ProxyCreds']['Value']
         stagerRetries = self.options['StagerRetries']['Value']
-	    obfuscation = self.options['Obfuscation']['Value']
+	obfuscation = self.options['Obfuscation']['Value']
 
         # generate the launcher code
         launcher = self.mainMenu.stagers.generate_launcher(listenerName, encode=True, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries)
