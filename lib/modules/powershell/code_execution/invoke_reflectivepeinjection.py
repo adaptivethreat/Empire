@@ -60,6 +60,11 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   ''
             },
+            'ForceASLR' : {
+                'Description'   :   'Optional, will force the use of ASLR on the PE being loaded even if the PE indicates it doesn\'t support ASLR.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
             'ComputerName' : {
                 'Description'   :   'Optional an array of computernames to run the script on.',
                 'Required'      :   False,
@@ -110,7 +115,8 @@ class Module:
 
                         except:
                             print helpers.color("[!] Error in reading/encoding dll: " + str(values['Value']))
-
+                elif option.lower() == "forceaslr" and values['Value'].lower() == 'true':
+                    script += " -ForceASLR"
                 elif values['Value'] and values['Value'] != '':
                     script += " -" + str(option) + " " + str(values['Value'])
 
