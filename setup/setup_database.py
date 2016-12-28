@@ -89,6 +89,9 @@ API_PASSWORD = ''.join(random.sample(string.ascii_letters + string.digits + punc
 # the 'permanent' API token (doesn't change)
 API_PERMANENT_TOKEN = ''.join(random.choice(string.ascii_lowercase + string.digits) for x in range(40))
 
+# an IP white list to ONLY accept API requests from
+#    format is "192.168.1.1,192.168.1.10-192.168.1.100,10.0.0.0/8"
+API_IP_WHITELIST = "0.0.0.0/0"
 
 ###################################################
 #
@@ -124,11 +127,12 @@ c.execute('''CREATE TABLE config (
     "api_username" text,
     "api_password" text,
     "api_current_token" text,
-    "api_permanent_token" text
+    "api_permanent_token" text,
+    "api_ip_whitelist" text
     )''')
 
 # kick off the config component of the database
-c.execute("INSERT INTO config VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (STAGING_KEY,STAGE0_URI,STAGE1_URI,STAGE2_URI,DEFAULT_DELAY,DEFAULT_JITTER,DEFAULT_PROFILE,DEFAULT_CERT_PATH,DEFAULT_PORT,INSTALL_PATH,SERVER_VERSION,IP_WHITELIST,IP_BLACKLIST, DEFAULT_LOST_LIMIT, "", "", API_USERNAME, API_PASSWORD, "", API_PERMANENT_TOKEN))
+c.execute("INSERT INTO config VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (STAGING_KEY,STAGE0_URI,STAGE1_URI,STAGE2_URI,DEFAULT_DELAY,DEFAULT_JITTER,DEFAULT_PROFILE,DEFAULT_CERT_PATH,DEFAULT_PORT,INSTALL_PATH,SERVER_VERSION,IP_WHITELIST,IP_BLACKLIST, DEFAULT_LOST_LIMIT, "", "", API_USERNAME, API_PASSWORD, "", API_PERMANENT_TOKEN, API_IP_WHITELIST))
 
 c.execute('''CREATE TABLE "agents" (
     "id" integer PRIMARY KEY,

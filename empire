@@ -139,7 +139,7 @@ def get_permanent_token(conn):
 #    
 ####################################################################
 
-def start_restful_api(startEmpire=False, suppress=False, username=None, password=None, port=1337):
+def start_restful_api(startEmpire=False, suppress=False, username=None, password=None, port=1337, whitelist=None):
     """
     Kick off the RESTful API with the given parameters.
 
@@ -148,6 +148,7 @@ def start_restful_api(startEmpire=False, suppress=False, username=None, password
     username    -   optional username to use for the API, otherwise pulls from the empire.db config
     password    -   optional password to use for the API, otherwise pulls from the empire.db config
     port        -   port to start the API on, defaults to 1337 ;)
+    whitelist   -   optional CIDR ip address to whitelist for the API, otherwise pulls from the empire.db config
     """
 
     app = Flask(__name__)
@@ -165,6 +166,15 @@ def start_restful_api(startEmpire=False, suppress=False, username=None, password
     if not password:
         password = dbPassword
 
+    # if a whitelist was not supplied, use the whitelist stored in the db
+    (dbAPIIPWhitelist) = execute_db_query(conn, "SELECT api_ip_whitelist FROM config")[0]
+
+    if not whitelist:
+        dbAPIIPWhitelist_str = ', '.join(map(str, dbAPIIPWhitelist))
+        api_ip_whitelist = helpers.generate_ip_list(str(dbAPIIPWhitelist_str))
+    else:
+        whitelist_str = ', '.join(whitelist)
+        api_ip_whitelist = helpers.generate_ip_list(whitelist_str)
 
     class Namespace:
         def __init__(self, **kwargs):
@@ -213,6 +223,10 @@ def start_restful_api(startEmpire=False, suppress=False, username=None, password
             if (token != apiToken) and (token != permanentApiToken):
                 return make_response('', 401)
 
+    @app.before_request
+    def check_ip_whitelist():
+        if request.remote_addr not in api_ip_whitelist:
+            abort(403)
 
     @app.errorhandler(Exception)
     def exception_handler(error):
@@ -259,7 +273,7 @@ def start_restful_api(startEmpire=False, suppress=False, username=None, password
         configRaw = execute_db_query(conn, 'SELECT * FROM config')
 
         [staging_key, stage0_uri, stage1_uri, stage2_uri, default_delay, default_jitter, default_profile, default_cert_path, default_port, install_path, server_version, ip_whitelist, ip_blacklist, default_lost_limit, autorun_command, autorun_data, api_username, api_password, current_api_token, permanent_api_token] = configRaw[0]
-        config = [{"version":empire.VERSION, "staging_key":staging_key, "stage0_uri":stage0_uri, "stage1_uri":stage1_uri, "stage2_uri":stage2_uri, "default_delay":default_delay, "default_jitter":default_jitter, "default_profile":default_profile, "default_cert_path":default_cert_path, "default_port":default_port, "install_path":install_path, "server_version":server_version, "ip_whitelist":ip_whitelist, "ip_blacklist":ip_blacklist, "default_lost_limit":default_lost_limit, "autorun_command":autorun_command, "autorun_data":autorun_data, "api_username":api_username, "api_password":api_password, "current_api_token":current_api_token, "permanent_api_token":permanent_api_token}]
+        config = [{"version":empire.VERSION, "staging_key":staging_key, "stage0_uri":stage0_uri, "stage1_uri":stage1_uri, "stage2_uri":stage2_uri, "default_delay":default_delay, "default_jitter":default_jitter, "default_profile":default_profile, "default_cert_path":default_cert_path, "default_port":default_port, "install_path":install_path, "server_version":server_version, "ip_whitelist":ip_whitelist, "ip_blacklist":ip_blacklist, "default_lost_limit":default_lost_limit, "autorun_command":autorun_command, "autorun_data":autorun_data, "api_username":api_username, "api_password":api_password, "current_api_token":current_api_token, "permanent_api_token":permanent_api_token, "api_ip_whitelist":api_ip_whitelist}]
         return jsonify({'config': config})
 
 
@@ -1086,8 +1100,11 @@ def start_restful_api(startEmpire=False, suppress=False, username=None, password
 
         # try to prevent some basic bruting
         time.sleep(2)
+
+        username_str = ''.join(username)
+        password_str = ''.join(password)
         
-        if suppliedUsername == username and suppliedPassword == password:
+        if suppliedUsername == username_str and suppliedPassword == password_str:
             return jsonify({'token': apiToken})
         else:
             return make_response('', 401)
@@ -1206,6 +1223,7 @@ if __name__ == '__main__':
     restGroup.add_argument('--restport', type=int, nargs=1, help='Port to run the Empire RESTful API on.')
     restGroup.add_argument('--username', nargs=1, help='Start the RESTful API with the specified username instead of pulling from empire.db')
     restGroup.add_argument('--password', nargs=1, help='Start the RESTful API with the specified password instead of pulling from empire.db')
+    restGroup.add_argument('--whitelist', nargs=1, help='CIDR range from which to whitelist API calls instead of pulling from empire.db')
 
     args = parser.parse_args()
 
@@ -1221,7 +1239,7 @@ if __name__ == '__main__':
         # start just the RESTful API
         while serverExitCommand == 'restart':
             try:
-                start_restful_api(startEmpire=False, suppress=False, username=args.username, password=args.password, port=args.restport)
+                start_restful_api(startEmpire=False, suppress=False, username=args.username, password=args.password, port=args.restport, whitelist=args.whitelist)
             except SystemExit as e:
                 pass
 
@@ -1229,7 +1247,7 @@ if __name__ == '__main__':
         # start an Empire instance and RESTful API and suppress output
         while serverExitCommand == 'restart':
             try:
-                start_restful_api(startEmpire=True, suppress=True, username=args.username, password=args.password, port=args.restport)
+                start_restful_api(startEmpire=True, suppress=True, username=args.username, password=args.password, port=args.restport, whitelist=args.whitelist)
             except SystemExit as e:
                 pass
     else:
