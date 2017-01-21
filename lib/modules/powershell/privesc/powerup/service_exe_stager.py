@@ -64,7 +64,7 @@ class Module:
                 'Value'         :   'default'
             },
             'ProxyCreds' : {
-                'Description'   :   'Proxy credentials ([domain\]username:password) to use for request (default, none, or other).',
+                'Description'   :   'Proxy credentials ([domain.com\]username:password) to use for request (default, none, or other).',
                 'Required'      :   False,
                 'Value'         :   'default'
             }
