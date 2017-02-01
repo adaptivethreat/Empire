@@ -9,7 +9,7 @@ class Module:
 
             'Author': ['@harmj0y'],
 
-            'Description': ("Displays a specified message to the a user."),
+            'Description': ("Displays a specified message to the user."),
 
             'Background' : True,
 

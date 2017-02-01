@@ -56,7 +56,7 @@ class Module:
                 'Value'           :   ''
             },
             'SMBRelayAutoDisable' : {
-                'Description'     :   'Automaticaly disable SMB relay after a successful command execution on target (Y/N).',
+                'Description'     :   'Enable/Disable automatically disabling SMB relay after a successful command execution on target (Y/N).',
                 'Required'        :   False,
                 'Value'           :   'Y'
             },

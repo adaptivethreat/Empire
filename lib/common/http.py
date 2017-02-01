@@ -10,7 +10,8 @@ These are the first places URI requests are processed.
 
 """
 
-from BaseHTTPServer import BaseHTTPRequestHandler
+from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
+from SocketServer import ThreadingMixIn
 import BaseHTTPServer, threading, ssl, os, string, random
 from pydispatch import dispatcher
 import re
@@ -63,6 +64,9 @@ def checksum8(s):
 # HTTP servers and handlers.
 #
 ###############################################################
+
+class EmpireHTTPServer(ThreadingMixIn, HTTPServer):
+    pass
 
 class RequestHandler(BaseHTTPRequestHandler):
     """
@@ -161,7 +165,7 @@ class EmpireServer(threading.Thread):
             threading.Thread.__init__(self)
             self.server = None
 
-            self.server = BaseHTTPServer.HTTPServer((lhost, int(port)), RequestHandler)
+            self.server = EmpireHTTPServer((lhost, int(port)), RequestHandler)
             
             # pass the agent handler object along for the RequestHandler
             self.server.agents = handler

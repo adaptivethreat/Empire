@@ -770,7 +770,7 @@ class AgentsMenu(cmd.Cmd):
         self.doc_header = 'Commands'
 
         # set the prompt text
-        self.prompt = '(Empire: ' + helpers.color("agents", color="blue") + ') > '
+        self.prompt = '(Empire: ' + helpers.color("agents", color="blue", prompt=True) + ') > '
 
         messages.display_agents(self.mainMenu.agents.get_agents())
 
@@ -1296,7 +1296,7 @@ class AgentMenu(cmd.Cmd):
         name = self.mainMenu.agents.get_agent_name(sessionID)
 
         # set the text prompt
-        self.prompt = '(Empire: ' + helpers.color(name, 'red') + ') > '
+        self.prompt = '(Empire: ' + helpers.color(name, 'red', prompt=True) + ') > '
 
         # agent commands that have opsec-safe alises in the agent code
         self.agentCommands = ["ls", "dir", "rm", "del", "cp", "copy", "pwd", "cat", "cd", "mkdir", "rmdir", "mv", "move", "ipconfig", "ifconfig", "route", "reboot", "restart", "shutdown", "ps", "tasklist", "getpid", "whoami", "getuid", "hostname"]
@@ -1423,7 +1423,7 @@ class AgentMenu(cmd.Cmd):
             # replace the old name with the new name
             result = self.mainMenu.agents.rename_agent(oldname, parts[0])
             if result:
-                self.prompt = "(Empire: " + helpers.color(parts[0], 'red') + ") > "
+                self.prompt = "(Empire: " + helpers.color(parts[0], 'red', prompt=True) + ") > "
         else:
             print helpers.color("[!] Please enter a new name for the agent")
 
@@ -2091,7 +2091,7 @@ class ListenerMenu(cmd.Cmd):
         self.options = self.mainMenu.listeners.get_listener_options()
 
         # set the prompt text
-        self.prompt = '(Empire: ' + helpers.color("listeners", color="blue") + ') > '
+        self.prompt = '(Empire: ' + helpers.color("listeners", color="blue", prompt=True) + ') > '
 
         # display all active listeners on menu startup
         messages.display_listeners(self.mainMenu.listeners.get_listeners())
@@ -2404,7 +2404,7 @@ class ModuleMenu(cmd.Cmd):
         self.module = self.mainMenu.modules.modules[moduleName]
 
         # set the prompt text
-        self.prompt = '(Empire: ' + helpers.color(self.moduleName, color="blue") + ') > '
+        self.prompt = '(Empire: ' + helpers.color(self.moduleName, color="blue", prompt=True) + ') > '
 
         # if this menu is being called from an agent menu
         if agent:
@@ -2791,7 +2791,7 @@ class StagerMenu(cmd.Cmd):
         self.stager = self.mainMenu.stagers.stagers[stagerName]
 
         # set the prompt text
-        self.prompt = '(Empire: ' + helpers.color("stager/" + self.stagerName, color="blue") + ') > '
+        self.prompt = '(Empire: ' + helpers.color("stager/" + self.stagerName, color="blue", prompt=True) + ') > '
 
         # if this menu is being called from an listener menu
         if listener:

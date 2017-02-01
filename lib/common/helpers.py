@@ -556,15 +556,22 @@ def lhost():
     return ip
 
 
-def color(string, color=None):
+def color(string, color=None, prompt=False):
     """
     Change text color for the Linux terminal.
     """
-    
+
     attr = []
     # bold
     attr.append('1')
-    
+
+    if prompt:
+        ignore_start = '\x01'
+        ignore_end = '\x02'
+    else:
+        ignore_start = ''
+        ignore_end = ''
+
     if color:
         if color.lower() == "red":
             attr.append('31')
@@ -572,20 +579,19 @@ def color(string, color=None):
             attr.append('32')
         elif color.lower() == "blue":
             attr.append('34')
-        return '\x1b[%sm%s\x1b[0m' % (';'.join(attr), string)
-
     else:
         if string.strip().startswith("[!]"):
             attr.append('31')
-            return '\x1b[%sm%s\x1b[0m' % (';'.join(attr), string)
         elif string.strip().startswith("[+]"):
             attr.append('32')
-            return '\x1b[%sm%s\x1b[0m' % (';'.join(attr), string)
         elif string.strip().startswith("[*]"):
             attr.append('34')
-            return '\x1b[%sm%s\x1b[0m' % (';'.join(attr), string)
         else:
             return string
+
+    ansi_color = '%s\x1b[%sm%s' % (ignore_start, ';'.join(attr), ignore_end)
+    ansi_reset = '%s\x1b[0m%s' % (ignore_start, ignore_end)
+    return '%s%s%s' % (ansi_color, string, ansi_reset)
 
 
 def unique(seq, idfun=None):

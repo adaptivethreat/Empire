@@ -41,7 +41,7 @@ class Module:
                 'Value'         :   ''
             },
             'SpooferIP' : {
-                'Description'   :   'Specific IP address for LLMNR/NBNS spoofing. This parameter is only necessary when redirecting victims to a system other than the Inveigh host.',
+                'Description'   :   'IP address for LLMNR/NBNS spoofer. This parameter is only necessary when redirecting victims to a system other than the Inveigh host.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
@@ -65,28 +65,43 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   ''
             },
+            'SpooferLearning' : {
+                'Description'   :   'Enable/Disable LLMNR/NBNS valid host learning. (Y/N).',
+                'Required'      :   False,
+                'Value'         :   'N'
+            },
+            'SpooferLearningDelay' : {
+                'Description'   :   'Time in minutes that Inveigh will delay spoofing while valid hosts are being blacklisted through SpooferLearning.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'SpooferLearningInterval' : {
+                'Description'   :   'Time in minutes that Inveigh wait before sending out an LLMNR/NBNS request for a hostname that has already been checked if SpooferLearning is enabled.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
             'SpooferRepeat' : {
                 'Description'   :   'Enable/Disable repeated LLMNR/NBNS spoofs to a victim system after one user challenge/response has been captured (Y/N).',
                 'Required'      :   False,
                 'Value'         :   'Y'
             },
             'LLMNR' : {
-                'Description'   :   'Enable/Disable LLMNR spoofing (Y/N).',
+                'Description'   :   'Enable/Disable LLMNR spoofer (Y/N).',
                 'Required'      :   False,
                 'Value'         :   'Y'
             },
             'LLMNRTTL' : {
-                'Description'   :   'Custom LLMNR TTL in seconds for the response packet.',
+                'Description'   :   'LLMNR TTL in seconds for the response packet.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
             'NBNS' : {
-                'Description'   :   'Enable/Disable NBNS spoofing (Y/N).',
+                'Description'   :   'Enable/Disable NBNS spoofer (Y/N).',
                 'Required'      :   False,
                 'Value'         :   'Y'
             },
             'NBNSTTL' : {
-                'Description'   :   'Custom NBNS TTL in seconds for the response packet.',
+                'Description'   :   'NBNS TTL in seconds for the response packet.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
@@ -146,7 +161,7 @@ class Module:
                 'Value'         :   'Y'
             },
             'Challenge' : {
-                'Description'   :   'Specific 16 character hex NTLM challenge for use with the HTTP listener. If left blank, a random challenge will be generated for each request.',
+                'Description'   :   '16 character hex NTLM challenge for use with the HTTP listener. If left blank, a random challenge will be generated for each request.',
                 'Required'      :   False,
                 'Value'         :   ''
             },

