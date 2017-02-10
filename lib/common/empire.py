@@ -1786,6 +1786,32 @@ class AgentMenu(cmd.Cmd):
         else:
             print helpers.color("[!] Injection requires you to specify listener")
 
+    def do_sc(self, line):
+        "Takes a screenshot, default is PNG. Giving a ratio means using JPEG. Ex. sc [1-100]"
+			
+        # get the info for the psinject module
+        if len(line.strip())>0:
+            # JPEG compression ratio
+            try:
+                sRatio = str(int(line.strip()))
+            except:
+                print helpers.color("[*] JPEG Ratio incorrect. Has been set to 80.")
+                sRatio = "80"
+        else:
+            sRatio = ""
+			
+        if self.mainMenu.modules.modules["collection/screenshot"]:
+            module = self.mainMenu.modules.modules["collection/screenshot"]
+            module.options['Agent']['Value'] = self.mainMenu.agents.get_agent_name(self.sessionID)
+            module.options['Ratio']['Value'] = sRatio
+				
+            # execute the screenshot module
+            l = ModuleMenu(self.mainMenu, "collection/screenshot")
+            l.do_execute("")
+				
+        else:
+            print helpers.color("[!] collection/screenshot module not loaded") 
+
 
     def do_injectshellcode(self, line):
         "Inject listener shellcode into a remote process. Ex. injectshellcode <meter_listener> <pid>"
