@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 import sqlite3, argparse, sys, argparse, logging, json, string, os, re, time, signal, copy, base64
 from flask import Flask, request, jsonify, make_response, abort, url_for
