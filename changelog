@@ -40,7 +40,7 @@ Running
 
 -Listeners:
     added http
-    added http_foreign (for 'foreign' Emire listeners)
+    added http_foreign (for 'foreign' Empire listeners)
     added meterpreter (for meterpreter/cobalt strike, using Invoke-Shellcode)
     added management/switch_listener module which switches an agent to a new listener module comms
     redid hop listeners, added listeners/http_hop
