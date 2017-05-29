@@ -76,7 +76,7 @@ class Stagers:
                     stager.options[option]['Value'] = str(value)
 
 
-    def generate_launcher(self, listenerName, language=None, encode=True, userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', safeChecks='true'):
+    def generate_launcher(self, listenerName, language='', encode=True, userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', safeChecks='true'):
         """
         Abstracted functionality that invokes the generate_launcher() method for a given listener,
         if it exists.
@@ -89,7 +89,7 @@ class Stagers:
         activeListener = self.mainMenu.listeners.activeListeners[listenerName]
 
         launcherCode = self.mainMenu.listeners.loadedListeners[activeListener['moduleName']].generate_launcher(encode=encode, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries, language=language, listenerName=listenerName, safeChecks=safeChecks)
-        
+
         if launcherCode:
             return launcherCode
 
@@ -450,4 +450,5 @@ class Stagers:
         jarfile.close()
         os.remove('Run.jar')
 
-        return jar 
+        return jar
+
