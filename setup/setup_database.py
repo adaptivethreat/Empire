@@ -30,6 +30,9 @@ if STAGING_KEY == "BLANK":
 elif STAGING_KEY == "RANDOM":
     STAGING_KEY = ''.join(random.sample(string.ascii_letters + string.digits + punctuation, 32))
 
+# os-dependable path delimiter (separator) 
+delimiter = os.path.sep
+
 # the installation path for Empire, defaults to auto-calculating it
 #   set manually if issues arise
 currentPath = os.path.dirname(os.path.realpath(__file__))
@@ -37,11 +40,11 @@ empireIndex = currentPath.rfind("Empire")
 if empireIndex < 0:
     empireIndex = currentPath.rfind("empire")
 if empireIndex < 0:
-    INSTALL_PATH = "/".join(os.getcwd().split("/")[0:-1])+"/"
+    INSTALL_PATH = delimiter.join(os.getcwd().split(delimiter)[0:-1])+delimiter
 else:
-    endIndex = currentPath.find("/", empireIndex)
+    endIndex = currentPath.find(delimiter, empireIndex)
     endIndex = None if endIndex < 0 else endIndex
-    INSTALL_PATH = currentPath[0:endIndex] + "/"
+    INSTALL_PATH = currentPath[0:endIndex] + delimiter
 
 # an IP white list to ONLY accept clients from
 #   format is "192.168.1.1,192.168.1.10-192.168.1.100,10.0.0.0/8"
