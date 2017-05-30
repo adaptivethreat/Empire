@@ -1,5 +1,6 @@
 data/empire.db
-data/empire.pem
+data/empire-chain.pem
+data/empire-priv.key
 empire.debug
 *.pyc
 downloads/*
