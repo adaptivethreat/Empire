@@ -1,0 +1,12 @@
+setuptools
+pycrypto
+iptools
+pydispatcher
+flask
+macholib
+dropbox
+pyOpenSSL
+pyinstaller
+zlib_wrapper
+netifaces
+M2Crypto
