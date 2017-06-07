@@ -4,7 +4,9 @@ empire.debug
 *.pyc
 downloads/*
 .vscode/*
-*.txt
 LastTask*
 setup/xar*
 setup/bomutils/*
+bin/*
+empire_virtualenv/*
+
