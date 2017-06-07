@@ -8,3 +8,4 @@ downloads/*
 LastTask*
 setup/xar*
 setup/bomutils/*
+.venv
