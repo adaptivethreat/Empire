@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 import sqlite3, os, string, hashlib
 from Crypto.Random import random
