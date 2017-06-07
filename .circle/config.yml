@@ -1,0 +1,10 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: kalilinux/kali-linux-docker
+    steps:
+      - checkout
+      - run:
+          name: update-npm
+          command: 'sudo -H ./setup/install.sh'
