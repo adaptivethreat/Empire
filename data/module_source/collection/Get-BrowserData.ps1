@@ -77,7 +77,7 @@ function Get-BrowserInformation {
         Add-Type -AssemblyName System.Web.Extensions
         $ps_js = New-Object System.Web.Script.Serialization.JavaScriptSerializer
         return ,$ps_js.DeserializeObject($item)
-        
+
     }
 
     function Get-ChromeHistory {
@@ -97,13 +97,13 @@ function Get-BrowserInformation {
                     Data = $_
                 }
             }
-        }        
+        }
     }
 
     function Get-ChromeBookmarks {
     $Path = "$Env:systemdrive\Users\$UserName\AppData\Local\Google\Chrome\User Data\Default\Bookmarks"
     if (-not (Test-Path -Path $Path)) {
-        Write-Verbose "[!] Could not find FireFox Bookmarks for username: $UserName"
+        Write-Verbose "[!] Could not find Chrome Bookmarks for username: $UserName"
     }   else {
             $Json = Get-Content $Path
             $Output = ConvertFrom-Json20($Json)
@@ -112,7 +112,7 @@ function Get-BrowserInformation {
                 if ($_ -match $Search) {
                     New-Object -TypeName PSObject -Property @{
                         User = $UserName
-                        Browser = 'Firefox'
+                        Browser = 'Chrome'
                         DataType = 'Bookmark'
                         Data = $_
                     }
@@ -202,7 +202,7 @@ function Get-BrowserInformation {
                         Browser = 'Firefox'
                         DataType = 'History'
                         Data = $_
-                        }    
+                        }
                     }
                 }
             }
