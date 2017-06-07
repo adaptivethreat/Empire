@@ -500,21 +500,21 @@ def start_restful_api(startEmpire=False, suppress=False, username=None, password
 
             for agent in main.agents.get_agents():
                 sessionID = agent[1]
-                main.agents.add_agent_task_db(sessionID, taskCommand, moduleData)
+                taskID = main.agents.add_agent_task_db(sessionID, taskCommand, moduleData)
                 msg = "tasked agent %s to run module %s" %(sessionID, module_name)
                 main.agents.save_agent_log(sessionID, msg)
 
             msg = "tasked all agents to run module %s" %(module_name)
-            return jsonify({'success': True, 'msg':msg})
+            return jsonify({'success': True, 'taskID': taskID, 'msg':msg})
 
         else:
             # set the agent's tasking in the cache
-            main.agents.add_agent_task_db(sessionID, taskCommand, moduleData)
+            taskID = main.agents.add_agent_task_db(sessionID, taskCommand, moduleData)
 
             # update the agent log
             msg = "tasked agent %s to run module %s" %(sessionID, module_name)
             main.agents.save_agent_log(sessionID, msg)
-            return jsonify({'success': True, 'msg':msg})
+            return jsonify({'success': True, 'taskID': taskID, 'msg':msg})
 
 
     @app.route('/api/modules/search', methods=['POST'])
@@ -865,11 +865,11 @@ def start_restful_api(startEmpire=False, suppress=False, username=None, password
         for agentNameID in agentNameIDs:
             [agentName, agentSessionID] = agentNameID
 
-            agentResults = execute_db_query(conn, 'SELECT agent, data FROM results WHERE agent=?', [agentSessionID])
+            agentResults = execute_db_query(conn, 'SELECT id, agent, data FROM results WHERE agent=?', [agentSessionID])
 
             for result in agentResults:
-                [agent, data] = result
-                agentTaskResults.append({"agentname":result[0], "results":result[1]})
+                [resultid, agent, data] = result
+                agentTaskResults.append({"taskID":result[0], "agentname":result[1], "results":result[2]})
 
         return jsonify({'results': agentTaskResults})
 

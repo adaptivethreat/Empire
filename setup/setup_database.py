@@ -173,7 +173,7 @@ c.execute('''CREATE TABLE "reporting" (
     "message" text,
     "time_stamp" text,
     "taskID" integer,
-    foreign key("taskID") references results(id)
+    foreign key(taskID) references results(id)
     )''')
 
 # commit the changes and close everything off
