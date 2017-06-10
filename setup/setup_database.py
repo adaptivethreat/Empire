@@ -134,7 +134,6 @@ c.execute('''CREATE TABLE "listeners" (
     "options" blob
     )''')
 
-
 # type = hash, plaintext, token
 #   for krbtgt, the domain SID is stored in misc
 #   for tokens, the data is base64'ed and stored in pass
@@ -149,7 +148,6 @@ c.execute('''CREATE TABLE "credentials" (
     "sid" text,
     "notes" text
     )''')
-
 
 c.execute( '''CREATE TABLE "taskings" (
     "id" integer,
@@ -173,8 +171,8 @@ c.execute('''CREATE TABLE "reporting" (
     "message" text,
     "time_stamp" text,
     "taskID" integer,
-    foreign key("taskID") references results(id)
-    )''')
+    FOREIGN KEY(taskID) REFERENCES results(id)
+)''')
 
 # commit the changes and close everything off
 conn.commit()

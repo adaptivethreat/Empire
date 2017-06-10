@@ -15,7 +15,7 @@ fi
 version=$( lsb_release -r | grep -oP "[0-9]+" | head -1 )
 if lsb_release -d | grep -q "Fedora"; then
 	Release=Fedora
-	dnf install -y make g++ python-devel m2crypto python-m2ext swig python-iptools python3-iptools libxml2-devel default-jdk openssl-devel libssl-dev
+	dnf install -y make g++ python-devel m2crypto python-m2ext swig python-iptools python3-iptools libxml2-devel default-jdk openssl-devel libssl1.0-dev
 	pip install setuptools
 	pip install pycrypto
 	pip install iptools
@@ -29,7 +29,7 @@ if lsb_release -d | grep -q "Fedora"; then
 	pip install netifaces
 elif lsb_release -d | grep -q "Kali"; then
 	Release=Kali
-	apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk libssl-dev
+	apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk libssl1.0-dev
 	pip install setuptools
 	pip install pycrypto
 	pip install iptools
@@ -43,7 +43,7 @@ elif lsb_release -d | grep -q "Kali"; then
 	pip install netifaces
 elif lsb_release -d | grep -q "Ubuntu"; then
 	Release=Ubuntu
-	apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk libssl-dev
+	apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk libssl1.0-dev
 	pip install setuptools
 	pip install pycrypto
 	pip install iptools
@@ -58,7 +58,7 @@ elif lsb_release -d | grep -q "Ubuntu"; then
 	pip install netifaces
 else
 	echo "Unknown distro - Debian/Ubuntu Fallback"
-	 apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk libffi-dev libssl-dev
+	 apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk libffi-dev libssl1.0-dev
 	 pip install setuptools
 	 pip install pycrypto
 	 pip install iptools

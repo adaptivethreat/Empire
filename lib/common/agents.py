@@ -1041,14 +1041,14 @@ class Agents:
                     if pk is None:
                         pk = 0
                     pk = (pk + 1) % 65536
-                    taskID = cur.execute("INSERT INTO taskings (id, agent, data) VALUES(?, ?, ?)", [pk, sessionID, task[:100]]).lastrowid
+                    cur.execute("INSERT INTO taskings (id, agent, data) VALUES(?, ?, ?)", [pk, sessionID, task[:100]])
 
                     # append our new json-ified task and update the backend
-                    agent_tasks.append([taskName, task, taskID])
+                    agent_tasks.append([taskName, task, pk])
                     cur.execute("UPDATE agents SET taskings=? WHERE session_id=?", [json.dumps(agent_tasks), sessionID])
 
                     # report the agent tasking in the reporting database
-                    cur.execute("INSERT INTO reporting (name,event_type,message,time_stamp,taskID) VALUES (?,?,?,?,?)", (sessionID, "task", taskName + " - " + task[0:50], helpers.get_datetime(), taskID))
+                    cur.execute("INSERT INTO reporting (name,event_type,message,time_stamp,taskID) VALUES (?,?,?,?,?)", (sessionID, "task", taskName + " - " + task[0:50], helpers.get_datetime(), pk))
 
                     cur.close()
 
@@ -1058,7 +1058,7 @@ class Agents:
                         f.write(task)
                         f.close()
                     
-                    return taskID
+                    return pk
 
                 finally:
                     self.lock.release()
