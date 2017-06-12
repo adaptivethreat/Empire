@@ -42,7 +42,7 @@ class Listeners:
         Load listeners from the install + "/lib/listeners/*" path
         """
 
-        rootPath = "%s/lib/listeners/" % (self.mainMenu.installPath)
+        rootPath = "%slib/listeners/" % (self.mainMenu.installPath)
         pattern = '*.py'
         print helpers.color("[*] Loading listeners from: %s" % (rootPath))
 

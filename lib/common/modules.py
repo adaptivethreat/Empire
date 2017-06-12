@@ -38,7 +38,7 @@ class Modules:
         """
         
         if rootPath == '':
-            rootPath = "%s/lib/modules/" % (self.mainMenu.installPath)
+            rootPath = "%slib/modules" % (self.mainMenu.installPath)
 
         pattern = '*.py'
         print helpers.color("[*] Loading modules from: %s" % (rootPath))
@@ -54,7 +54,7 @@ class Modules:
                 # extract just the module name from the full path
                 moduleName = filePath.split(rootPath)[-1][0:-3]
 
-                if rootPath != "%s/lib/modules/" % (self.mainMenu.installPath):
+                if rootPath != "%slib/modules/" % (self.mainMenu.installPath):
                     moduleName = "external/%s" %(moduleName)
 
                 # instantiate the module and save it to the internal cache
