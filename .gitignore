@@ -13,3 +13,4 @@ data/misc/Obfuscated.ps1
 setup/xar*
 setup/bomutils/*
 .venv
+docker/docker-compose.override.yml

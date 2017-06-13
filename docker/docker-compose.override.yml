@@ -1,0 +1,7 @@
+version: "3"
+services:
+  empire:
+    # Note that network_mode: host doesn't work properly on mac
+    # https://github.com/docker/for-mac/issues/1031
+    network_mode: host
+    #ports: ["80"]
