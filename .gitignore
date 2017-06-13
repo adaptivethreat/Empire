@@ -10,3 +10,4 @@ LastTask*
 setup/xar*
 setup/bomutils/*
 .venv
+docker/docker-compose.override.yml
