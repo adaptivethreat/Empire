@@ -61,7 +61,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         moduleName = self.info["Name"]
         folderName = self.options['FolderName']['Value']
@@ -69,7 +69,9 @@ class Module:
 
         # read in the common powerview.ps1 module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/management/MailRaider.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -81,8 +83,10 @@ class Module:
 
         script = moduleCode + "\n"
 
-        script += "Get-OutlookFolder -Name '%s' | Get-EmailItems -MaxEmails %s" %(folderName, maxEmails)
+        scriptEnd = "Get-OutlookFolder -Name '%s' | Get-EmailItems -MaxEmails %s" %(folderName, maxEmails)
 
-        script += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
-
+        scriptEnd += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

@@ -67,7 +67,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         script = """
 # Adapted from http://blog.logrhythm.com/security/do-you-trust-your-computer/
@@ -119,5 +119,6 @@ Invoke-Prompt """
                         script += " -" + str(option)
                     else:
                         script += " -" + str(option) + " \"" + str(values['Value'].strip("\"")) + "\""
-
+        if obfuscate:
+            script = helpers.obfuscate(psScript=script, obfuscationCommand=obfuscationCommand)
         return script

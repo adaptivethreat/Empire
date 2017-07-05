@@ -110,11 +110,13 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/credentials/Invoke-TokenManipulation.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -126,14 +128,14 @@ class Module:
 
         script = moduleCode
 
-        script += "Invoke-TokenManipulation"
+        scriptEnd = "Invoke-TokenManipulation"
 
         if self.options['RevToSelf']['Value'].lower() == "true":
-            script += " -RevToSelf"
+            scriptEnd += " -RevToSelf"
         elif self.options['WhoAmI']['Value'].lower() == "true":
-            script += " -WhoAmI"
+            scriptEnd += " -WhoAmI"
         elif self.options['ShowAll']['Value'].lower() == "true":
-            script += " -ShowAll | Out-String"
+            scriptEnd += " -ShowAll | Out-String"
         else:
 
             for option,values in self.options.iteritems():
@@ -141,16 +143,18 @@ class Module:
                     if values['Value'] and values['Value'] != '':
                         if values['Value'].lower() == "true":
                             # if we're just adding a switch
-                            script += " -" + str(option)
+                            scriptEnd += " -" + str(option)
                         else:
-                            script += " -" + str(option) + " " + str(values['Value']) 
+                            scriptEnd += " -" + str(option) + " " + str(values['Value']) 
 
             # try to make the output look nice
             if script.endswith("Invoke-TokenManipulation") or script.endswith("-ShowAll"):
-                script += "| Select-Object Domain, Username, ProcessId, IsElevated, TokenType | ft -autosize | Out-String"
+                scriptEnd += "| Select-Object Domain, Username, ProcessId, IsElevated, TokenType | ft -autosize | Out-String"
             else:
-                script += "| Out-String"
+                scriptEnd += "| Out-String"
                 if self.options['RevToSelf']['Value'].lower() != "true":
-                    script += ';"`nUse credentials/tokens with RevToSelf option to revert token privileges"'
-
+                    scriptEnd += ';"`nUse credentials/tokens with RevToSelf option to revert token privileges"'
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

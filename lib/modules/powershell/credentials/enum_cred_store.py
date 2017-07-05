@@ -37,12 +37,14 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
-        scriptPath = self.mainMenu.installPath + "/data/module_source/credentials/dumpCredStore.ps1"
+    def generate(self, obfuscate=False, obfuscationCommand=""):
+        moduleSource = self.mainMenu.installPath + "/data/module_source/credentials/dumpCredStore.ps1"
         scriptCmd = "Invoke-X"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
-            f = open(scriptPath, 'r')
+            f = open(moduleSource, 'r')
         except:
             print helpers.color("[!] Unable to open script at the configured path: " + str(scriptPath))
             return ""
@@ -50,6 +52,8 @@ class Module:
         script = f.read()
         f.close()
 
-        script += "\n%s" %(scriptCmd)
-
+        scriptEnd = "\n%s" %(scriptCmd)
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

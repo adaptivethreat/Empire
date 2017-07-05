@@ -989,11 +989,11 @@ filter Convert-ADName {
 
     .PARAMETER InputType
 
-        The InputType of the user/group name ("NT4","Simple","Canonical").
+        The InputType of the user/group name ("NT4","DN","Simple","Canonical").
 
     .PARAMETER OutputType
 
-        The OutputType of the user/group name ("NT4","Simple","Canonical").
+        The OutputType of the user/group name ("NT4","DN","Simple","Canonical").
 
     .EXAMPLE
 
@@ -1018,15 +1018,16 @@ filter Convert-ADName {
         $ObjectName,
 
         [String]
-        [ValidateSet("NT4","Simple","Canonical")]
+        [ValidateSet("NT4","DN","Simple","Canonical")]
         $InputType,
 
         [String]
-        [ValidateSet("NT4","Simple","Canonical")]
+        [ValidateSet("NT4","DN","Simple","Canonical")]
         $OutputType
     )
 
     $NameTypes = @{
+        'DN'        = 1
         'Canonical' = 2
         'NT4'       = 3
         'Simple'    = 5
@@ -1046,6 +1047,9 @@ filter Convert-ADName {
         elseif($ObjectName -match "^[A-Za-z\.]+/[A-Za-z]+/[A-Za-z/ ]+") {
             $InputType = 'Canonical'
         }
+        elseif($ObjectName -match '^CN=.*') {
+            $InputType = 'DN'
+        }
         else {
             Write-Warning "Can not identify InType for $ObjectName"
         }
@@ -1058,6 +1062,7 @@ filter Convert-ADName {
         $OutputType = Switch($InputType) {
             'NT4' {'Canonical'}
             'Simple' {'NT4'}
+            'DN' {'NT4'}
             'Canonical' {'NT4'}
         }
     }
@@ -1067,6 +1072,7 @@ filter Convert-ADName {
         'NT4' { $ObjectName.split("\")[0] }
         'Simple' { $ObjectName.split("@")[1] }
         'Canonical' { $ObjectName.split("/")[0] }
+        'DN' {$ObjectName.subString($ObjectName.IndexOf('DC=')) -replace 'DC=','' -replace ',','.'}
     }
 
     # Accessor functions to simplify calls to NameTranslate
@@ -4445,6 +4451,153 @@ function Invoke-MapDomainTrust {
 #
 ########################################################
 
+function New-ThreadedFunction {
+    # Helper used by any threaded host enumeration functions
+    [CmdletBinding()]
+    Param(
+        [Parameter(Position = 0, Mandatory = $True, ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
+        [String[]]
+        $ComputerName,
+
+        [Parameter(Position = 1, Mandatory = $True)]
+        [System.Management.Automation.ScriptBlock]
+        $ScriptBlock,
+
+        [Parameter(Position = 2)]
+        [Hashtable]
+        $ScriptParameters,
+
+        [Int]
+        [ValidateRange(1,  100)]
+        $Threads = 20,
+
+        [Switch]
+        $NoImports
+    )
+
+    BEGIN {
+        # Adapted from:
+        #   http://powershell.org/wp/forums/topic/invpke-parallel-need-help-to-clone-the-current-runspace/
+        $SessionState = [System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
+        $SessionState.ApartmentState = [System.Threading.Thread]::CurrentThread.GetApartmentState()
+
+        # import the current session state's variables and functions so the chained PowerView
+        #   functionality can be used by the threaded blocks
+        if (-not $NoImports) {
+            # grab all the current variables for this runspace
+            $MyVars = Get-Variable -Scope 2
+
+            # these Variables are added by Runspace.Open() Method and produce Stop errors if you add them twice
+            $VorbiddenVars = @('?','args','ConsoleFileName','Error','ExecutionContext','false','HOME','Host','input','InputObject','MaximumAliasCount','MaximumDriveCount','MaximumErrorCount','MaximumFunctionCount','MaximumHistoryCount','MaximumVariableCount','MyInvocation','null','PID','PSBoundParameters','PSCommandPath','PSCulture','PSDefaultParameterValues','PSHOME','PSScriptRoot','PSUICulture','PSVersionTable','PWD','ShellId','SynchronizedHash','true')
+
+            # add Variables from Parent Scope (current runspace) into the InitialSessionState
+            ForEach ($Var in $MyVars) {
+                if ($VorbiddenVars -NotContains $Var.Name) {
+                $SessionState.Variables.Add((New-Object -TypeName System.Management.Automation.Runspaces.SessionStateVariableEntry -ArgumentList $Var.name,$Var.Value,$Var.description,$Var.options,$Var.attributes))
+                }
+            }
+
+            # add Functions from current runspace to the InitialSessionState
+            ForEach ($Function in (Get-ChildItem Function:)) {
+                $SessionState.Commands.Add((New-Object -TypeName System.Management.Automation.Runspaces.SessionStateFunctionEntry -ArgumentList $Function.Name, $Function.Definition))
+            }
+        }
+
+        # threading adapted from
+        # https://github.com/darkoperator/Posh-SecMod/blob/master/Discovery/Discovery.psm1#L407
+        #   Thanks Carlos!
+
+        # create a pool of maxThread runspaces
+        $Pool = [RunspaceFactory]::CreateRunspacePool(1, $Threads, $SessionState, $Host)
+        $Pool.Open()
+
+        # do some trickery to get the proper BeginInvoke() method that allows for an output queue
+        $Method = $Null
+        ForEach ($M in [PowerShell].GetMethods() | Where-Object { $_.Name -eq 'BeginInvoke' }) {
+            $MethodParameters = $M.GetParameters()
+            if (($MethodParameters.Count -eq 2) -and $MethodParameters[0].Name -eq 'input' -and $MethodParameters[1].Name -eq 'output') {
+                $Method = $M.MakeGenericMethod([Object], [Object])
+                break
+            }
+        }
+
+        $Jobs = @()
+        $ComputerName = $ComputerName | Where-Object { $_ -and ($_ -ne '') }
+        Write-Verbose "[New-ThreadedFunction] Total number of hosts: $($ComputerName.count)"
+
+        # partition all hosts from -ComputerName into $Threads number of groups 
+        if ($Threads -ge $ComputerName.Length) {
+            $Threads = $ComputerName.Length
+        }
+        $ElementSplitSize = [Int]($ComputerName.Length/$Threads)
+        $ComputerNamePartitioned = @()
+        $Start = 0
+        $End = $ElementSplitSize
+
+        for($i = 1; $i -le $Threads; $i++) {
+            $List = New-Object System.Collections.ArrayList
+            if ($i -eq $Threads) {
+                $End = $ComputerName.Length
+            }
+            $List.AddRange($ComputerName[$Start..($End-1)])
+            $Start += $ElementSplitSize
+            $End += $ElementSplitSize
+            $ComputerNamePartitioned += @(,@($List.ToArray()))
+        }
+
+        Write-Verbose "[New-ThreadedFunction] Total number of threads/partitions: $Threads"
+
+        ForEach ($ComputerNamePartition in $ComputerNamePartitioned) {
+            # create a "powershell pipeline runner"
+            $PowerShell = [PowerShell]::Create()
+            $PowerShell.runspacepool = $Pool
+
+            # add the script block + arguments with the given computer partition
+            $Null = $PowerShell.AddScript($ScriptBlock).AddParameter('ComputerName', $ComputerNamePartition)
+            if ($ScriptParameters) {
+                ForEach ($Param in $ScriptParameters.GetEnumerator()) {
+                    $Null = $PowerShell.AddParameter($Param.Name, $Param.Value)
+                }
+            }
+
+            # create the output queue
+            $Output = New-Object Management.Automation.PSDataCollection[Object]
+
+            # kick off execution using the BeginInvok() method that allows queues
+            $Jobs += @{
+                PS = $PowerShell
+                Output = $Output
+                Result = $Method.Invoke($PowerShell, @($Null, [Management.Automation.PSDataCollection[Object]]$Output))
+            }
+        }
+    }
+
+    END {
+        Write-Verbose "[New-ThreadedFunction] Threads executing"
+        
+        # continuously loop through each job queue, consuming output as appropriate
+        Do {
+            ForEach ($Job in $Jobs) {
+                $Job.Output.ReadAll()
+            }
+            Start-Sleep -Seconds 1
+        }
+        While (($Jobs | Where-Object { -not $_.Result.IsCompleted }).Count -gt 0)
+        Write-Verbose "[New-ThreadedFunction] Waiting 120 seconds for final cleanup..."
+        Start-Sleep -Seconds 120
+
+        # cleanup- make sure we didn't miss anything
+        ForEach ($Job in $Jobs) {
+            $Job.Output.ReadAll()
+            $Job.PS.Dispose()
+        }
+
+        $Pool.Dispose()
+        Write-Verbose "[New-ThreadedFunction] all threads completed"
+    }
+}
+
+
 function Get-GlobalCatalogUserMapping {
 <#
     .SYNOPSIS
@@ -4547,6 +4700,18 @@ function Invoke-BloodHound {
         To modify this, use -CSVFolder. To export to a neo4j RESTful API interface, specify a
         -URI X and -UserPass "...".
 
+    .PARAMETER ComputerName
+
+        Array of one or more computers to enumerate.
+
+    .PARAMETER ComputerADSpath
+
+        The LDAP source to search through for computers, e.g. "LDAP://OU=secret,DC=testlab,DC=local".
+
+    .PARAMETER UserADSpath
+
+        The LDAP source to search through for users/groups, e.g. "LDAP://OU=secret,DC=testlab,DC=local".
+
     .PARAMETER Domain
 
         Domain to query for machines, defaults to the current domain.
@@ -4557,9 +4722,10 @@ function Invoke-BloodHound {
 
     .PARAMETER CollectionMethod
 
-        The method to collect data. 'Group', 'LocalGroup', 'GPOLocalGroup', 'Sesssion', 'LoggedOn', 'Trusts, 'Stealth', or 'Default'.
+        The method to collect data. 'Group', 'ComputerOnly', 'LocalGroup', 'GPOLocalGroup', 'Session', 'LoggedOn', 'Trusts, 'Stealth', or 'Default'.
         'Stealth' uses 'Group' collection, stealth user hunting ('Session' on certain servers), 'GPOLocalGroup' enumeration, and trust enumeration.
         'Default' uses 'Group' collection, regular user hunting with 'Session'/'LoggedOn', 'LocalGroup' enumeration, and 'Trusts' enumeration.
+        'ComputerOnly' only enumerates computers, not groups/trusts, and executes local admin/session/loggedon on each.
 
     .PARAMETER SearchForest
 
@@ -4585,6 +4751,10 @@ function Invoke-BloodHound {
    .PARAMETER GlobalCatalog
 
         The global catalog location to resolve user memberships from, form of GC://global.catalog.
+
+    .PARAMETER SkipGCDeconfliction
+
+        Switch. Skip global catalog enumeration for session deconfliction.
 
     .PARAMETER Threads
 
@@ -4622,6 +4792,18 @@ function Invoke-BloodHound {
 
     [CmdletBinding(DefaultParameterSetName = 'CSVExport')]
     param(
+        [Parameter(ValueFromPipeline=$True)]
+        [Alias('HostName')]
+        [String[]]
+        [ValidateNotNullOrEmpty()]
+        $ComputerName,
+
+        [String]
+        $ComputerADSpath,
+
+        [String]
+        $UserADSpath,
+
         [String]
         $Domain,
 
@@ -4629,7 +4811,7 @@ function Invoke-BloodHound {
         $DomainController,
 
         [String]
-        [ValidateSet('Group', 'LocalGroup', 'GPOLocalGroup', 'Session', 'LoggedOn', 'Stealth', 'Trusts', 'Default')]
+        [ValidateSet('Group', 'ACLs', 'ComputerOnly', 'LocalGroup', 'GPOLocalGroup', 'Session', 'LoggedOn', 'Stealth', 'Trusts', 'Default')]
         $CollectionMethod = 'Default',
 
         [Switch]
@@ -4658,6 +4840,9 @@ function Invoke-BloodHound {
         [String]
         $GlobalCatalog,
 
+        [Switch]
+        $SkipGCDeconfliction,
+
         [ValidateRange(1,50)]
         [Int]
         $Threads = 20,
@@ -4670,18 +4855,20 @@ function Invoke-BloodHound {
     BEGIN {
 
         Switch ($CollectionMethod) {
-            'Group'         { $UseGroup = $True; $SkipComputerEnumeration = $True; $SkipGCDeconfliction = $True }
-            'LocalGroup'    { $UseLocalGroup = $True; $SkipGCDeconfliction = $True }
-            'GPOLocalGroup' { $UseGPOGroup = $True; $SkipComputerEnumeration = $True; $SkipGCDeconfliction = $True }
-            'Session'       { $UseSession = $True; $SkipGCDeconfliction = $False }
-            'LoggedOn'      { $UseLoggedOn = $True; $SkipGCDeconfliction = $True }
-            'Trusts'        { $UseDomainTrusts = $True; $SkipComputerEnumeration = $True; $SkipGCDeconfliction = $True }
+            'Group'         { $UseGroup = $True; $SkipComputerEnumeration = $True; $SkipGCDeconfliction2 = $True }
+            'ACLs'          { $UseGroup = $False; $SkipComputerEnumeration = $True; $SkipGCDeconfliction2 = $True; $UseACLs = $True }
+            'ComputerOnly'  { $UseGroup = $False; $UseLocalGroup = $True; $UseSession = $True; $UseLoggedOn = $True; $SkipGCDeconfliction2 = $False }
+            'LocalGroup'    { $UseLocalGroup = $True; $SkipGCDeconfliction2 = $True }
+            'GPOLocalGroup' { $UseGPOGroup = $True; $SkipComputerEnumeration = $True; $SkipGCDeconfliction2 = $True }
+            'Session'       { $UseSession = $True; $SkipGCDeconfliction2 = $False }
+            'LoggedOn'      { $UseLoggedOn = $True; $SkipGCDeconfliction2 = $True }
+            'Trusts'        { $UseDomainTrusts = $True; $SkipComputerEnumeration = $True; $SkipGCDeconfliction2 = $True }
             'Stealth'       {
                 $UseGroup = $True
                 $UseGPOGroup = $True
                 $UseSession = $True
                 $UseDomainTrusts = $True
-                $SkipGCDeconfliction = $False
+                $SkipGCDeconfliction2 = $False
             }
             'Default'       {
                 $UseGroup = $True
@@ -4689,9 +4876,21 @@ function Invoke-BloodHound {
                 $UseSession = $True
                 $UseLoggedOn = $False
                 $UseDomainTrusts = $True
-                $SkipGCDeconfliction = $False
+                $SkipGCDeconfliction2 = $False
             }
         }
+
+        if($SkipGCDeconfliction) {
+            $SkipGCDeconfliction2 = $True
+        }
+
+        $GCPath = ([ADSI]'LDAP://RootDSE').dnshostname
+        $GCADSPath = "GC://$GCPath"
+
+        # the ActiveDirectoryRights regex we're using for output
+        #   https://msdn.microsoft.com/en-us/library/system.directoryservices.activedirectoryrights(v=vs.110).aspx
+        # $ACLRightsRegex = [regex] 'GenericAll|GenericWrite|WriteProperty|WriteOwner|WriteDacl|ExtendedRight'
+        $ACLGeneralRightsRegex = [regex] 'GenericAll|GenericWrite|WriteOwner|WriteDacl'
 
         if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
             try {
@@ -4734,6 +4933,18 @@ function Invoke-BloodHound {
                 }
             }
 
+            if($UseACLs) {
+                $ACLPath = "$OutputFolder\$($CSVExportPrefix)acls.csv"
+                $Exists = [System.IO.File]::Exists($ACLPath)
+                $ACLFileStream = New-Object IO.FileStream($ACLPath, [System.IO.FileMode]::Append, [System.IO.FileAccess]::Write, [IO.FileShare]::Read)
+                $ACLWriter = New-Object System.IO.StreamWriter($ACLFileStream)
+                $ACLWriter.AutoFlush = $True
+                if (-not $Exists) {
+                    # add the header if the file doesn't already exist
+                    $ACLWriter.WriteLine('"ObjectName","ObjectType","PrincipalName","PrincipalType","ActiveDirectoryRights","ACEType","AccessControlType","IsInherited"')
+                }
+            }
+
             if($UseLocalGroup -or $UseGPOGroup) {
                 $LocalAdminPath = "$OutputFolder\$($CSVExportPrefix)local_admins.csv"
                 $Exists = [System.IO.File]::Exists($LocalAdminPath)
@@ -4754,14 +4965,13 @@ function Invoke-BloodHound {
                 $TrustWriter.AutoFlush = $True
                 if (-not $Exists) {
                     # add the header if the file doesn't already exist
-                    $TrustWriter.WriteLine('"SourceDomain","TargetDomain","TrustDirection","TrustType","Transitive')
+                    $TrustWriter.WriteLine('"SourceDomain","TargetDomain","TrustDirection","TrustType","Transitive"')
                 }
             }
         }
 
         else {
             # otherwise we're doing ingestion straight to the neo4j RESTful API interface
-
             $WebClient = New-Object System.Net.WebClient
 
             $Base64UserPass = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($UserPass))
@@ -4805,7 +5015,7 @@ function Invoke-BloodHound {
         }
 
         $UserDomainMappings = @{}
-        if(-not $SkipGCDeconfliction) {
+        if(-not $SkipGCDeconfliction2) {
             # if we're doing session enumeration, create a {user : @(domain,..)} from a global catalog
             #   in order to do user domain deconfliction for sessions
             if($PSBoundParameters['GlobalCatalog']) {
@@ -4833,14 +5043,17 @@ function Invoke-BloodHound {
             $Title = (Get-Culture).TextInfo
             ForEach ($TargetDomain in $TargetDomains) {
                 # enumerate all groups and all members of each group
+                Write-Verbose "Enumerating group memberships for domain $TargetDomain"
 
-                Write-Output "Enumerating group memberships for domain $TargetDomain"
-
+                # in-line updated hashtable with group DN->SamAccountName mappings
+                $GroupDNMappings = @{}
                 $PrimaryGroups = @{}
                 $DomainSID = Get-DomainSID -Domain $TargetDomain -DomainController $DomainController
 
-                $ObjectSearcher = Get-DomainSearcher -Domain $TargetDomain -DomainController $DomainController
+                $ObjectSearcher = Get-DomainSearcher -Domain $TargetDomain -DomainController $DomainController -ADSPath $UserADSpath
+                # only return results that have 'memberof' set
                 $ObjectSearcher.Filter = '(memberof=*)'
+                # only return specific properties in the results
                 $Null = $ObjectSearcher.PropertiesToLoad.AddRange(('samaccountname', 'distinguishedname', 'cn', 'dnshostname', 'samaccounttype', 'primarygroupid', 'memberof'))
                 $Counter = 0
                 $ObjectSearcher.FindAll() | ForEach-Object {
@@ -4908,7 +5121,9 @@ function Invoke-BloodHound {
                     }
                     elseif (@('805306369') -contains $Properties['samaccounttype']) {
                         $ObjectType = 'computer'
-                        $AccountName = $Properties['dnshostname'][0]
+                        if ($Properties['dnshostname']) {
+                            $AccountName = $Properties['dnshostname'][0]
+                        }
                     }
                     elseif (@('805306368') -contains $Properties['samaccounttype']) {
                         $ObjectType = 'user'
@@ -4940,46 +5155,70 @@ function Invoke-BloodHound {
 
                     if($AccountName -and (-not $AccountName.StartsWith('@'))) {
 
+                        # Write-Verbose "AccountName: $AccountName"
                         $MemberPrimaryGroupName = $Null
                         try {
                             if($AccountName -match $TargetDomain) {
                                 # also retrieve the primary group name for this object, if it exists
-                                if($Properties['primarygroupid'] -and $Properties['primarygroupid'][0] -ne '') {
+                                if($Properties['primarygroupid'] -and $Properties['primarygroupid'][0] -and ($Properties['primarygroupid'][0] -ne '')) {
                                     $PrimaryGroupSID = "$DomainSID-$($Properties['primarygroupid'][0])"
+                                    # Write-Verbose "PrimaryGroupSID: $PrimaryGroupSID"
                                     if($PrimaryGroups[$PrimaryGroupSID]) {
                                         $PrimaryGroupName = $PrimaryGroups[$PrimaryGroupSID]
                                     }
                                     else {
-                                        $PrimaryGroupName = Get-ADObject -Domain $Domain -SID $PrimaryGroupSID | Select-Object -ExpandProperty samaccountname
-                                        $PrimaryGroups[$PrimaryGroupSID] = $PrimaryGroupName
+                                        $RawName = Convert-SidToName -SID $PrimaryGroupSID
+                                        if ($RawName -notmatch '^S-1-.*') {
+                                            $PrimaryGroupName = $RawName.split('\')[-1]
+                                            $PrimaryGroups[$PrimaryGroupSID] = $PrimaryGroupName
+                                        }
                                     }
-                                    $MemberPrimaryGroupName = "$PrimaryGroupName@$TargetDomain"
+                                    if ($PrimaryGroupName) {
+                                        $MemberPrimaryGroupName = "$PrimaryGroupName@$TargetDomain"
+                                    }
                                 }
                                 else { }
                             }
                         }
                         catch { }
 
+                        if($MemberPrimaryGroupName) {
+                            # Write-Verbose "MemberPrimaryGroupName: $MemberPrimaryGroupName"
+                            if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
+                                $GroupWriter.WriteLine("`"$MemberPrimaryGroupName`",`"$AccountName`",`"$ObjectType`"")
+                            }
+                            else {
+                                $ObjectTypeCap = $Title.ToTitleCase($ObjectType)
+                                $Null = $Statements.Add( @{ "statement"="MERGE ($($ObjectType)1:$ObjectTypeCap { name: UPPER('$AccountName') }) MERGE (group2:Group { name: UPPER('$MemberPrimaryGroupName') }) MERGE ($($ObjectType)1)-[:MemberOf]->(group2)" } )
+                            }
+                        }
+
+                        # iterate through each membership for this object
                         ForEach($GroupDN in $_.properties['memberof']) {
-                            # iterate through each membership for this object
                             $GroupDomain = $GroupDN.subString($GroupDN.IndexOf('DC=')) -replace 'DC=','' -replace ',','.'
-                            $GroupName = $GroupDN.SubString(0, $GroupDN.IndexOf(',')).Split('=')[-1]
+
+                            if($GroupDNMappings[$GroupDN]) {
+                                $GroupName = $GroupDNMappings[$GroupDN]
+                            }
+                            else {
+                                $GroupName = Convert-ADName -ObjectName $GroupDN
+                                if($GroupName) {
+                                    $GroupName = $GroupName.Split('\')[-1]
+                                }
+                                else {
+                                    $GroupName = $GroupDN.SubString(0, $GroupDN.IndexOf(',')).Split('=')[-1]
+                                }
+                                $GroupDNMappings[$GroupDN] = $GroupName
+                            }
 
                             if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
                                 $GroupWriter.WriteLine("`"$GroupName@$GroupDomain`",`"$AccountName`",`"$ObjectType`"")
-
-                                if($MemberPrimaryGroupName) {
-                                    $GroupWriter.WriteLine("`"$MemberPrimaryGroupName`",`"$AccountName`",`"$ObjectType`"")
-                                }
                             }
                             else {
                                 # otherwise we're exporting to the neo4j RESTful API
                                 $ObjectTypeCap = $Title.ToTitleCase($ObjectType)
 
                                 $Null = $Statements.Add( @{ "statement"="MERGE ($($ObjectType)1:$ObjectTypeCap { name: UPPER('$AccountName') }) MERGE (group2:Group { name: UPPER('$GroupName@$GroupDomain') }) MERGE ($($ObjectType)1)-[:MemberOf]->(group2)" } )
-                                if($MemberPrimaryGroupName) {
-                                    $Null = $Statements.Add( @{ "statement"="MERGE ($($ObjectType)1:$ObjectTypeCap { name: UPPER('$AccountName') }) MERGE (group2:Group { name: UPPER('$MemberPrimaryGroupName') }) MERGE ($($ObjectType)1)-[:MemberOf]->(group2)" } )
-                                }
 
                                 if ($Statements.Count -ge $Throttle) {
                                     $Json = @{ "statements"=[System.Collections.Hashtable[]]$Statements }
@@ -5000,13 +5239,265 @@ function Invoke-BloodHound {
                     $Null = $WebClient.UploadString($URI.AbsoluteUri + "db/data/transaction/commit", $JsonRequest)
                     $Statements.Clear()
                 }
-                Write-Output "Done with group enumeration for domain $TargetDomain"
+                Write-Verbose "Done with group enumeration for domain $TargetDomain"
             }
             [GC]::Collect()
         }
 
+        if($UseACLs -and $TargetDomains) {
+
+            # $PrincipalMapping format -> @{ PrincipalSID : @(PrincipalSimpleName, PrincipalObjectClass) }
+            $PrincipalMapping = @{}
+            $Counter = 0
+
+            # #CommonSidMapping[SID] = @(name, objectClass)
+            $CommonSidMapping = @{
+                'S-1-0'         = @('Null Authority', 'USER')
+                'S-1-0-0'       = @('Nobody', 'USER')
+                'S-1-1'         = @('World Authority', 'USER')
+                'S-1-1-0'       = @('Everyone', 'GROUP')
+                'S-1-2'         = @('Local Authority', 'USER')
+                'S-1-2-0'       = @('Local', 'GROUP')
+                'S-1-2-1'       = @('Console Logon', 'GROUP')
+                'S-1-3'         = @('Creator Authority', 'USER')
+                'S-1-3-0'       = @('Creator Owner', 'USER')
+                'S-1-3-1'       = @('Creator Group', 'GROUP')
+                'S-1-3-2'       = @('Creator Owner Server', 'COMPUTER')
+                'S-1-3-3'       = @('Creator Group Server', 'COMPUTER')
+                'S-1-3-4'       = @('Owner Rights', 'GROUP')
+                'S-1-4'         = @('Non-unique Authority', 'USER')
+                'S-1-5'         = @('NT Authority', 'USER')
+                'S-1-5-1'       = @('Dialup', 'GROUP')
+                'S-1-5-2'       = @('Network', 'GROUP')
+                'S-1-5-3'       = @('Batch', 'GROUP')
+                'S-1-5-4'       = @('Interactive', 'GROUP')
+                'S-1-5-6'       = @('Service', 'GROUP')
+                'S-1-5-7'       = @('Anonymous', 'GROUP')
+                'S-1-5-8'       = @('Proxy', 'GROUP')
+                'S-1-5-9'       = @('Enterprise Domain Controllers', 'GROUP')
+                'S-1-5-10'      = @('Principal Self', 'USER')
+                'S-1-5-11'      = @('Authenticated Users', 'GROUP')
+                'S-1-5-12'      = @('Restricted Code', 'GROUP')
+                'S-1-5-13'      = @('Terminal Server Users', 'GROUP')
+                'S-1-5-14'      = @('Remote Interactive Logon', 'GROUP')
+                'S-1-5-15'      = @('This Organization ', 'GROUP')
+                'S-1-5-17'      = @('This Organization ', 'GROUP')
+                'S-1-5-18'      = @('Local System', 'USER')
+                'S-1-5-19'      = @('NT Authority', 'USER')
+                'S-1-5-20'      = @('NT Authority', 'USER')
+                'S-1-5-80-0'    = @('All Services ', 'GROUP')
+                'S-1-5-32-544'  = @('Administrators', 'GROUP')
+                'S-1-5-32-545'  = @('Users', 'GROUP')
+                'S-1-5-32-546'  = @('Guests', 'GROUP')
+                'S-1-5-32-547'  = @('Power Users', 'GROUP')
+                'S-1-5-32-548'  = @('Account Operators', 'GROUP')
+                'S-1-5-32-549'  = @('Server Operators', 'GROUP')
+                'S-1-5-32-550'  = @('Print Operators', 'GROUP')
+                'S-1-5-32-551'  = @('Backup Operators', 'GROUP')
+                'S-1-5-32-552'  = @('Replicators', 'GROUP')
+                'S-1-5-32-554'  = @('Pre-Windows 2000 Compatible Access', 'GROUP')
+                'S-1-5-32-555'  = @('Remote Desktop Users', 'GROUP')
+                'S-1-5-32-556'  = @('Network Configuration Operators', 'GROUP')
+                'S-1-5-32-557'  = @('Incoming Forest Trust Builders', 'GROUP')
+                'S-1-5-32-558'  = @('Performance Monitor Users', 'GROUP')
+                'S-1-5-32-559'  = @('Performance Log Users', 'GROUP')
+                'S-1-5-32-560'  = @('Windows Authorization Access Group', 'GROUP')
+                'S-1-5-32-561'  = @('Terminal Server License Servers', 'GROUP')
+                'S-1-5-32-562'  = @('Distributed COM Users', 'GROUP')
+                'S-1-5-32-569'  = @('Cryptographic Operators', 'GROUP')
+                'S-1-5-32-573'  = @('Event Log Readers', 'GROUP')
+                'S-1-5-32-574'  = @('Certificate Service DCOM Access', 'GROUP')
+                'S-1-5-32-575'  = @('RDS Remote Access Servers', 'GROUP')
+                'S-1-5-32-576'  = @('RDS Endpoint Servers', 'GROUP')
+                'S-1-5-32-577'  = @('RDS Management Servers', 'GROUP')
+                'S-1-5-32-578'  = @('Hyper-V Administrators', 'GROUP')
+                'S-1-5-32-579'  = @('Access Control Assistance Operators', 'GROUP')
+                'S-1-5-32-580'  = @('Access Control Assistance Operators', 'GROUP')
+            }
+
+            ForEach ($TargetDomain in $TargetDomains) {
+                # enumerate all reachable user/group/computer objects and their associated ACLs
+                Write-Verbose "Enumerating ACLs for objects in domain: $TargetDomain"
+
+                $ObjectSearcher = Get-DomainSearcher -Domain $TargetDomain -DomainController $DomainController -ADSPath $UserADSpath
+                $ObjectSearcher.SecurityMasks = [System.DirectoryServices.SecurityMasks]::Dacl
+
+                # only enumerate user and group objects (for now)
+                #   805306368 -> user
+                #   805306369 -> computer
+                #   268435456|268435457|536870912|536870913 -> groups
+                $ObjectSearcher.Filter = '(|(samAccountType=805306368)(samAccountType=805306369)(samAccountType=268435456)(samAccountType=268435457)(samAccountType=536870912)(samAccountType=536870913))'
+                $ObjectSearcher.PropertiesToLoad.AddRange(('distinguishedName','samaccountname','dnshostname','objectclass','objectsid','name', 'ntsecuritydescriptor'))
+
+                $ObjectSearcher.FindAll() | ForEach-Object {
+                    $Object = $_.Properties
+                    if($Object -and $Object.distinguishedname -and $Object.distinguishedname[0] -and $Object.objectsid -and $Object.objectsid[0]) {
+
+                        $ObjectSid = (New-Object System.Security.Principal.SecurityIdentifier($Object.objectsid[0],0)).Value
+
+                        try {
+                            # parse the 'ntsecuritydescriptor' field returned
+                            New-Object -TypeName Security.AccessControl.RawSecurityDescriptor -ArgumentList $Object['ntsecuritydescriptor'][0], 0 | Select-Object -Expand DiscretionaryAcl | ForEach-Object {
+                                $Counter += 1
+                                if($Counter % 10000 -eq 0) {
+                                    Write-Verbose "ACE counter: $Counter"
+                                    if($ACLWriter) {
+                                        $ACLWriter.Flush()
+                                    }
+                                    [GC]::Collect()
+                                }
+
+                                $RawActiveDirectoryRights = ([Enum]::ToObject([System.DirectoryServices.ActiveDirectoryRights], $_.AccessMask))
+
+                                # check for the following rights:
+                                #   GenericAll                      -   generic fully control of an object
+                                #   GenericWrite                    -   write to any object properties
+                                #   WriteDacl                       -   modify the permissions of the object
+                                #   WriteOwner                      -   modify the owner of an object
+                                #   User-Force-Change-Password      -   extended attribute (00299570-246d-11d0-a768-00aa006e0529)
+                                #   WriteProperty/Self-Membership   -   modify group membership (bf9679c0-0de6-11d0-a285-00aa003049e2)
+                                #   WriteProperty/Script-Path       -   modify a user's script-path (bf9679a8-0de6-11d0-a285-00aa003049e2)
+                                if (
+                                        ( ($RawActiveDirectoryRights -match 'GenericAll|GenericWrite') -and (-not $_.ObjectAceType -or $_.ObjectAceType -eq '00000000-0000-0000-0000-000000000000') ) -or 
+                                        ($RawActiveDirectoryRights -match 'WriteDacl|WriteOwner') -or 
+                                        ( ($RawActiveDirectoryRights -match 'ExtendedRight') -and (-not $_.ObjectAceType -or $_.ObjectAceType -eq '00000000-0000-0000-0000-000000000000') ) -or 
+                                        (($_.ObjectAceType -eq '00299570-246d-11d0-a768-00aa006e0529') -and ($RawActiveDirectoryRights -match 'ExtendedRight')) -or
+                                        (($_.ObjectAceType -eq 'bf9679c0-0de6-11d0-a285-00aa003049e2') -and ($RawActiveDirectoryRights -match 'WriteProperty')) -or
+                                        (($_.ObjectAceType -eq 'bf9679a8-0de6-11d0-a285-00aa003049e2') -and ($RawActiveDirectoryRights -match 'WriteProperty'))
+                                    ) {
+                                    
+                                    $PrincipalSid = $_.SecurityIdentifier.ToString()
+                                    $PrincipalSimpleName, $PrincipalObjectClass, $ACEType = $Null
+
+                                    # only grab the AD right names we care about
+                                    #   'GenericAll|GenericWrite|WriteOwner|WriteDacl'
+                                    $ActiveDirectoryRights = $ACLGeneralRightsRegex.Matches($RawActiveDirectoryRights) | Select-Object -ExpandProperty Value
+                                    if (-not $ActiveDirectoryRights) {
+                                        if ($RawActiveDirectoryRights -match 'ExtendedRight') {
+                                            $ActiveDirectoryRights = 'ExtendedRight'
+                                        }
+                                        else {
+                                            $ActiveDirectoryRights = 'WriteProperty'
+                                        }
+
+                                        # decode the ACE types here
+                                        $ACEType = Switch ($_.ObjectAceType) {
+                                            '00299570-246d-11d0-a768-00aa006e0529' {'User-Force-Change-Password'}
+                                            'bf9679c0-0de6-11d0-a285-00aa003049e2' {'Member'}
+                                            'bf9679a8-0de6-11d0-a285-00aa003049e2' {'Script-Path'}
+                                            Default {'All'}
+                                        }
+                                    }
+
+                                    if ($PrincipalMapping[$PrincipalSid]) {
+                                        # Write-Verbose "$PrincipalSid in cache!"
+                                        # $PrincipalMappings format -> @{ SID : @(PrincipalSimpleName, PrincipalObjectClass) }
+                                        $PrincipalSimpleName, $PrincipalObjectClass = $PrincipalMapping[$PrincipalSid]
+                                    }
+                                    elseif ($CommonSidMapping[$PrincipalSid]) {
+                                        # Write-Verbose "$PrincipalSid in common sids!"
+                                        $PrincipalName, $PrincipalObjectClass = $CommonSidMapping[$PrincipalSid]
+                                        $PrincipalSimpleName = "$PrincipalName@$TargetDomain"
+                                        $PrincipalMapping[$PrincipalSid] = $PrincipalSimpleName, $PrincipalObjectClass
+                                    }
+                                    else {
+                                        # Write-Verbose "$PrincipalSid NOT in cache!"
+                                        # first try querying the target domain for this SID
+                                        $SIDSearcher = Get-DomainSearcher -Domain $TargetDomain -DomainController $DomainController
+                                        $SIDSearcher.PropertiesToLoad.AddRange(('samaccountname','distinguishedname','dnshostname','objectclass'))
+                                        $SIDSearcher.Filter = "(objectsid=$PrincipalSid)"
+                                        $PrincipalObject = $SIDSearcher.FindOne()
+
+                                        if ((-not $PrincipalObject) -and ((-not $DomainController) -or (-not $DomainController.StartsWith('GC:')))) {
+                                            # if the object didn't resolve from the current domain, attempt to query the global catalog
+                                            $GCSearcher = Get-DomainSearcher -ADSpath $GCADSPath
+                                            $GCSearcher.PropertiesToLoad.AddRange(('samaccountname','distinguishedname','dnshostname','objectclass'))
+                                            $GCSearcher.Filter = "(objectsid=$PrincipalSid)"
+                                            $PrincipalObject = $GCSearcher.FindOne()
+                                        }
+
+                                        if ($PrincipalObject) {
+                                            if ($PrincipalObject.Properties.objectclass.contains('computer')) {
+                                                $PrincipalObjectClass = 'COMPUTER'
+                                                $PrincipalSimpleName = $PrincipalObject.Properties.dnshostname[0]
+                                            }
+                                            else {
+                                                $PrincipalSamAccountName = $PrincipalObject.Properties.samaccountname[0]
+                                                $PrincipalDN = $PrincipalObject.Properties.distinguishedname[0]
+                                                $PrincipalDomain = $PrincipalDN.SubString($PrincipalDN.IndexOf('DC=')) -replace 'DC=','' -replace ',','.'
+                                                $PrincipalSimpleName = "$PrincipalSamAccountName@$PrincipalDomain"
+
+                                                if ($PrincipalObject.Properties.objectclass.contains('group')) {
+                                                    $PrincipalObjectClass = 'GROUP'
+                                                }
+                                                elseif ($PrincipalObject.Properties.objectclass.contains('user')) {
+                                                    $PrincipalObjectClass = 'USER'
+                                                }
+                                                else {
+                                                    $PrincipalObjectClass = 'OTHER'
+                                                }
+                                            }
+                                        }
+                                        else {
+                                            Write-Verbose "SID not resolved: $PrincipalSid"
+                                        }
+
+                                        $PrincipalMapping[$PrincipalSid] = $PrincipalSimpleName, $PrincipalObjectClass
+                                    }
+
+                                    if ($PrincipalSimpleName -and $PrincipalObjectClass) {
+                                        $ObjectName, $ObjectADType = $Null
+
+                                        if ($Object.objectclass.contains('computer')) {
+                                            $ObjectADType = 'COMPUTER'
+                                            if ($Object.dnshostname) {
+                                                $ObjectName = $Object.dnshostname[0]
+                                            }
+                                        }
+                                        else {
+                                            if($Object.samaccountname) {
+                                                $ObjectSamAccountName = $Object.samaccountname[0]
+                                            }
+                                            else {
+                                                $ObjectSamAccountName = $Object.name[0]
+                                            }
+                                            $DN = $Object.distinguishedname[0]
+                                            $ObjectDomain = $DN.SubString($DN.IndexOf('DC=')) -replace 'DC=','' -replace ',','.'
+                                            $ObjectName = "$ObjectSamAccountName@$ObjectDomain"
+
+                                            if ($Object.objectclass.contains('group')) {
+                                                $ObjectADType = 'GROUP'
+                                            }
+                                            elseif ($Object.objectclass.contains('user')) {
+                                                $ObjectADType = 'USER'
+                                            }
+                                            else {
+                                                $ObjectADType = 'OTHER'
+                                            }
+                                        }
+
+                                        if ($ObjectName -and $ObjectADType) {
+                                            if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
+                                                $ACLWriter.WriteLine("`"$ObjectName`",`"$ObjectADType`",`"$PrincipalSimpleName`",`"$PrincipalObjectClass`",`"$ActiveDirectoryRights`",`"$ACEType`",`"$($_.AceQualifier)`",`"$($_.IsInherited)`"")
+                                            }
+                                            else {
+                                                Write-Warning 'TODO: implement neo4j RESTful API ingestion for ACLs!'
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        catch {
+                            Write-Verbose "ACL ingestion error: $_"
+                        }
+                    }
+                }
+            }
+        }
+
         if($UseDomainTrusts -and $TargetDomains) {
-            Write-Output "Mapping domain trusts"
+            Write-Verbose "Mapping domain trusts"
             Invoke-MapDomainTrust | ForEach-Object {
                 if($_.SourceDomain) {
                     $SourceDomain = $_.SourceDomain
@@ -5050,13 +5541,13 @@ function Invoke-BloodHound {
                 $Null = $WebClient.UploadString($URI.AbsoluteUri + "db/data/transaction/commit", $JsonRequest)
                 $Statements.Clear()
             }
-            Write-Output "Done mapping domain trusts"
+            Write-Verbose "Done mapping domain trusts"
         }
 
         if($UseGPOGroup -and $TargetDomains) {
             ForEach ($TargetDomain in $TargetDomains) {
 
-                Write-Output "Enumerating GPO local group memberships for domain $TargetDomain"
+                Write-Verbose "Enumerating GPO local group memberships for domain $TargetDomain"
                 Find-GPOLocation -Domain $TargetDomain -DomainController $DomainController | ForEach-Object {
                     $AccountName = "$($_.ObjectName)@$($_.ObjectDomain)"
                     ForEach($Computer in $_.ComputerName) {
@@ -5078,9 +5569,9 @@ function Invoke-BloodHound {
                         }
                     }
                 }
-                Write-Output "Done enumerating GPO local group memberships for domain $TargetDomain"
+                Write-Verbose "Done enumerating GPO local group memberships for domain $TargetDomain"
             }
-            Write-Output "Done enumerating GPO local groups"
+            Write-Verbose "Done enumerating GPO local group"
             # TODO: cypher query to add 'domain admins' to every found machine
         }
 
@@ -5089,70 +5580,88 @@ function Invoke-BloodHound {
 
         # script block that enumerates a server
         $HostEnumBlock = {
-            param($ComputerName, $Ping, $CurrentUser2, $UseLocalGroup2, $UseSession2, $UseLoggedon2, $DomainSID2)
-            $Up = $True
-            if($Ping) {
-                $Up = Test-Connection -Count 1 -Quiet -ComputerName $ComputerName
-            }
-            if($Up) {
+            Param($ComputerName, $CurrentUser2, $UseLocalGroup2, $UseSession2, $UseLoggedon2, $DomainSID2)
 
-                if($UseLocalGroup2) {
-                    # grab the users for the local admins on this server
-                    $Results = Get-NetLocalGroup -ComputerName $ComputerName -API -IsDomain -DomainSID $DomainSID2
-                    if($Results) {
-                        $Results
-                    }
-                    else {
-                        Get-NetLocalGroup -ComputerName $ComputerName -IsDomain -DomainSID $DomainSID2
-                    }
-                }
-
-                $IPAddress = @(Get-IPAddress -ComputerName $ComputerName)[0].IPAddress
-
-                if($UseSession2) {
-                    ForEach ($Session in $(Get-NetSession -ComputerName $ComputerName)) {
-                        $UserName = $Session.sesi10_username
-                        $CName = $Session.sesi10_cname
-
-                        if($CName -and $CName.StartsWith("\\")) {
-                            $CName = $CName.TrimStart("\")
+            ForEach ($TargetComputer in $ComputerName) {
+                $Up = Test-Connection -Count 1 -Quiet -ComputerName $TargetComputer
+                if($Up) {
+                    if($UseLocalGroup2) {
+                        # grab the users for the local admins on this server
+                        $Results = Get-NetLocalGroup -ComputerName $TargetComputer -API -IsDomain -DomainSID $DomainSID2
+                        if($Results) {
+                            $Results
                         }
-
-                        # make sure we have a result
-                        if (($UserName) -and ($UserName.trim() -ne '') -and ($UserName -notmatch '\$') -and ($UserName -notmatch $CurrentUser2)) {
-                            # Try to resolve the DNS hostname of $Cname
-                            try {
-                                $CNameDNSName = [System.Net.Dns]::GetHostEntry($CName) | Select-Object -ExpandProperty HostName
-                            }
-                            catch {
-                                $CNameDNSName = $CName
-                            }
-                            @{
-                                'UserDomain' = $Null
-                                'UserName' = $UserName
-                                'ComputerName' = $ComputerName
-                                'IPAddress' = $IPAddress
-                                'SessionFrom' = $CName
-                                'SessionFromName' = $CNameDNSName
-                                'LocalAdmin' = $Null
-                                'Type' = 'UserSession'
-                            }
+                        else {
+                            Get-NetLocalGroup -ComputerName $TargetComputer -IsDomain -DomainSID $DomainSID2
                         }
                     }
-                }
 
-                if($UseLoggedon2) {
-                    ForEach ($User in $(Get-NetLoggedon -ComputerName $ComputerName)) {
-                        $UserName = $User.wkui1_username
-                        $UserDomain = $User.wkui1_logon_domain
+                    $IPAddress = @(Get-IPAddress -ComputerName $TargetComputer)[0].IPAddress
 
-                        # ignore local account logons
-                        if($ComputerName -notmatch "^$UserDomain") {
-                            if (($UserName) -and ($UserName.trim() -ne '') -and ($UserName -notmatch '\$')) {
+                    if($UseSession2) {
+                        ForEach ($Session in $(Get-NetSession -ComputerName $TargetComputer)) {
+                            $UserName = $Session.sesi10_username
+                            $CName = $Session.sesi10_cname
+
+                            if($CName -and $CName.StartsWith("\\")) {
+                                $CName = $CName.TrimStart("\")
+                            }
+
+                            # make sure we have a result
+                            if (($UserName) -and ($UserName.trim() -ne '') -and ($UserName -notmatch '\$') -and ($UserName -notmatch $CurrentUser2)) {
+                                # Try to resolve the DNS hostname of $Cname
+                                try {
+                                    $CNameDNSName = [System.Net.Dns]::GetHostEntry($CName) | Select-Object -ExpandProperty HostName
+                                }
+                                catch {
+                                    $CNameDNSName = $CName
+                                }
+                                @{
+                                    'UserDomain' = $Null
+                                    'UserName' = $UserName
+                                    'ComputerName' = $TargetComputer
+                                    'IPAddress' = $IPAddress
+                                    'SessionFrom' = $CName
+                                    'SessionFromName' = $CNameDNSName
+                                    'LocalAdmin' = $Null
+                                    'Type' = 'UserSession'
+                                }
+                            }
+                        }
+                    }
+
+                    if($UseLoggedon2) {
+                        ForEach ($User in $(Get-NetLoggedon -ComputerName $TargetComputer)) {
+                            $UserName = $User.wkui1_username
+                            $UserDomain = $User.wkui1_logon_domain
+
+                            # ignore local account logons
+                            if($TargetComputer -notmatch "^$UserDomain") {
+                                if (($UserName) -and ($UserName.trim() -ne '') -and ($UserName -notmatch '\$')) {
+                                    @{
+                                        'UserDomain' = $UserDomain
+                                        'UserName' = $UserName
+                                        'ComputerName' = $TargetComputer
+                                        'IPAddress' = $IPAddress
+                                        'SessionFrom' = $Null
+                                        'SessionFromName' = $Null
+                                        'LocalAdmin' = $Null
+                                        'Type' = 'UserSession'
+                                    }
+                                }
+                            }
+                        }
+
+                        ForEach ($User in $(Get-LoggedOnLocal -ComputerName $TargetComputer)) {
+                            $UserName = $User.UserName
+                            $UserDomain = $User.UserDomain
+
+                            # ignore local account logons ?
+                            if($TargetComputer -notmatch "^$UserDomain") {
                                 @{
                                     'UserDomain' = $UserDomain
                                     'UserName' = $UserName
-                                    'ComputerName' = $ComputerName
+                                    'ComputerName' = $TargetComputer
                                     'IPAddress' = $IPAddress
                                     'SessionFrom' = $Null
                                     'SessionFromName' = $Null
@@ -5162,84 +5671,24 @@ function Invoke-BloodHound {
                             }
                         }
                     }
-
-                    ForEach ($User in $(Get-LoggedOnLocal -ComputerName $ComputerName)) {
-                        $UserName = $User.UserName
-                        $UserDomain = $User.UserDomain
-
-                        # ignore local account logons ?
-                        if($ComputerName -notmatch "^$UserDomain") {
-                            @{
-                                'UserDomain' = $UserDomain
-                                'UserName' = $UserName
-                                'ComputerName' = $ComputerName
-                                'IPAddress' = $IPAddress
-                                'SessionFrom' = $Null
-                                'SessionFromName' = $Null
-                                'LocalAdmin' = $Null
-                                'Type' = 'UserSession'
-                            }
-                        }
-                    }
                 }
             }
-        }
-
-        if ($TargetDomains -and (-not $SkipComputerEnumeration)) {
-            # Adapted from:
-            #   http://powershell.org/wp/forums/topic/invpke-parallel-need-help-to-clone-the-current-runspace/
-            $SessionState = [System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
-            $SessionState.ApartmentState = [System.Threading.Thread]::CurrentThread.GetApartmentState()
-
-            # grab all the current variables for this runspace
-            $MyVars = Get-Variable -Scope 1
-
-            # these Variables are added by Runspace.Open() Method and produce Stop errors if you add them twice
-            $VorbiddenVars = @('?','args','ConsoleFileName','Error','ExecutionContext','false','HOME','Host','input','InputObject','MaximumAliasCount','MaximumDriveCount','MaximumErrorCount','MaximumFunctionCount','MaximumHistoryCount','MaximumVariableCount','MyInvocation','null','PID','PSBoundParameters','PSCommandPath','PSCulture','PSDefaultParameterValues','PSHOME','PSScriptRoot','PSUICulture','PSVersionTable','PWD','ShellId','SynchronizedHash','true')
-
-            # Add Variables from Parent Scope (current runspace) into the InitialSessionState
-            ForEach($Var in $MyVars) {
-                if($VorbiddenVars -NotContains $Var.Name) {
-                    $SessionState.Variables.Add((New-Object -TypeName System.Management.Automation.Runspaces.SessionStateVariableEntry -ArgumentList $Var.name,$Var.Value,$Var.description,$Var.options,$Var.attributes))
-                }
-            }
-
-            # Add Functions from current runspace to the InitialSessionState
-            ForEach($Function in (Get-ChildItem Function:)) {
-                $SessionState.Commands.Add((New-Object -TypeName System.Management.Automation.Runspaces.SessionStateFunctionEntry -ArgumentList $Function.Name, $Function.Definition))
-            }
-
-            # threading adapted from
-            # https://github.com/darkoperator/Posh-SecMod/blob/master/Discovery/Discovery.psm1#L407
-            #   Thanks Carlos!
-
-            # create a pool of maxThread runspaces
-            Write-Output "Creating a runspace with $Threads threads"
-            $Pool = [RunspaceFactory]::CreateRunspacePool(1, $Threads, $SessionState, $Host)
-            $Pool.ThreadOptions = [System.Management.Automation.Runspaces.PSThreadOptions]::UseNewThread
-            $Pool.Open()
-
-            $Jobs = @()
-            $PS = @()
-            $Wait = @()
-            $Counter = 0
-            $MovingWindow = 0
         }
     }
 
     PROCESS {
         if ($TargetDomains -and (-not $SkipComputerEnumeration)) {
-
+            
             if($Statements) {
                 $Statements.Clear()
             }
+            [Array]$TargetComputers = @()
 
             ForEach ($TargetDomain in $TargetDomains) {
 
                 $DomainSID = Get-DomainSid -Domain $TargetDomain
 
                 $ScriptParameters = @{
-                    'Ping' = $True
                     'CurrentUser2' = $CurrentUser
                     'UseLocalGroup2' = $UseLocalGroup
                     'UseSession2' = $UseSession
@@ -5248,302 +5697,68 @@ function Invoke-BloodHound {
                 }
 
                 if($CollectionMethod -eq 'Stealth') {
-                    Write-Output "Executing stealth computer enumeration of domain $TargetDomain"
+                    Write-Verbose "Executing stealth computer enumeration of domain $TargetDomain"
 
-                    [Array]$TargetComputers = @()
-                    Write-Output "Querying domain $TargetDomain for File Servers"
+                    Write-Verbose "Querying domain $TargetDomain for File Servers"
                     $TargetComputers += Get-NetFileServer -Domain $TargetDomain -DomainController $DomainController
 
-                    Write-Output "Querying domain $TargetDomain for DFS Servers"
+                    Write-Verbose "Querying domain $TargetDomain for DFS Servers"
                     $TargetComputers += ForEach($DFSServer in $(Get-DFSshare -Domain $TargetDomain -DomainController $DomainController)) {
                         $DFSServer.RemoteServerName
                     }
 
-                    Write-Output "Querying domain $TargetDomain for Domain Controllers"
+                    Write-Verbose "Querying domain $TargetDomain for Domain Controllers"
                     $TargetComputers += ForEach($DomainController in $(Get-NetDomainController -LDAP -DomainController $DomainController -Domain $TargetDomain)) {
                         $DomainController.dnshostname
                     }
 
                     $TargetComputers = $TargetComputers | Where-Object {$_ -and ($_.Trim() -ne '')} | Sort-Object -Unique
-
-                    ForEach ($Computer in $TargetComputers) {
-                        While ($($Pool.GetAvailableRunspaces()) -le 0) {
-                            Start-Sleep -MilliSeconds 500
-                        }
-
-                        # create a "powershell pipeline runner"
-                        $PS += [PowerShell]::Create()
-                        $PS[$Counter].RunspacePool = $Pool
-
-                        # add the script block + arguments
-                        $Null = $PS[$Counter].AddScript($HostEnumBlock).AddParameter('ComputerName', $Computer)
-                        ForEach ($Param in $ScriptParameters.GetEnumerator()) {
-                            $Null = $PS[$Counter].AddParameter($Param.Name, $Param.Value)
-                        }
-
-                        # start job
-                        $Jobs += $PS[$Counter].BeginInvoke()
-                        $Counter += 1
-                    }
                 }
                 else {
-                    Write-Output "Enumerating all machines in domain $TargetDomain"
-                    $ComputerSearcher = Get-DomainSearcher -Domain $TargetDomain -DomainController $DomainController
-                    $ComputerSearcher.filter = '(sAMAccountType=805306369)'
-                    $Null = $ComputerSearcher.PropertiesToLoad.Add('dnshostname')
+                    if($ComputerName) {
+                        Write-Verbose "Using specified -ComputerName target set"
+                        if($ComputerName -isnot [System.Array]) {$ComputerName = @($ComputerName)}
+                        $TargetComputers = $ComputerName
+                    }
+                    else {
+                        Write-Verbose "Enumerating all machines in domain $TargetDomain"
+                        $ComputerSearcher = Get-DomainSearcher -Domain $TargetDomain -DomainController $DomainController -ADSPath $ComputerADSpath
+                        $ComputerSearcher.filter = '(sAMAccountType=805306369)'
+                        $Null = $ComputerSearcher.PropertiesToLoad.Add('dnshostname')
+                        $TargetComputers = $ComputerSearcher.FindAll() | ForEach-Object {$_.Properties.dnshostname}
+                        $ComputerSearcher.Dispose()
+                    }
+                }
+                $TargetComputers = $TargetComputers | Where-Object { $_ }
 
-                    ForEach($ComputerResult in $ComputerSearcher.FindAll()) {
-                        $Slept = $False
-                        if($Counter % 100 -eq 0) {
-                            Write-Output "Computer counter: $Counter"
-                        }
-                        elseif($Counter % 1000 -eq 0) {
-                            1..3 | ForEach-Object {
-                                $Null = [GC]::Collect()
-                            }
-                        }
+                New-ThreadedFunction -ComputerName $TargetComputers -ScriptBlock $HostEnumBlock -ScriptParameters $ScriptParameters -Threads $Threads | ForEach-Object {
+                    if($_['Type'] -eq 'UserSession') {
+                        if($_['SessionFromName']) {
+                            try {
+                                $SessionFromName = $_['SessionFromName']
+                                $UserName = $_['UserName'].ToUpper()
+                                $ComputerDomain = $_['SessionFromName'].SubString($_['SessionFromName'].IndexOf('.')+1).ToUpper()
 
-                        while ($($Pool.GetAvailableRunspaces()) -le 0) {
-                            Start-Sleep -MilliSeconds 500
-                            $Slept = $True
-                        }
-
-                        # if we slept, meaning all threads were occupised, consume results as they complete
-                        #   with a 'moving window' that moves 300 threads behind the current point
-                        if($Slept -and (($Counter-$Threads-300) -gt 0) ) {
-                            for ($y = $MovingWindow; $y -lt $($Counter-$Threads-300); $y++) {
-                                if($Jobs[$y].IsCompleted) {
-                                    try {
-                                        # complete async job
-                                        $PS[$y].EndInvoke($Jobs[$y]) | ForEach-Object {
-                                            if($_['Type'] -eq 'UserSession') {
-                                                if($_['SessionFromName']) {
-                                                    try {
-                                                        $SessionFromName = $_['SessionFromName']
-                                                        $UserName = $_['UserName'].ToUpper()
-                                                        $ComputerDomain = $_['SessionFromName'].SubString($_['SessionFromName'].IndexOf('.')+1).ToUpper()
-
-                                                        if($UserDomainMappings) {
-                                                            $UserDomain = $Null
-                                                            if($UserDomainMappings[$UserName]) {
-                                                                if($UserDomainMappings[$UserName].Count -eq 1) {
-                                                                    $UserDomain = $UserDomainMappings[$UserName]
-                                                                    $LoggedOnUser = "$UserName@$UserDomain"
-                                                                    if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
-                                                                        $SessionWriter.WriteLine("`"$SessionFromName`",`"$LoggedOnUser`",`"1`"")
-                                                                    }
-                                                                    else {
-                                                                        $Null = $Statements.Add( @{"statement"="MERGE (user:User { name: UPPER('$LoggedOnUser') }) MERGE (computer:Computer { name: UPPER('$SessionFromName') }) MERGE (computer)-[:HasSession {Weight: '1'}]->(user)" } )
-                                                                    }
-                                                                }
-                                                                else {
-                                                                    $ComputerDomain = $_['SessionFromName'].SubString($_['SessionFromName'].IndexOf('.')+1).ToUpper()
-
-                                                                    $UserDomainMappings[$UserName] | ForEach-Object {
-                                                                        # for multiple GC results, set a weight of 1 for the same domain as the target computer
-                                                                        if($_ -eq $ComputerDomain) {
-                                                                            $UserDomain = $_
-                                                                            $LoggedOnUser = "$UserName@$UserDomain"
-                                                                            if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
-                                                                                $SessionWriter.WriteLine("`"$SessionFromName`",`"$LoggedOnUser`",`"1`"")
-                                                                            }
-                                                                            else {
-                                                                                $Null = $Statements.Add( @{"statement"="MERGE (user:User { name: UPPER('$LoggedOnUser') }) MERGE (computer:Computer { name: UPPER('$SessionFromName') }) MERGE (computer)-[:HasSession {Weight: '1'}]->(user)" } )
-                                                                            }
-                                                                        }
-                                                                        # and set a weight of 2 for all other users in additional domains
-                                                                        else {
-                                                                            $UserDomain = $_
-                                                                            $LoggedOnUser = "$UserName@$UserDomain"
-                                                                            if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
-                                                                                $SessionWriter.WriteLine("`"$SessionFromName`",`"$LoggedOnUser`",`"2`"")
-                                                                            }
-                                                                            else {
-                                                                                $Null = $Statements.Add( @{"statement"="MERGE (user:User { name: UPPER('$LoggedOnUser') }) MERGE (computer:Computer { name: UPPER('$SessionFromName') }) MERGE (computer)-[:HasSession {Weight: '2'}]->(user)" } )
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                }
-                                                            }
-                                                            else {
-                                                                # no user object in the GC with this username, so set the domain to "UNKNOWN"
-                                                                $LoggedOnUser = "$UserName@UNKNOWN"
-                                                                if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
-                                                                    $SessionWriter.WriteLine("`"$SessionFromName`",`"$LoggedOnUser`",`"2`"")
-                                                                }
-                                                                else {
-                                                                    $Null = $Statements.Add( @{"statement"="MERGE (user:User { name: UPPER('$LoggedOnUser') }) MERGE (computer:Computer { name: UPPER('$SessionFromName') }) MERGE (computer)-[:HasSession {Weight: '2'}]->(user)" } )
-                                                                }
-                                                            }
-                                                        }
-                                                        else {
-                                                            # if not using GC mappings, set the weight to 2
-                                                            $LoggedOnUser = "$UserName@$ComputerDomain"
-                                                            if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
-                                                                $SessionWriter.WriteLine("`"$SessionFromName`",`"$LoggedOnUser`",`"2`"")
-                                                            }
-                                                            else {
-                                                                $Null = $Statements.Add( @{"statement"="MERGE (user:User { name: UPPER('$LoggedOnUser') }) MERGE (computer:Computer { name: UPPER('$SessionFromName') }) MERGE (computer)-[:HasSession {Weight: '2'}]->(user)"} )
-                                                            }
-                                                        }
-                                                    }
-                                                    catch {
-                                                        Write-Warning "Error extracting domain from $SessionFromName"
-                                                    }
-                                                }
-                                                elseif($_['SessionFrom']) {
-                                                    $SessionFromName = $_['SessionFrom']
-                                                    $LoggedOnUser = "$($_['UserName'])@UNKNOWN"
-                                                    if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
-                                                        $SessionWriter.WriteLine("`"$SessionFromName`",`"$LoggedOnUser`",`"2`"")
-                                                    }
-                                                    else {
-                                                        $Null = $Statements.Add( @{"statement"="MERGE (user:User { name: UPPER(`"$LoggedOnUser`") }) MERGE (computer:Computer { name: UPPER(`"$SessionFromName`") }) MERGE (computer)-[:HasSession {Weight: '2'}]->(user)"} )
-                                                    }
-                                                }
-                                                else {
-                                                    # assume Get-NetLoggedOn result
-                                                    $UserDomain = $_['UserDomain']
-                                                    $UserName = $_['UserName']
-                                                    try {
-                                                        if($DomainShortnameMappings[$UserDomain]) {
-                                                            # in case the short name mapping is 'cached'
-                                                            $AccountName = "$UserName@$($DomainShortnameMappings[$UserDomain])"
-                                                        }
-                                                        else {
-                                                            $MemberSimpleName = "$UserDomain\$UserName" | Convert-ADName -InputType 'NT4' -OutputType 'Canonical'
- 
-                                                            if($MemberSimpleName) {
-                                                                $MemberDomain = $MemberSimpleName.Split('/')[0]
-                                                                $AccountName = "$UserName@$MemberDomain"
-                                                                $DomainShortnameMappings[$UserDomain] = $MemberDomain
-                                                            }
-                                                            else {
-                                                                $AccountName = "$UserName@UNKNOWN"
-                                                            }
-                                                        }
-
-                                                        $SessionFromName = $_['ComputerName']
-
-                                                        if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
-                                                            $SessionWriter.WriteLine("`"$SessionFromName`",`"$AccountName`",`"1`"")
-                                                        }
-                                                        else {
-                                                            $Null = $Statements.Add( @{"statement"="MERGE (user:User { name: UPPER('$AccountName') }) MERGE (computer:Computer { name: UPPER('$SessionFromName') }) MERGE (computer)-[:HasSession {Weight: '1'}]->(user)" } )
-                                                        }
-                                                    }
-                                                    catch {
-                                                        Write-Verbose "Error converting $UserDomain\$UserName : $_"
-                                                    }
-                                                }
+                                if($UserDomainMappings) {
+                                    $UserDomain = $Null
+                                    if($UserDomainMappings[$UserName]) {
+                                        if($UserDomainMappings[$UserName].Count -eq 1) {
+                                            $UserDomain = $UserDomainMappings[$UserName]
+                                            $LoggedOnUser = "$UserName@$UserDomain"
+                                            if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
+                                                $SessionWriter.WriteLine("`"$SessionFromName`",`"$LoggedOnUser`",`"1`"")
                                             }
-                                            elseif($_['Type'] -eq 'LocalUser') {
-                                                $Parts = $_['AccountName'].split('\')
-                                                $UserDomain = $Parts[0]
-                                                $UserName = $Parts[-1]
-
-                                                if($DomainShortnameMappings[$UserDomain]) {
-                                                    # in case the short name mapping is 'cached'
-                                                    $AccountName = "$UserName@$($DomainShortnameMappings[$UserDomain])"
-                                                }
-                                                else {
-                                                    $MemberSimpleName = "$UserDomain\$UserName" | Convert-ADName -InputType 'NT4' -OutputType 'Canonical'
-
-                                                    if($MemberSimpleName) {
-                                                        $MemberDomain = $MemberSimpleName.Split('/')[0]
-                                                        $AccountName = "$UserName@$MemberDomain"
-                                                        $DomainShortnameMappings[$UserDomain] = $MemberDomain
-                                                    }
-                                                    else {
-                                                        $AccountName = "$UserName@UNKNOWN"
-                                                    }
-                                                }
-
-                                                $ComputerName = $_['ComputerName']
-                                                if($_['IsGroup']) {
-                                                    if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
-                                                        $LocalAdminWriter.WriteLine("`"$ComputerName`",`"$AccountName`",`"group`"")
-                                                    }
-                                                    else {
-                                                        $Null = $Statements.Add( @{ "statement"="MERGE (group:Group { name: UPPER('$AccountName') }) MERGE (computer:Computer { name: UPPER('$ComputerName') }) MERGE (group)-[:AdminTo]->(computer)" } )
-                                                    }
-                                                }
-                                                else {
-                                                    if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
-                                                        $LocalAdminWriter.WriteLine("`"$ComputerName`",`"$AccountName`",`"user`"")
-                                                    }
-                                                    else {
-                                                        $Null = $Statements.Add( @{"statement"="MERGE (user:User { name: UPPER('$AccountName') }) MERGE (computer:Computer { name: UPPER('$ComputerName') }) MERGE (user)-[:AdminTo]->(computer)" } )
-                                                    }
-                                                }
-                                            }
-
-                                            if (($PSCmdlet.ParameterSetName -eq 'RESTAPI') -and ($Statements.Count -ge $Throttle)) {
-                                                $Json = @{ "statements"=[System.Collections.Hashtable[]]$Statements }
-                                                $JsonRequest = ConvertTo-Json20 $Json
-                                                $Null = $WebClient.UploadString($URI.AbsoluteUri + "db/data/transaction/commit", $JsonRequest)
-                                                $Statements.Clear()
+                                            else {
+                                                $Null = $Statements.Add( @{"statement"="MERGE (user:User { name: UPPER('$LoggedOnUser') }) MERGE (computer:Computer { name: UPPER('$SessionFromName') }) MERGE (computer)-[:HasSession {Weight: '1'}]->(user)" } )
                                             }
                                         }
-                                    }
-                                    catch {
-                                        Write-Verbose "Error ending Invoke-BloodHound thread $y : $_"
-                                    }
-                                    finally {
-                                        $PS[$y].Dispose()
-                                        $PS[$y] = $Null
-                                        $Jobs[$y] = $Null
-                                    }
-                                }
-                            }
-                            $MovingWindow = $Counter-$Threads-200
-                        }
+                                        else {
+                                            $ComputerDomain = $_['SessionFromName'].SubString($_['SessionFromName'].IndexOf('.')+1).ToUpper()
 
-                        # create a "powershell pipeline runner"
-                        $PS += [PowerShell]::Create()
-                        $PS[$Counter].RunspacePool = $Pool
-
-                        # add the script block + arguments
-                        $Null = $PS[$Counter].AddScript($HostEnumBlock).AddParameter('ComputerName', $($ComputerResult.Properties['dnshostname']))
-
-                        ForEach ($Param in $ScriptParameters.GetEnumerator()) {
-                            $Null = $PS[$Counter].AddParameter($Param.Name, $Param.Value)
-                        }
-
-                        # start job
-                        $Jobs += $PS[$Counter].BeginInvoke()
-                        $Counter += 1
-                    }
-                    $ComputerSearcher.Dispose()
-                    [GC]::Collect()
-                }
-            }
-        }
-    }
-
-    END {
-
-        if ($TargetDomains -and (-not $SkipComputerEnumeration)) {
-            Write-Output "Waiting for Invoke-BloodHound threads to finish..."
-            Start-Sleep -Seconds 30
-
-            for ($y = 0; $y -lt $Counter; $y++) {
-                if($Jobs[$y] -and ($Jobs[$y].IsCompleted)) {
-                    try {
-                        # complete async job
-                        $PS[$y].EndInvoke($Jobs[$y]) | ForEach-Object {
-                            if($_['Type'] -eq 'UserSession') {
-                                if($_['SessionFromName']) {
-                                    try {
-                                        $SessionFromName = $_['SessionFromName']
-                                        $UserName = $_['UserName'].ToUpper()
-                                        $ComputerDomain = $_['SessionFromName'].SubString($_['SessionFromName'].IndexOf('.')+1).ToUpper()
-
-                                        if($UserDomainMappings) {
-                                            $UserDomain = $Null
-                                            if($UserDomainMappings[$UserName]) {
-                                                if($UserDomainMappings[$UserName].Count -eq 1) {
-                                                    $UserDomain = $UserDomainMappings[$UserName]
+                                            $UserDomainMappings[$UserName] | ForEach-Object {
+                                                # for multiple GC results, set a weight of 1 for the same domain as the target computer
+                                                if($_ -eq $ComputerDomain) {
+                                                    $UserDomain = $_
                                                     $LoggedOnUser = "$UserName@$UserDomain"
                                                     if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
                                                         $SessionWriter.WriteLine("`"$SessionFromName`",`"$LoggedOnUser`",`"1`"")
@@ -5552,112 +5767,61 @@ function Invoke-BloodHound {
                                                         $Null = $Statements.Add( @{"statement"="MERGE (user:User { name: UPPER('$LoggedOnUser') }) MERGE (computer:Computer { name: UPPER('$SessionFromName') }) MERGE (computer)-[:HasSession {Weight: '1'}]->(user)" } )
                                                     }
                                                 }
+                                                # and set a weight of 2 for all other users in additional domains
                                                 else {
-                                                    $ComputerDomain = $_['SessionFromName'].SubString($_['SessionFromName'].IndexOf('.')+1).ToUpper()
-
-                                                    $UserDomainMappings[$UserName] | ForEach-Object {
-                                                        # for multiple GC results, set a weight of 1 for the same domain as the target computer
-                                                        if($_ -eq $ComputerDomain) {
-                                                            $UserDomain = $_
-                                                            $LoggedOnUser = "$UserName@$UserDomain"
-                                                            if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
-                                                                $SessionWriter.WriteLine("`"$SessionFromName`",`"$LoggedOnUser`",`"1`"")
-                                                            }
-                                                            else {
-                                                                $Null = $Statements.Add( @{"statement"="MERGE (user:User { name: UPPER('$LoggedOnUser') }) MERGE (computer:Computer { name: UPPER('$SessionFromName') }) MERGE (computer)-[:HasSession {Weight: '1'}]->(user)" } )
-                                                            }
-                                                        }
-                                                        # and set a weight of 2 for all other users in additional domains
-                                                        else {
-                                                            $UserDomain = $_
-                                                            $LoggedOnUser = "$UserName@$UserDomain"
-                                                            if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
-                                                                $SessionWriter.WriteLine("`"$SessionFromName`",`"$LoggedOnUser`",`"2`"")
-                                                            }
-                                                            else {
-                                                                $Null = $Statements.Add( @{"statement"="MERGE (user:User { name: UPPER('$LoggedOnUser') }) MERGE (computer:Computer { name: UPPER('$SessionFromName') }) MERGE (computer)-[:HasSession {Weight: '2'}]->(user)" } )
-                                                            }
-                                                        }
+                                                    $UserDomain = $_
+                                                    $LoggedOnUser = "$UserName@$UserDomain"
+                                                    if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
+                                                        $SessionWriter.WriteLine("`"$SessionFromName`",`"$LoggedOnUser`",`"2`"")
+                                                    }
+                                                    else {
+                                                        $Null = $Statements.Add( @{"statement"="MERGE (user:User { name: UPPER('$LoggedOnUser') }) MERGE (computer:Computer { name: UPPER('$SessionFromName') }) MERGE (computer)-[:HasSession {Weight: '2'}]->(user)" } )
                                                     }
                                                 }
                                             }
-                                            else {
-                                                # no user object in the GC with this username, so set the domain to "UNKNOWN"
-                                                $LoggedOnUser = "$UserName@UNKNOWN"
-                                                if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
-                                                    $SessionWriter.WriteLine("`"$SessionFromName`",`"$LoggedOnUser`",`"2`"")
-                                                }
-                                                else {
-                                                    $Null = $Statements.Add( @{"statement"="MERGE (user:User { name: UPPER('$LoggedOnUser') }) MERGE (computer:Computer { name: UPPER('$SessionFromName') }) MERGE (computer)-[:HasSession {Weight: '2'}]->(user)" } )
-                                                }
-                                            }
+                                        }
+                                    }
+                                    else {
+                                        # no user object in the GC with this username, so set the domain to "UNKNOWN"
+                                        $LoggedOnUser = "$UserName@UNKNOWN"
+                                        if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
+                                            $SessionWriter.WriteLine("`"$SessionFromName`",`"$LoggedOnUser`",`"2`"")
                                         }
                                         else {
-                                            # if not using GC mappings, set the weight to 2
-                                            $LoggedOnUser = "$UserName@$ComputerDomain"
-                                            if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
-                                                $SessionWriter.WriteLine("`"$SessionFromName`",`"$LoggedOnUser`",`"2`"")
-                                            }
-                                            else {
-                                                $Null = $Statements.Add( @{"statement"="MERGE (user:User { name: UPPER('$LoggedOnUser') }) MERGE (computer:Computer { name: UPPER('$SessionFromName') }) MERGE (computer)-[:HasSession {Weight: '2'}]->(user)"} )
-                                            }
+                                            $Null = $Statements.Add( @{"statement"="MERGE (user:User { name: UPPER('$LoggedOnUser') }) MERGE (computer:Computer { name: UPPER('$SessionFromName') }) MERGE (computer)-[:HasSession {Weight: '2'}]->(user)" } )
                                         }
                                     }
-                                    catch {
-                                        Write-Warning "Error extracting domain from $SessionFromName"
-                                    }
                                 }
-                                elseif($_['SessionFrom']) {
-                                    $SessionFromName = $_['SessionFrom']
-                                    $LoggedOnUser = "$($_['UserName'])@UNKNOWN"
+                                else {
+                                    # if not using GC mappings, set the weight to 2
+                                    $LoggedOnUser = "$UserName@$ComputerDomain"
                                     if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
                                         $SessionWriter.WriteLine("`"$SessionFromName`",`"$LoggedOnUser`",`"2`"")
                                     }
                                     else {
-                                        $Null = $Statements.Add( @{"statement"="MERGE (user:User { name: UPPER(`"$LoggedOnUser`") }) MERGE (computer:Computer { name: UPPER(`"$SessionFromName`") }) MERGE (computer)-[:HasSession {Weight: '2'}]->(user)"} )
-                                    }
-                                }
-                                else {
-                                    # assume Get-NetLoggedOn result
-                                    $UserDomain = $_['UserDomain']
-                                    $UserName = $_['UserName']
-                                    try {
-                                        if($DomainShortnameMappings[$UserDomain]) {
-                                            # in case the short name mapping is 'cached'
-                                            $AccountName = "$UserName@$($DomainShortnameMappings[$UserDomain])"
-                                        }
-                                        else {
-                                            $MemberSimpleName = "$UserDomain\$UserName" | Convert-ADName -InputType 'NT4' -OutputType 'Canonical'
-
-                                            if($MemberSimpleName) {
-                                                $MemberDomain = $MemberSimpleName.Split('/')[0]
-                                                $AccountName = "$UserName@$MemberDomain"
-                                                $DomainShortnameMappings[$UserDomain] = $MemberDomain
-                                            }
-                                            else {
-                                                $AccountName = "$UserName@UNKNOWN"
-                                            }
-                                        }
-
-                                        $SessionFromName = $_['ComputerName']
-
-                                        if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
-                                            $SessionWriter.WriteLine("`"$SessionFromName`",`"$AccountName`",`"1`"")
-                                        }
-                                        else {
-                                            $Null = $Statements.Add( @{"statement"="MERGE (user:User { name: UPPER('$AccountName') }) MERGE (computer:Computer { name: UPPER('$SessionFromName') }) MERGE (computer)-[:HasSession {Weight: '1'}]->(user)" } )
-                                        }
-                                    }
-                                    catch {
-                                        Write-Verbose "Error converting $UserDomain\$UserName : $_"
+                                        $Null = $Statements.Add( @{"statement"="MERGE (user:User { name: UPPER('$LoggedOnUser') }) MERGE (computer:Computer { name: UPPER('$SessionFromName') }) MERGE (computer)-[:HasSession {Weight: '2'}]->(user)"} )
                                     }
                                 }
                             }
-                            elseif($_['Type'] -eq 'LocalUser') {
-                                $Parts = $_['AccountName'].split('\')
-                                $UserDomain = $Parts[0]
-                                $UserName = $Parts[-1]
-
+                            catch {
+                                Write-Warning "Error extracting domain from $SessionFromName"
+                            }
+                        }
+                        elseif($_['SessionFrom']) {
+                            $SessionFromName = $_['SessionFrom']
+                            $LoggedOnUser = "$($_['UserName'])@UNKNOWN"
+                            if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
+                                $SessionWriter.WriteLine("`"$SessionFromName`",`"$LoggedOnUser`",`"2`"")
+                            }
+                            else {
+                                $Null = $Statements.Add( @{"statement"="MERGE (user:User { name: UPPER(`"$LoggedOnUser`") }) MERGE (computer:Computer { name: UPPER(`"$SessionFromName`") }) MERGE (computer)-[:HasSession {Weight: '2'}]->(user)"} )
+                            }
+                        }
+                        else {
+                            # assume Get-NetLoggedOn result
+                            $UserDomain = $_['UserDomain']
+                            $UserName = $_['UserName']
+                            try {
                                 if($DomainShortnameMappings[$UserDomain]) {
                                     # in case the short name mapping is 'cached'
                                     $AccountName = "$UserName@$($DomainShortnameMappings[$UserDomain])"
@@ -5675,46 +5839,74 @@ function Invoke-BloodHound {
                                     }
                                 }
 
-                                $ComputerName = $_['ComputerName']
-                                if($_['IsGroup']) {
-                                    if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
-                                        $LocalAdminWriter.WriteLine("`"$ComputerName`",`"$AccountName`",`"group`"")
-                                    }
-                                    else {
-                                        $Null = $Statements.Add( @{ "statement"="MERGE (group:Group { name: UPPER('$AccountName') }) MERGE (computer:Computer { name: UPPER('$ComputerName') }) MERGE (group)-[:AdminTo]->(computer)" } )
-                                    }
+                                $SessionFromName = $_['ComputerName']
+
+                                if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
+                                    $SessionWriter.WriteLine("`"$SessionFromName`",`"$AccountName`",`"1`"")
                                 }
                                 else {
-                                    if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
-                                        $LocalAdminWriter.WriteLine("`"$ComputerName`",`"$AccountName`",`"user`"")
-                                    }
-                                    else {
-                                        $Null = $Statements.Add( @{"statement"="MERGE (user:User { name: UPPER('$AccountName') }) MERGE (computer:Computer { name: UPPER('$ComputerName') }) MERGE (user)-[:AdminTo]->(computer)" } )
-                                    }
+                                    $Null = $Statements.Add( @{"statement"="MERGE (user:User { name: UPPER('$AccountName') }) MERGE (computer:Computer { name: UPPER('$SessionFromName') }) MERGE (computer)-[:HasSession {Weight: '1'}]->(user)" } )
                                 }
                             }
-
-                            if (($PSCmdlet.ParameterSetName -eq 'RESTAPI') -and ($Statements.Count -ge $Throttle)) {
-                                $Json = @{ "statements"=[System.Collections.Hashtable[]]$Statements }
-                                $JsonRequest = ConvertTo-Json20 $Json
-                                $Null = $WebClient.UploadString($URI.AbsoluteUri + "db/data/transaction/commit", $JsonRequest)
-                                $Statements.Clear()
+                            catch {
+                                Write-Verbose "Error converting $UserDomain\$UserName : $_"
                             }
                         }
                     }
-                    catch {
-                        Write-Verbose "Error ending Invoke-BloodHound thread $y : $_"
+                    elseif($_['Type'] -eq 'LocalUser') {
+                        $Parts = $_['AccountName'].split('\')
+                        $UserDomain = $Parts[0]
+                        $UserName = $Parts[-1]
+
+                        if($DomainShortnameMappings[$UserDomain]) {
+                            # in case the short name mapping is 'cached'
+                            $AccountName = "$UserName@$($DomainShortnameMappings[$UserDomain])"
+                        }
+                        else {
+                            $MemberSimpleName = "$UserDomain\$UserName" | Convert-ADName -InputType 'NT4' -OutputType 'Canonical'
+
+                            if($MemberSimpleName) {
+                                $MemberDomain = $MemberSimpleName.Split('/')[0]
+                                $AccountName = "$UserName@$MemberDomain"
+                                $DomainShortnameMappings[$UserDomain] = $MemberDomain
+                            }
+                            else {
+                                $AccountName = "$UserName@UNKNOWN"
+                            }
+                        }
+
+                        $ComputerName = $_['ComputerName']
+                        if($_['IsGroup']) {
+                            if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
+                                $LocalAdminWriter.WriteLine("`"$ComputerName`",`"$AccountName`",`"group`"")
+                            }
+                            else {
+                                $Null = $Statements.Add( @{ "statement"="MERGE (group:Group { name: UPPER('$AccountName') }) MERGE (computer:Computer { name: UPPER('$ComputerName') }) MERGE (group)-[:AdminTo]->(computer)" } )
+                            }
+                        }
+                        else {
+                            if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
+                                $LocalAdminWriter.WriteLine("`"$ComputerName`",`"$AccountName`",`"user`"")
+                            }
+                            else {
+                                $Null = $Statements.Add( @{"statement"="MERGE (user:User { name: UPPER('$AccountName') }) MERGE (computer:Computer { name: UPPER('$ComputerName') }) MERGE (user)-[:AdminTo]->(computer)" } )
+                            }
+                        }
                     }
-                    finally {
-                        $PS[$y].Dispose()
-                        $PS[$y] = $Null
-                        $Jobs[$y] = $Null
+
+                    if (($PSCmdlet.ParameterSetName -eq 'RESTAPI') -and ($Statements.Count -ge $Throttle)) {
+                        $Json = @{ "statements"=[System.Collections.Hashtable[]]$Statements }
+                        $JsonRequest = ConvertTo-Json20 $Json
+                        $Null = $WebClient.UploadString($URI.AbsoluteUri + "db/data/transaction/commit", $JsonRequest)
+                        $Statements.Clear()
+                        [GC]::Collect()
                     }
                 }
             }
-            $Pool.Dispose()
-            Write-Output "All threads completed!"
         }
+    }
+
+    END {
 
         if ($PSCmdlet.ParameterSetName -eq 'CSVExport') {
             if($SessionWriter) {
@@ -5725,7 +5917,10 @@ function Invoke-BloodHound {
                 $GroupWriter.Dispose()
                 $GroupFileStream.Dispose()
             }
-            
+            if($ACLWriter) {
+                $ACLWriter.Dispose()
+                $ACLFileStream.Dispose()
+            }
             if($LocalAdminWriter) {
                 $LocalAdminWriter.Dispose()
                 $LocalAdminFileStream.Dispose()

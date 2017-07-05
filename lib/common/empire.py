@@ -19,7 +19,7 @@ import sqlite3
 import os
 import hashlib
 import time
-
+import fnmatch
 
 # Empire imports
 import helpers
@@ -72,7 +72,7 @@ class MainMenu(cmd.Cmd):
         time.sleep(1)
 
         # pull out some common configuration information
-        (self.isroot, self.installPath, self.ipWhiteList, self.ipBlackList) = helpers.get_config('rootuser, install_path,ip_whitelist,ip_blacklist')
+        (self.isroot, self.installPath, self.ipWhiteList, self.ipBlackList, self.obfuscate, self.obfuscateCommand) = helpers.get_config('rootuser, install_path,ip_whitelist,ip_blacklist,obfuscate,obfuscate_command')
 
         # change the default prompt for the user
         self.prompt = '(Empire) > '
@@ -573,8 +573,22 @@ class MainMenu(cmd.Cmd):
                         print helpers.color("[!] Error opening ip file %s" % (parts[1]))
                 else:
                     self.agents.ipBlackList = helpers.generate_ip_list(",".join(parts[1:]))
+            elif parts[0].lower() == "obfuscate":
+                if parts[1].lower() == "true":
+                    if not helpers.is_powershell_installed():
+                        print helpers.color("[!] PowerShell is not installed and is required to use obfuscation, please install it first.")
+                    else:
+                        self.obfuscate = True
+                        print helpers.color("[*] Obfuscating all future powershell commands run on all agents.")
+                elif parts[1].lower() == "false":
+                    print helpers.color("[*] Future powershell command run on all agents will not be obfuscated.")
+                    self.obfuscate = False
+                else:
+                    print helpers.color("[!] Valid options for obfuscate are 'true' or 'false'")
+            elif parts[0].lower() == "obfuscate_command":
+                self.obfuscateCommand = parts[1]
             else:
-                print helpers.color("[!] Please choose 'ip_whitelist' or 'ip_blacklist'")
+                print helpers.color("[!] Please choose 'ip_whitelist', 'ip_blacklist', 'obfuscate', or 'obfuscate_command'")
 
 
     def do_reset(self, line):
@@ -593,6 +607,10 @@ class MainMenu(cmd.Cmd):
             print self.agents.ipWhiteList
         if line.strip().lower() == "ip_blacklist":
             print self.agents.ipBlackList
+        if line.strip().lower() == "obfuscate":
+            print self.obfuscate
+        if line.strip().lower() == "obfuscate_command":
+            print self.obfuscateCommand
 
 
     def do_load(self, line):
@@ -688,6 +706,55 @@ class MainMenu(cmd.Cmd):
         else:
             print helpers.color("[!] Please enter a valid agent name")
 
+    def do_preobfuscate(self, line):
+        "Preobfuscate PowerShell module_source files"
+        
+        if not helpers.is_powershell_installed():
+            print helpers.color("[!] PowerShell is not installed and is required to use obfuscation, please install it first.")
+            return
+        
+        module = line.strip()
+        obfuscate_all = False
+        obfuscate_confirmation = False
+        reobfuscate = False
+        
+        # Preobfuscate ALL module_source files
+        if module == "" or module == "all":
+            choice = raw_input(helpers.color("[>] Preobfuscate all PowerShell module_source files using obfuscation command: \"" + self.obfuscateCommand + "\"?\nThis may take a substantial amount of time. [y/N] ", "red"))
+            if choice.lower() != "" and choice.lower()[0] == "y":
+                obfuscate_all = True
+                obfuscate_confirmation = True
+                choice = raw_input(helpers.color("[>] Force reobfuscation of previously obfuscated modules? [y/N] ", "red"))
+                if choice.lower() != "" and choice.lower()[0] == "y":
+                    reobfuscate = True
+
+        # Preobfuscate a selected module_source file
+        else:
+            module_source_fullpath = self.installPath + 'data/module_source/' + module
+            if not os.path.isfile(module_source_fullpath):
+                print helpers.color("[!] The module_source file:" + module_source_fullpath + " does not exist.")
+                return
+
+            choice = raw_input(helpers.color("[>] Preobfuscate the module_source file: " + module + " using obfuscation command: \"" + self.obfuscateCommand + "\"? [y/N] ", "red"))
+            if choice.lower() != "" and choice.lower()[0] == "y":
+                obfuscate_confirmation = True
+                choice = raw_input(helpers.color("[>] Force reobfuscation of previously obfuscated modules? [y/N] ", "red"))
+                if choice.lower() != "" and choice.lower()[0] == "y":
+                    reobfuscate = True
+
+        # Perform obfuscation
+        if obfuscate_confirmation:
+            if obfuscate_all:
+                files = [file for file in helpers.get_module_source_files()]
+            else:
+                files = [self.installPath + 'data/module_source/' + module]
+            for file in files:
+                if reobfuscate or not helpers.is_obfuscated(file):
+                    print helpers.color("[*] Obfuscating " + os.path.basename(file) + "...")
+                else:
+                    print helpers.color("[*] " + os.path.basename(file) + " was already obfuscated. Not reobfuscating.")
+                helpers.obfuscate_module(file, self.obfuscateCommand, reobfuscate)
+
 
     def complete_usemodule(self, text, line, begidx, endidx, language=None):
         "Tab-complete an Empire module path."
@@ -743,7 +810,7 @@ class MainMenu(cmd.Cmd):
     def complete_set(self, text, line, begidx, endidx):
         "Tab-complete a global option."
 
-        options = ["ip_whitelist", "ip_blacklist"]
+        options = ["ip_whitelist", "ip_blacklist", "obfuscate", "obfuscate_command"]
 
         if line.split(' ')[1].lower() in options:
             return helpers.complete_path(text, line, arg=True)
@@ -793,6 +860,15 @@ class MainMenu(cmd.Cmd):
 
         return self.complete_setlist(text, line, begidx, endidx)
 
+    def complete_preobfuscate(self, text, line, begidx, endidx):
+        "Tab-complete an interact command"
+        options = [ (option[len('data/module_source/'):]) for option in helpers.get_module_source_files() ]
+        options.append('all')
+
+        mline = line.partition(' ')[2]
+        offs = len(mline) - len(text)
+        return [s[offs:] for s in options if s.startswith(mline)]
+    
 
 class AgentsMenu(cmd.Cmd):
     """
@@ -2825,6 +2901,10 @@ class ListenersMenu(cmd.Cmd):
                 stager.options['Listener']['Value'] = listenerName
                 stager.options['Language']['Value'] = language
                 stager.options['Base64']['Value'] = "True"
+                if self.mainMenu.obfuscate:
+                    stager.options['Obfuscate']['Value'] = "True"
+                else:
+                    stager.options['Obfuscate']['Value'] = "False"
                 print stager.generate()
             except Exception as e:
                 print helpers.color("[!] Error generating launcher: %s" % (e))
@@ -3286,7 +3366,7 @@ class ModuleMenu(cmd.Cmd):
             self.module.execute()
         else:
             agentName = self.module.options['Agent']['Value']
-            moduleData = self.module.generate()
+            moduleData = self.module.generate(self.mainMenu.obfuscate, self.mainMenu.obfuscateCommand)
 
             if not moduleData or moduleData == "":
                 print helpers.color("[!] Error: module produced an empty script")

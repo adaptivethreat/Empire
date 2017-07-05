@@ -52,7 +52,8 @@ import pickle
 import netifaces
 from time import localtime, strftime
 from Crypto.Random import random
-
+import subprocess
+import fnmatch
 
 ###############################################################
 #
@@ -769,6 +770,77 @@ def dict_factory(cursor, row):
         d[col[0]] = row[idx]
     return d
 
+def get_module_source_files():
+    """
+    Get the filepaths of PowerShell module_source files located
+    in the data/module_source directory.
+    """
+    paths = []
+    pattern = '*.ps1'
+    for root, dirs, files in os.walk('data/module_source'):
+        for filename in fnmatch.filter(files, pattern):
+                paths.append(os.path.join(root, filename))
+    return paths
+
+def obfuscate(psScript, obfuscationCommand):
+    """
+    Obfuscate PowerShell scripts using Invoke-Obfuscation
+    """
+    if not is_powershell_installed():
+        print color("[!] PowerShell is not installed and is required to use obfuscation, please install it first.")
+        return ""
+    # When obfuscating large scripts, command line length is too long. Need to save to temp file
+    toObfuscateFilename = "data/misc/ToObfuscate.ps1"
+    obfuscatedFilename = "data/misc/Obfuscated.ps1"
+    toObfuscateFile = open(toObfuscateFilename, 'w')
+    toObfuscateFile.write(psScript)
+    toObfuscateFile.close()
+    # Obfuscate using Invoke-Obfuscation w/ PowerShell
+    subprocess.call("powershell 'Invoke-Obfuscation -ScriptPath %s -Command \"%s\" -Quiet | Out-File -Encoding ASCII %s'" % (toObfuscateFilename, convert_obfuscation_command(obfuscationCommand), obfuscatedFilename), shell=True)
+    obfuscatedFile = open(obfuscatedFilename , 'r')
+    # Obfuscation writes a newline character to the end of the file, ignoring that character
+    psScript = obfuscatedFile.read()[0:-1]
+    obfuscatedFile.close()
+    
+    return psScript
+    
+def obfuscate_module(moduleSource, obfuscationCommand="", forceReobfuscation=False):
+    if is_obfuscated(moduleSource) and not forceReobfuscation:
+        return
+
+    try:
+        f = open(moduleSource, 'r')
+    except:
+        print color("[!] Could not read module source path at: " + moduleSource)
+        return ""
+
+    moduleCode = f.read()
+    f.close()
+
+    # obfuscate and write to obfuscated source path
+    obfuscatedCode = obfuscate(psScript=moduleCode, obfuscationCommand=obfuscationCommand)
+    obfuscatedSource = moduleSource.replace("module_source", "obfuscated_module_source")
+    try:
+        f = open(obfuscatedSource, 'w')
+    except:
+        print color("[!] Could not read obfuscated module source path at: " + obfuscatedSource)
+        return ""
+    f.write(obfuscatedCode)
+    f.close()
+    
+def is_obfuscated(moduleSource):
+    obfuscatedSource = moduleSource.replace("module_source", "obfuscated_module_source")
+    return os.path.isfile(obfuscatedSource)
+
+def is_powershell_installed():
+    try:
+        powershell_location = subprocess.check_output("which powershell", shell=True)
+    except subprocess.CalledProcessError as e:
+        return False
+    return True
+
+def convert_obfuscation_command(obfuscate_command):
+    return "".join(obfuscate_command.split()).replace(",",",home,").replace("\\",",")
 
 class KThread(threading.Thread):
     """

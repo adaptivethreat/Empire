@@ -54,7 +54,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         # extract all of our options
         listenerName = self.options['Listener']['Value']
@@ -70,5 +70,6 @@ class Module:
 
         # signal the existing listener that we're switching listeners, and the new comms code
         commsCode = "Send-Message -Packets $(Encode-Packet -Type 130 -Data '%s');\n%s" % (listenerName, commsCode)
-
+        if obfuscate:
+            commsCode = helpers.obfuscate(psScript=commsCode, obfuscationCommand=obfuscationCommand)
         return commsCode

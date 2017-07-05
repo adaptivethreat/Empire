@@ -67,7 +67,7 @@ class Module:
             if option in self.options:
                 self.options[option]['Value'] = value
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         username = self.options['Username']['Value']
         password = self.options['Password']['Value']
@@ -78,34 +78,42 @@ class Module:
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "data/module_source/collection/Get-SQLColumnSampleData.ps1"
         script = ""
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            script = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
-            with open(moduleSource, 'r') as source:
-                script = source.read()
+            f = open(moduleSource, 'r')
         except:
             print helpers.color("[!] Could not read module source path at: " + str(moduleSource))
             return ""
 
         if check_all:
             auxModuleSource = self.mainMenu.installPath + "data/module_source/situational_awareness/network/Get-SQLInstanceDomain.ps1"
+            if obfuscate:
+                helpers.obfuscate_module(moduleSource=auxModuleSource, obfuscationCommand=obfuscationCommand)
+                auxModuleSource = moduleSource.replace("module_source", "obfuscated_module_source")
             try:
                 with open(auxModuleSource, 'r') as auxSource:
                     auxScript = auxSource.read()
                     script += " " + auxScript
             except:
                 print helpers.color("[!] Could not read additional module source path at: " + str(auxModuleSource))
-            script += " Get-SQLInstanceDomain "
+            scriptEnd = " Get-SQLInstanceDomain "
             if username != "":
-                script += " -Username "+username
+                scriptEnd += " -Username "+username
             if password != "":
-                script += " -Password "+password
-            script += " | "
-        script += " Get-SQLColumnSampleData"
+                scriptEnd += " -Password "+password
+            scriptEnd += " | "
+        scriptEnd += " Get-SQLColumnSampleData"
         if username != "":
-            script += " -Username "+username
+            scriptEnd += " -Username "+username
         if password != "":
-            script += " -Password "+password
+            scriptEnd += " -Password "+password
         if instance != "" and not check_all:
-            script += " -Instance "+instance
+            scriptEnd += " -Instance "+instance
         if no_defaults:
-            script += " -NoDefaults "
+            scriptEnd += " -NoDefaults "
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script
