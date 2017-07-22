@@ -7,7 +7,7 @@ class Module:
         self.info = {
             'Name': 'Invoke-Prompt',
 
-            'Author': ['greg.fossk', '@harmj0y', '@enigma0x3'],
+            'Author': ['greg foss', '@harmj0y', '@enigma0x3'],
 
             'Description': ("Prompts the current user to enter their credentials "
                             "in a forms box and returns the results."),
