@@ -10,7 +10,7 @@ class Module:
             'Name': 'LaunchDaemon',
 
             # list of one or more authors for the module
-            'Author': ['@xorrior', '@malcomvetter', '@h1ghtopfade', 'jrm'],
+            'Author': ['@xorrior', '@malcomvetter', '@h1ghtopfade', 'notcharles'],
 
             # more verbose multi-line description of the module
             'Description': ('Installs an Empire launchDaemon.'),
