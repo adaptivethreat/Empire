@@ -230,7 +230,7 @@ class Agents:
         parts
 
         # construct the appropriate save path
-        save_path = "%sdownloads/%s%s" % (self.installPath, sessionID, "/".join(parts[0:-1]))
+        save_path = "%sdownloads/%s/%s" % (self.installPath, sessionID, "/".join(parts[0:-1]))
         filename = os.path.basename(parts[-1])
 
         try:
@@ -1608,6 +1608,19 @@ class Agents:
                 msg = "file download: %s, part: %s" % (path, index)
                 self.save_agent_log(sessionID, msg)
 
+        elif responseName == "TASK_GETDOWNLOADS":
+            if not data or data.strip().strip() == "":
+                data = "[*] No active downloads"
+
+            self.update_agent_results_db(sessionID, data)
+            #update the agent log
+            self.save_agent_log(sessionID, data)
+
+        elif responseName == "TASK_STOPDOWNLOAD":
+            # download kill response
+            self.update_agent_results_db(sessionID, data)
+            #update the agent log
+            self.save_agent_log(sessionID, data)
 
         elif responseName == "TASK_UPLOAD":
             pass

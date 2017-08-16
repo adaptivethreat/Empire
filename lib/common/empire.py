@@ -1606,6 +1606,23 @@ class PowerShellAgentMenu(cmd.Cmd):
             # update the agent log
             self.mainMenu.agents.save_agent_log(self.sessionID, "Tasked agent to stop job " + str(jobID))
 
+    def do_downloads(self, line):
+        "Return downloads or kill a download job"
+
+        parts = line.split(' ')
+
+        if len(parts) == 1:
+            if parts[0] == '':
+                self.mainMenu.agents.add_agent_task_db(self.sessionID, "TASK_GETDOWNLOADS")
+                #update the agent log
+                self.mainMenu.agents.save_agent_log(self.sessionID, "Tasked agent to get downloads")
+            else:
+                print helpers.color("[!] Please use for m 'downloads kill DOWNLOAD_ID'")
+        elif len(parts) == 2:
+            jobID = parts[1].strip()
+            self.mainMenu.agents.add_agent_task_db(self.sessionID, "TASK_STOPDOWNLOAD", jobID)
+            #update the agent log
+            self.mainMenu.agents.save_agent_log(self.sessionID, "Tasked agent to stop download " + str(jobID))
 
     def do_sleep(self, line):
         "Task an agent to 'sleep interval [jitter]'"
