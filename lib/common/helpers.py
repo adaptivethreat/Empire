@@ -615,7 +615,7 @@ def lhost():
                 return socket.inet_ntoa(fcntl.ioctl(
                         s.fileno(),
                         0x8915,  # SIOCGIFADDR
-                        struct.pack('256s', ifname[:15])
+                        struct.pack('256s', str(ifname[:15]))
                     )[20:24])
             except IOError as e:
                 return ""
