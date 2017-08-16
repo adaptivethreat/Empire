@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # generate a self-signed CERT
 #openssl genrsa -des3 -out ./data/empire.orig.key 2048
