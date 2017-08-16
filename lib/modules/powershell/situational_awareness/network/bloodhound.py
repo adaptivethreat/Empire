@@ -37,6 +37,21 @@ class Module:
                 'Required'      :   True,
                 'Value'         :   ''
             },
+            'ComputerName' : {
+                'Description'   :   'Array of one or more computers to enumerate',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'ComputerADSpath' : {
+                'Description'   :   'The LDAP source to search through for computers, e.g. "LDAP://OU=secret,DC=testlab,DC=local"',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'UserADSPath' : {
+                'Description'   :   'The LDAP source to search through for users/groups, e.g. "LDAP://OU=secret,DC=testlab,DC=local"',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
             'Domain' : {
                 'Description'   :   'The domain to use for the query, defaults to the current domain.',
                 'Required'      :   False,
@@ -48,7 +63,7 @@ class Module:
                 'Value'         :   ''
             },
             'CollectionMethod' : {
-                'Description'   :   "The method to collect data. 'Group', 'LocalGroup', 'GPOLocalGroup', 'Sesssion', 'LoggedOn', 'Trusts, 'Stealth', or 'Default'.",
+                'Description'   :   "The method to collect data. 'Group', 'ComputerOnly', 'LocalGroup', 'GPOLocalGroup', 'Session', 'LoggedOn', 'Trusts, 'Stealth', or 'Default'.",
                 'Required'      :   True,
                 'Value'         :   'Default'
             },
@@ -60,10 +75,20 @@ class Module:
             'CSVFolder' : {
                 'Description'   :   'The CSV folder to use for output, defaults to the current folder location.',
                 'Required'      :   False,
-                'Value'         :   ''
+                'Value'         :   '$(Get-Location)'
             },
             'CSVPrefix' : {
                 'Description'   :   'A prefix for all CSV files.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'URI' : {
+                'Description'   :   'The BloodHound neo4j URL location (http://host:port/)',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'UserPass' : {
+                'Description'   :   'The "user:password" for the BloodHound neo4j instance',
                 'Required'      :   False,
                 'Value'         :   ''
             },
@@ -72,10 +97,20 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   ''
             },
+            'SkipGCDeconfliction' : {
+                'Description'   :   'Switch. Skip global catalog enumeration for session deconfliction',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
             'Threads' : {
                 'Description'   :   'The maximum concurrent threads to execute.',
                 'Required'      :   True,
                 'Value'         :   '20'
+            },
+            'Throttle' : {
+                'Description'   :   'The number of cypher queries to queue up for neo4j RESTful API ingestion.',
+                'Required'      :   True,
+                'Value'         :   '1000'
             }
         }
 
@@ -90,13 +125,15 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         moduleName = self.info["Name"]
 
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/situational_awareness/network/BloodHound.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         # TODO: just CSV output for this bloodhound version? no output to file?
 
         try:
@@ -108,18 +145,21 @@ class Module:
         moduleCode = f.read()
         f.close()
 
-        script = "%s\n%s" %(moduleCode, moduleName)
+        script = "%s\n" %(moduleCode)
+        scriptEnd = moduleName
 
         for option,values in self.options.iteritems():
             if option.lower() != "agent":
                 if values['Value'] and values['Value'] != '':
                     if values['Value'].lower() == "true":
                         # if we're just adding a switch
-                        script += " -" + str(option)
+                        scriptEnd += " -" + str(option)
                     else:
-                        script += " -" + str(option) + " " + str(values['Value']) 
+                        scriptEnd += " -" + str(option) + " " + str(values['Value']) 
 
-        script += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
-
+        scriptEnd += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script
 

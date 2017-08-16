@@ -73,7 +73,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         listenerName = self.options['Listener']['Value']
 
@@ -112,5 +112,6 @@ else  {
     "[!] User is not a local administrator!"
 }
 ''' %(encLauncher)
-
+                if obfuscate:
+                    script = helpers.obfuscate(psScript=script, obfuscationCommand=obfuscationCommand)
                 return script

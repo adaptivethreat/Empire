@@ -56,7 +56,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         script = """
 Function Invoke-Thunderstruck
@@ -98,5 +98,6 @@ Function Invoke-Thunderstruck
                         script += " -" + str(option) + " " + str(values['Value'])
 
         script += "; 'Agent Thunderstruck.'"
-
+        if obfuscate:
+            script = helpers.obfuscate(psScript=script, obfuscationCommand=obfuscationCommand)
         return script

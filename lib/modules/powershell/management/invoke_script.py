@@ -58,7 +58,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         scriptPath = self.options['ScriptPath']['Value']
         scriptCmd = self.options['ScriptCmd']['Value']
@@ -76,5 +76,6 @@ class Module:
             script += '\n'
 
         script += "%s" %(scriptCmd)
-
+        if obfuscate:
+            script = helpers.obfuscate(psScript=script, obfuscationCommand=obfuscationCommand)
         return script

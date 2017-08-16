@@ -57,7 +57,7 @@ class Module:
         #   like listeners/agent handlers/etc.
         self.mainMenu = mainMenu
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         # the PowerShell script itself, with the command to invoke
         #   for execution appended to the end. Scripts should output
@@ -67,6 +67,9 @@ class Module:
         #   original reference script included in the comments.   
 
         moduleSource = self.mainMenu.installPath + "/data/module_source/situational_awareness/host/Find-TrustedDocuments.ps1"
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -77,6 +80,8 @@ class Module:
         f.close()
 
         script = moduleCode
-        script += "Find-TrustedDocuments"
-
+        scriptEnd = "Find-TrustedDocuments"
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

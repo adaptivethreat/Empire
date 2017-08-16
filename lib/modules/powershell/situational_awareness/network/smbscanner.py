@@ -75,11 +75,13 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/situational_awareness/network/Invoke-SmbScanner.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -90,7 +92,7 @@ class Module:
         f.close()
 
         script = moduleCode + "\n"
-
+        scriptEnd = ""
         # if a credential ID is specified, try to parse
         credID = self.options["CredID"]['Value']
         if credID != "":
@@ -115,20 +117,22 @@ class Module:
 
         if (self.options['ComputerName']['Value'] != ''):
             usernames = "\"" + "\",\"".join(self.options['ComputerName']['Value'].split(",")) + "\""
-            script += usernames + " | "
+            scriptEnd += usernames + " | "
         
-        script += "Invoke-SMBScanner "
+        scriptEnd += "Invoke-SMBScanner "
 
         for option,values in self.options.iteritems():
             if option.lower() != "agent" and option.lower() != "computername" and option.lower() != "credid":
                 if values['Value'] and values['Value'] != '':
                     if values['Value'].lower() == "true":
                         # if we're just adding a switch
-                        script += " -" + str(option)
+                        scriptEnd += " -" + str(option)
                     else:
-                        script += " -" + str(option) + " '" + str(values['Value']) + "'" 
+                        scriptEnd += " -" + str(option) + " '" + str(values['Value']) + "'" 
 
-        script += "| Out-String | %{$_ + \"`n\"};"
-        script += "'Invoke-SMBScanner completed'"
-
+        scriptEnd += "| Out-String | %{$_ + \"`n\"};"
+        scriptEnd += "'Invoke-SMBScanner completed'"
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

@@ -108,7 +108,7 @@ function Invoke-NetRipper {
         {
             throw("Could not find string $FindString !")
         }
-        Write-Verbose "[*] Pattern found at $index: $FindString"
+        Write-Verbose "[*] Pattern found at $index : $FindString"
         Write-Verbose "[*] Replacing with pattern: $ReplaceString"
 
         for ($i=0; $i -lt $ReplaceStringBytes.Length; $i++)

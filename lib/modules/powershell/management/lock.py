@@ -50,7 +50,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         script = """
 Function Invoke-LockWorkStation {
@@ -86,5 +86,6 @@ Function Invoke-LockWorkStation {
 }
 Invoke-LockWorkStation; "Workstation locked."
 """
-
+        if obfuscate:
+            script = helpers.obfuscate(psScript=script, obfuscationCommand=obfuscationCommand)
         return script

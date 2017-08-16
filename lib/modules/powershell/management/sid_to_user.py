@@ -53,8 +53,9 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         script = "(New-Object System.Security.Principal.SecurityIdentifier(\"%s\")).Translate( [System.Security.Principal.NTAccount]).Value" %(self.options['SID']['Value'])
-
+        if obfuscate:
+            script = helpers.obfuscate(psScript=script, obfuscationCommand=obfuscationCommand)
         return script

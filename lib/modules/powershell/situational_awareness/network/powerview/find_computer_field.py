@@ -71,7 +71,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         moduleName = self.info["Name"]
         
@@ -102,5 +102,6 @@ class Module:
                         script += " -" + str(option) + " " + str(values['Value']) 
 
         script += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
-
+        if obfuscate:
+            script = helpers.obfuscate(psScript=script, obfuscationCommand=obfuscationCommand)
         return script

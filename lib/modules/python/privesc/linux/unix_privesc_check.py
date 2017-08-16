@@ -140,7 +140,7 @@ import sys
 import binascii
 
 data = '''
-#!/bin/sh
+#!/usr/bin/env sh
 # unix-privesc-check - Checks Unix system for simple privilege escalations
 # Copyright (C) 2008 pentestmonkey@pentestmonkey.net
 # Copyright (C) 2009 timb@nth-dimension.org.uk

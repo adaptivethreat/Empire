@@ -88,7 +88,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         listenerName = self.options['Listener']['Value']
         userAgent = self.options['UserAgent']['Value']
@@ -135,5 +135,6 @@ class Module:
                     script = "$PSPassword = \""+password+"\" | ConvertTo-SecureString -asPlainText -Force;$Credential = New-Object System.Management.Automation.PSCredential(\""+userName+"\",$PSPassword);" + script + " -Credential $Credential"
 
                 script += ";'Invoke-PSRemoting executed on " +computerNames +"'"
-            
+            if obfuscate:
+                script = helpers.obfuscate(psScript=script, obfuscationCommand=obfuscationCommand)
             return script

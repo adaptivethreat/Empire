@@ -72,14 +72,16 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         moduleName = self.info["Name"]
         reset = self.options['Reset']['Value']
 
         # read in the common powerview.ps1 module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/management/MailRaider.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -90,22 +92,24 @@ class Module:
         f.close()
 
         script = moduleCode + "\n" 
-
+        scriptEnd = ""
         if reset.lower() == "true":
             # if the flag is set to restore the security settings
-            script += "Reset-SecuritySettings "
+            scriptEnd += "Reset-SecuritySettings "
         else:
-            script += "Disable-SecuritySettings "
+            scriptEnd += "Disable-SecuritySettings "
 
         for option,values in self.options.iteritems():
             if option.lower() != "agent" and option.lower() != "reset":
                 if values['Value'] and values['Value'] != '':
                     if values['Value'].lower() == "true":
                         # if we're just adding a switch
-                        script += " -" + str(option)
+                        scriptEnd += " -" + str(option)
                     else:
-                        script += " -" + str(option) + " " + str(values['Value']) 
+                        scriptEnd += " -" + str(option) + " " + str(values['Value']) 
 
-        script += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
-
+        scriptEnd += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

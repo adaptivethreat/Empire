@@ -79,7 +79,7 @@ class Module:
             if option in self.options:
                 self.options[option]['Value'] = value
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         domainController = self.options['DomainController']['Value']
         computerName = self.options['ComputerName']['Value']
@@ -92,6 +92,9 @@ class Module:
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/situational_awareness/network/Get-SQLInstanceDomain.ps1"
         script = ""
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             with open(moduleSource, 'r') as source:
                 script = source.read()
@@ -99,20 +102,22 @@ class Module:
             print helpers.color("[!] Could not read module source path at: " + str(moduleSource))
             return ""
 
-        script += " Get-SQLInstanceDomain"
+        scriptEnd = " Get-SQLInstanceDomain"
         if username != "":
-            script += " -Username " + username
+            scriptEnd += " -Username " + username
         if password != "":
-            script += " -Password " + password
+            scriptEnd += " -Password " + password
         if domainController != "":
-            script += " -DomainController "+domainController
+            scriptEnd += " -DomainController "+domainController
         if computerName != "":
-            script += " -ComputerName "+computerName
+            scriptEnd += " -ComputerName "+computerName
         if domainAccount != "":
-            script += " -DomainAccount "+domainAccount
+            scriptEnd += " -DomainAccount "+domainAccount
         if checkMgmt.lower() != "false":
-	    script += " -CheckMgmt"
+	    scriptEnd += " -CheckMgmt"
             if udpTimeOut != "":
-                script += " -UDPTimeOut "+udpTimeOut
-
+                scriptEnd += " -UDPTimeOut "+udpTimeOut
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

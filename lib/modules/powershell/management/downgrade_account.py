@@ -69,13 +69,12 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         moduleName = self.info["Name"]
         
         # read in the common powerview.ps1 module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/situational_awareness/network/powerview.ps1"
-
         try:
             f = open(moduleSource, 'r')
         except:
@@ -89,7 +88,7 @@ class Module:
         script = helpers.generate_dynamic_powershell_script(moduleCode, moduleName)
 
         script += moduleName + " "
-
+        
         for option,values in self.options.iteritems():
             if option.lower() != "agent":
                 if values['Value'] and values['Value'] != '':
@@ -100,5 +99,6 @@ class Module:
                         script += " -" + str(option) + " " + str(values['Value']) 
 
         script += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
-
+        if obfuscate:
+            script = helpers.obfuscate(psScript=script, obfuscationCommand=obfuscationCommand)
         return script

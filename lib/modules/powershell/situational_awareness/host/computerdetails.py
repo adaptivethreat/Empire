@@ -75,11 +75,13 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/situational_awareness/host/Get-ComputerDetails.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -90,35 +92,55 @@ class Module:
         f.close()
 
         script = moduleCode + "\n\n"
+        scriptEnd = ""
 
         for option,values in self.options.iteritems():
             if option.lower() != "agent":
                 if values['Value'] and values['Value'] != '':
                     if option == "4624":
-                        script += "$SecurityLog = Get-EventLog -LogName Security; $Filtered4624 = Find-4624Logons $SecurityLog;"
-                        script += 'Write-Output "Event ID 4624 (Logon):`n";'
-                        script += "Write-Output $Filtered4624.Values | Out-String"
+                        scriptEnd += "$SecurityLog = Get-EventLog -LogName Security; $Filtered4624 = Find-4624Logons $SecurityLog;"
+                        scriptEnd += 'Write-Output "Event ID 4624 (Logon):`n";'
+                        scriptEnd += "Write-Output $Filtered4624.Values | Out-String"
+                        if obfuscate:
+                            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+                        script += scriptEnd
                         return script
                     if option == "4648":
-                        script += "$SecurityLog = Get-EventLog -LogName Security; $Filtered4648 = Find-4648Logons $SecurityLog;"
-                        script += 'Write-Output "Event ID 4648 (Explicit Credential Logon):`n";'
-                        script += "Write-Output $Filtered4648.Values | Out-String"
+                        scriptEnd += "$SecurityLog = Get-EventLog -LogName Security; $Filtered4648 = Find-4648Logons $SecurityLog;"
+                        scriptEnd += 'Write-Output "Event ID 4648 (Explicit Credential Logon):`n";'
+                        scriptEnd += "Write-Output $Filtered4648.Values | Out-String"
+                        if obfuscate:
+                            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+                        script += scriptEnd
                         return script
                     if option == "AppLocker":
-                        script += "$AppLockerLogs = Find-AppLockerLogs;"
-                        script += 'Write-Output "AppLocker Process Starts:`n";'
-                        script += "Write-Output $AppLockerLogs.Values | Out-String"
+                        scriptEnd += "$AppLockerLogs = Find-AppLockerLogs;"
+                        scriptEnd += 'Write-Output "AppLocker Process Starts:`n";'
+                        scriptEnd += "Write-Output $AppLockerLogs.Values | Out-String"
+                        if obfuscate:
+                            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+                        script += scriptEnd
                         return script
                     if option == "PSLogs":
-                        script += "$PSLogs = Find-PSScriptsInPSAppLog;"
-                        script += 'Write-Output "PowerShell Script Executions:`n";'
-                        script += "Write-Output $PSLogs.Values | Out-String"
+                        scriptEnd += "$PSLogs = Find-PSScriptsInPSAppLog;"
+                        scriptEnd += 'Write-Output "PowerShell Script Executions:`n";'
+                        scriptEnd += "Write-Output $PSLogs.Values | Out-String"
+                        if obfuscate:
+                            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+                        script += scriptEnd
                         return script
                     if option == "SavedRDP":
-                        script += "$RdpClientData = Find-RDPClientConnections;"
-                        script += 'Write-Output "RDP Client Data:`n";'
-                        script += "Write-Output $RdpClientData.Values | Out-String"
+                        scriptEnd += "$RdpClientData = Find-RDPClientConnections;"
+                        scriptEnd += 'Write-Output "RDP Client Data:`n";'
+                        scriptEnd += "Write-Output $RdpClientData.Values | Out-String"
+                        if obfuscate:
+                            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+                        script += scriptEnd
                         return script
 
         # if we get to this point, no switched were specified
-        return script + "Get-ComputerDetails -ToString"
+        scriptEnd += "Get-ComputerDetails -ToString"
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
+        return script

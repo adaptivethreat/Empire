@@ -55,7 +55,7 @@ handle_agent_data() is the main function that should be used by external listene
 Most methods utilize self.lock to deal with the concurreny issue of kicking off threaded listeners.
 
 """
-
+# -*- encoding: utf-8 -*-
 import os
 import json
 import string
@@ -230,7 +230,7 @@ class Agents:
         parts
 
         # construct the appropriate save path
-        save_path = "%sdownloads/%s%s" % (self.installPath, sessionID, "/".join(parts[0:-1]))
+        save_path = "%sdownloads/%s/%s" % (self.installPath, sessionID, "/".join(parts[0:-1]))
         filename = os.path.basename(parts[-1])
 
         try:
@@ -1041,14 +1041,14 @@ class Agents:
                     if pk is None:
                         pk = 0
                     pk = (pk + 1) % 65536
-                    taskID = cur.execute("INSERT INTO taskings (id, agent, data) VALUES(?, ?, ?)", [pk, sessionID, task[:100]]).lastrowid
+                    cur.execute("INSERT INTO taskings (id, agent, data) VALUES(?, ?, ?)", [pk, sessionID, task[:100]])
 
                     # append our new json-ified task and update the backend
-                    agent_tasks.append([taskName, task, taskID])
+                    agent_tasks.append([taskName, task, pk])
                     cur.execute("UPDATE agents SET taskings=? WHERE session_id=?", [json.dumps(agent_tasks), sessionID])
 
                     # report the agent tasking in the reporting database
-                    cur.execute("INSERT INTO reporting (name,event_type,message,time_stamp,taskID) VALUES (?,?,?,?,?)", (sessionID, "task", taskName + " - " + task[0:50], helpers.get_datetime(), taskID))
+                    cur.execute("INSERT INTO reporting (name,event_type,message,time_stamp,taskID) VALUES (?,?,?,?,?)", (sessionID, "task", taskName + " - " + task[0:50], helpers.get_datetime(), pk))
 
                     cur.close()
 
@@ -1058,7 +1058,7 @@ class Agents:
                         f.write(task)
                         f.close()
                     
-                    return taskID
+                    return pk
 
                 finally:
                     self.lock.release()
@@ -1180,6 +1180,7 @@ class Agents:
             try:
                 message = encryption.aes_decrypt_and_verify(stagingKey, encData)
             except Exception as e:
+                print 'exception e:' + str(e)
                 # if we have an error during decryption
                 dispatcher.send("[!] HMAC verification failed from '%s'" % (sessionID), sender='Agents')
                 return 'ERROR: HMAC verification failed'
@@ -1291,18 +1292,18 @@ class Agents:
 
                 dispatcher.send("[!] Nonce verified: agent %s posted valid sysinfo checkin format: %s" % (sessionID, message), sender='Agents')
 
-                # listener = parts[1].encode('ascii', 'ignore')
-                domainname = parts[2].encode('ascii', 'ignore')
-                username = parts[3].encode('ascii', 'ignore')
-                hostname = parts[4].encode('ascii', 'ignore')
-                external_ip = clientIP.encode('ascii', 'ignore')
-                internal_ip = parts[5].encode('ascii', 'ignore')
-                os_details = parts[6].encode('ascii', 'ignore')
-                high_integrity = parts[7].encode('ascii', 'ignore')
-                process_name = parts[8].encode('ascii', 'ignore')
-                process_id = parts[9].encode('ascii', 'ignore')
-                language = parts[10].encode('ascii', 'ignore')
-                language_version = parts[11].encode('ascii', 'ignore')
+                listener = unicode(parts[1], 'utf-8')
+                domainname = unicode(parts[2], 'utf-8')
+                username = unicode(parts[3], 'utf-8')
+                hostname = unicode(parts[4], 'utf-8')
+                external_ip = unicode(clientIP, 'utf-8')
+                internal_ip = unicode(parts[5], 'utf-8')
+                os_details = unicode(parts[6], 'utf-8')
+                high_integrity = unicode(parts[7], 'utf-8')
+                process_name = unicode(parts[8], 'utf-8')
+                process_id = unicode(parts[9], 'utf-8')
+                language = unicode(parts[10], 'utf-8')
+                language_version = unicode(parts[11], 'utf-8')
                 if high_integrity == "True":
                     high_integrity = 1
                 else:
@@ -1529,17 +1530,17 @@ class Agents:
             else:
                 print "sysinfo:",data
                 # extract appropriate system information
-                listener = parts[1].encode('ascii', 'ignore')
-                domainname = parts[2].encode('ascii', 'ignore')
-                username = parts[3].encode('ascii', 'ignore')
-                hostname = parts[4].encode('ascii', 'ignore')
-                internal_ip = parts[5].encode('ascii', 'ignore')
-                os_details = parts[6].encode('ascii', 'ignore')
-                high_integrity = parts[7].encode('ascii', 'ignore')
-                process_name = parts[8].encode('ascii', 'ignore')
-                process_id = parts[9].encode('ascii', 'ignore')
-                language = parts[10].encode('ascii', 'ignore')
-                language_version = parts[11].encode('ascii', 'ignore')
+                listener = unicode(parts[1], 'utf-8')
+                domainname = unicode(parts[2], 'utf-8')
+                username = unicode(parts[3], 'utf-8')
+                hostname = unicode(parts[4], 'utf-8')
+                internal_ip = unicode(parts[5], 'utf-8')
+                os_details = unicode(parts[6], 'utf-8')
+                high_integrity = unicode(parts[7], 'utf-8')
+                process_name = unicode(parts[8], 'utf-8')
+                process_id = unicode(parts[9], 'utf-8')
+                language = unicode(parts[10], 'utf-8')
+                language_version = unicode(parts[11], 'utf-8')
                 if high_integrity == 'True':
                     high_integrity = 1
                 else:
@@ -1607,6 +1608,19 @@ class Agents:
                 msg = "file download: %s, part: %s" % (path, index)
                 self.save_agent_log(sessionID, msg)
 
+        elif responseName == "TASK_GETDOWNLOADS":
+            if not data or data.strip().strip() == "":
+                data = "[*] No active downloads"
+
+            self.update_agent_results_db(sessionID, data)
+            #update the agent log
+            self.save_agent_log(sessionID, data)
+
+        elif responseName == "TASK_STOPDOWNLOAD":
+            # download kill response
+            self.update_agent_results_db(sessionID, data)
+            #update the agent log
+            self.save_agent_log(sessionID, data)
 
         elif responseName == "TASK_UPLOAD":
             pass

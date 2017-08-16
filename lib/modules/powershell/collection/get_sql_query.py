@@ -60,7 +60,7 @@ class Module:
             if option in self.options:
                 self.options[option]['Value'] = value
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         username = self.options['Username']['Value']
         password = self.options['Password']['Value']
@@ -70,6 +70,9 @@ class Module:
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "data/module_source/collection/Get-SQLQuery.ps1"
         script = ""
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             with open(moduleSource, 'r') as source:
                 script = source.read()
@@ -77,13 +80,15 @@ class Module:
             print helpers.color("[!] Could not read module source path at: " + str(moduleSource))
             return ""
 
-        script += " Get-SQLQuery"
+        scriptEnd = " Get-SQLQuery"
         if username != "":
-            script += " -Username "+username
+            scriptEnd += " -Username "+username
         if password != "":
-            script += " -Password "+password
+            scriptEnd += " -Password "+password
         if instance != "":
-            script += " -Instance "+instance
-        script += " -Query "+"\'"+query+"\'"
-
+            scriptEnd += " -Instance "+instance
+        scriptEnd += " -Query "+"\'"+query+"\'"
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

