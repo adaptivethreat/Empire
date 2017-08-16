@@ -73,10 +73,12 @@ class Module:
             if option in self.options:
                 self.options[option]['Value'] = value
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         moduleSource = self.mainMenu.stagers.installPath + "/data/module_source/lateral_movement/Invoke-SSHCommand.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -88,7 +90,7 @@ class Module:
 
         script = moduleCode
 
-        script += "\nInvoke-SSHCommand "
+        scriptEnd = "\nInvoke-SSHCommand "
 
         # if a credential ID is specified, try to parse
         credID = self.options["CredID"]['Value']
@@ -117,9 +119,10 @@ class Module:
                 if values['Value'] and values['Value'] != '':
                     if values['Value'].lower() == "true":
                         # if we're just adding a switch
-                        script += " -" + str(option)
+                        scriptEnd += " -" + str(option)
                     else:
-                        script += " -" + str(option) + " " + str(values['Value']) 
-
-
+                        scriptEnd += " -" + str(option) + " " + str(values['Value']) 
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

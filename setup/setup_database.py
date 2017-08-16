@@ -58,7 +58,11 @@ API_PASSWORD = ''.join(random.sample(string.ascii_letters + string.digits + punc
 # the 'permanent' API token (doesn't change)
 API_PERMANENT_TOKEN = ''.join(random.choice(string.ascii_lowercase + string.digits) for x in range(40))
 
+# default obfuscation setting
+OBFUSCATE = 0
 
+# default obfuscation command
+OBFUSCATE_COMMAND = r'Token\All\1'
 ###################################################
 #
 # Database setup.
@@ -84,11 +88,13 @@ c.execute('''CREATE TABLE config (
     "api_username" text,
     "api_password" text,
     "api_current_token" text,
-    "api_permanent_token" text
+    "api_permanent_token" text,
+    "obfuscate" integer,
+    "obfuscate_command" text
     )''')
 
 # kick off the config component of the database
-c.execute("INSERT INTO config VALUES (?,?,?,?,?,?,?,?,?,?,?)", (STAGING_KEY, INSTALL_PATH, IP_WHITELIST, IP_BLACKLIST, '', '', False, API_USERNAME, API_PASSWORD, '', API_PERMANENT_TOKEN))
+c.execute("INSERT INTO config VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", (STAGING_KEY, INSTALL_PATH, IP_WHITELIST, IP_BLACKLIST, '', '', False, API_USERNAME, API_PASSWORD, '', API_PERMANENT_TOKEN, OBFUSCATE, OBFUSCATE_COMMAND))
 
 c.execute('''CREATE TABLE "agents" (
     "id" integer PRIMARY KEY,

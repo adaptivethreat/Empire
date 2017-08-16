@@ -58,7 +58,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         script = """
 function Invoke-ZipFolder
@@ -92,5 +92,6 @@ Invoke-ZipFolder"""
             if option.lower() != "agent":
                 if values['Value'] and values['Value'] != '':
                     script += " -" + str(option) + " " + str(values['Value']) 
-    
+        if obfuscate:
+            script = helpers.obfuscate(psScript=script, obfuscationCommand=obfuscationCommand)
         return script

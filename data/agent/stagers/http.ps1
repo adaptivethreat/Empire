@@ -4,20 +4,20 @@ function Start-Negotiate {
     function ConvertTo-RC4ByteStream {
         Param ($RCK, $In)
         begin {
-            [Byte[]] $S = 0..255;
+            [Byte[]] $Str = 0..255;
             $J = 0;
             0..255 | ForEach-Object {
-                $J = ($J + $S[$_] + $RCK[$_ % $RCK.Length]) % 256;
-                $S[$_], $S[$J] = $S[$J], $S[$_];
+                $J = ($J + $Str[$_] + $RCK[$_ % $RCK.Length]) % 256;
+                $Str[$_], $Str[$J] = $Str[$J], $Str[$_];
             };
             $I = $J = 0;
         }
         process {
             ForEach($Byte in $In) {
                 $I = ($I + 1) % 256;
-                $J = ($J + $S[$I]) % 256;
-                $S[$I], $S[$J] = $S[$J], $S[$I];
-                $Byte -bxor $S[($S[$I] + $S[$J]) % 256];
+                $J = ($J + $Str[$I]) % 256;
+                $Str[$I], $Str[$J] = $Str[$J], $Str[$I];
+                $Byte -bxor $Str[($Str[$I] + $Str[$J]) % 256];
             }
         }
     }

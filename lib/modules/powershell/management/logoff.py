@@ -53,7 +53,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         allUsers = self.options['AllUsers']['Value']
 
@@ -61,5 +61,6 @@ class Module:
             script = "'Logging off all users.'; Start-Sleep -s 3; $null = (gwmi win32_operatingsystem).Win32Shutdown(4)"
         else:
             script = "'Logging off current user.'; Start-Sleep -s 3; shutdown /l /f"
-
+        if obfuscate:
+            script = helpers.obfuscate(psScript=script, obfuscationCommand=obfuscationCommand)
         return script
