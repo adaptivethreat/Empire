@@ -71,7 +71,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         maxSize = self.options['MaxSize']['Value']
         traceFile = self.options['TraceFile']['Value']
@@ -89,5 +89,6 @@ class Module:
 
             if persistent != "":
                 script += " persistent=yes"
-        
+        if obfuscate:
+            script = helpers.obfuscate(psScript=script, obfuscationCommand=obfuscationCommand)
         return script

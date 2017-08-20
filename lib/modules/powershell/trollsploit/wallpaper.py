@@ -56,7 +56,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         # Set-ItemProperty -Path 'HKCU:\\Control Panel\\Desktop\\' -Name wallpaper -Value $SavePath
         # rundll32.exe user32.dll, UpdatePerUserSystemParameters
@@ -142,5 +142,6 @@ namespace Wallpaper
             return ""
         
         script += "; 'Set-Wallpaper executed'"
-
+        if obfuscate:
+            script = helpers.obfuscate(psScript=script, obfuscationCommand=obfuscationCommand)
         return script

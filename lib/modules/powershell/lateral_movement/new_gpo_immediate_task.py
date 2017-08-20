@@ -110,7 +110,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         moduleName = self.info["Name"]
         listenerName = self.options['Listener']['Value']
@@ -137,7 +137,6 @@ class Module:
 
                 # read in the common powerview.ps1 module source code
                 moduleSource = self.mainMenu.installPath + "/data/module_source/situational_awareness/network/powerview.ps1"
-
                 try:
                     f = open(moduleSource, 'r')
                 except:
@@ -150,7 +149,7 @@ class Module:
                 # get just the code needed for the specified function
                 script = helpers.generate_dynamic_powershell_script(moduleCode, moduleName)
 
-                script += moduleName + " -Command cmd -CommandArguments '"+command+"' -Force"
+                script = moduleName + " -Command cmd -CommandArguments '"+command+"' -Force"
 
                 for option,values in self.options.iteritems():
                     if option.lower() in ["taskname", "taskdescription", "taskauthor", "gponame", "gpodisplayname", "domain", "domaincontroller"]:
@@ -162,5 +161,6 @@ class Module:
                                 script += " -" + str(option) + " '" + str(values['Value']) + "'"
 
                 script += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
-
+                if obfuscate:
+                    script = helpers.obfuscate(psScript=script, obfuscationCommand=obfuscationCommand)
                 return script

