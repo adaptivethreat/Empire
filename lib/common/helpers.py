@@ -65,7 +65,7 @@ def validate_ip(IP):
     """
     Uses iptools to validate an IP.
     """
-    try: 
+    try:
         validate_IPv4 = iptools.ipv4.validate_ip(IP)
         validate_IPv6 = iptools.ipv6.validate_ip(IP)
 
@@ -91,7 +91,7 @@ def validate_ntlm(data):
 
 def generate_ip_list(s):
     """
-    Takes a comma separated list of IP/range/CIDR addresses and 
+    Takes a comma separated list of IP/range/CIDR addresses and
     generates an IP range list.
     """
 
@@ -103,7 +103,7 @@ def generate_ip_list(s):
     ranges = ""
     if s and s != "":
         parts = s.split(",")
-        
+
         for part in parts:
             p = part.split("-")
             if len(p) == 2:
@@ -119,7 +119,7 @@ def generate_ip_list(s):
             return eval("iptools.IpRangeList("+ranges+")")
         else:
             return None
-                
+
     else:
         return None
 
@@ -211,13 +211,13 @@ def strip_powershell_comments(data):
     Strip block comments, line comments, empty lines, verbose statements,
     and debug statements from a PowerShell source file.
     """
-    
+
     # strip block comments
     strippedCode = re.sub(re.compile('<#.*?#>', re.DOTALL), '\n', data)
 
     # strip blank lines, lines starting with #, and verbose/debug statements
     strippedCode = "\n".join([line for line in strippedCode.split('\n') if ((line.strip() != '') and (not line.strip().startswith("#")) and (not line.strip().lower().startswith("write-verbose ")) and (not line.strip().lower().startswith("write-debug ")) )])
-    
+
     return strippedCode
 
 
@@ -237,7 +237,7 @@ def get_powerview_psreflect_overhead(script):
     else:
         # otherwise extracting from PowerView
         pattern = re.compile(r'\n\$Mod =.*\[\'wtsapi32\'\]', re.DOTALL)
-    
+
     try:
         return strip_powershell_comments(pattern.findall(script)[0])
     except:
@@ -247,7 +247,7 @@ def get_powerview_psreflect_overhead(script):
 
 def get_dependent_functions(code, functionNames):
     """
-    Helper that takes a chunk of PowerShell code and a set of function 
+    Helper that takes a chunk of PowerShell code and a set of function
     names and returns the unique set of function names within the script block.
     """
 
@@ -307,13 +307,13 @@ def find_all_dependent_functions(functions, functionsToProcess, resultFunctions=
 def generate_dynamic_powershell_script(script, functionNames):
     """
     Takes a PowerShell script and a function name (or array of function names,
-    generates a dictionary of "[functionNames] -> functionCode", and recursively 
+    generates a dictionary of "[functionNames] -> functionCode", and recursively
     maps all dependent functions for the specified function name.
 
     A script is returned with only the code necessary for the given
     functionName, stripped of comments and whitespace.
 
-    Note: for PowerView, it will also dynamically detect if psreflect 
+    Note: for PowerView, it will also dynamically detect if psreflect
     overhead is needed and add it to the result script.
     """
 
@@ -335,7 +335,7 @@ def generate_dynamic_powershell_script(script, functionNames):
     #   start building the new result script
     functionDependencies = []
 
-    for functionName in functionNames:        
+    for functionName in functionNames:
         functionDependencies += find_all_dependent_functions(functions, functionName, [])
         functionDependencies = unique(functionDependencies)
 
@@ -369,12 +369,12 @@ def parse_credentials(data):
     if parts[0].startswith("Hostname:"):
         return parse_mimikatz(data)
 
-    # collection/prompt output
+    # powershell/collection/prompt output
     elif parts[0].startswith("[+] Prompted credentials:"):
-        
+
         parts = parts[0].split("->")
         if len(parts) == 2:
-            
+
             username = parts[1].split(":",1)[0].strip()
             password = parts[1].split(":",1)[1].strip()
 
@@ -383,12 +383,19 @@ def parse_credentials(data):
                 username = username.split("\\")[1].strip()
             else:
                 domain = ""
-            
+
             return [("plaintext", domain, username, password, "", "")]
 
         else:
             print color("[!] Error in parsing prompted credential output.")
             return None
+
+    # python/collection/prompt (Mac OS)
+    elif "text returned:" in parts[0]:
+        parts2 = parts[0].split("text returned:")
+        if len(parts2) >= 2:
+            password = parts2[-1]
+            return [("plaintext", "", "", password, "", "")]
 
     else:
         return None
@@ -431,7 +438,7 @@ def parse_mimikatz(data):
 
             lines2 = match.split("\n")
             username, domain, password = "", "", ""
-            
+
             for line in lines2:
                 try:
                     if "Username" in line:
@@ -444,7 +451,7 @@ def parse_mimikatz(data):
                     pass
 
             if username != "" and password != "" and password != "(null)":
-                
+
                 sid = ""
 
                 # substitute the FQDN in if it matches
@@ -565,7 +572,7 @@ def get_datetime():
     Return the current date/time
     """
     return strftime("%Y-%m-%d %H:%M:%S", localtime())
-    
+
 
 def get_file_datetime():
     """
@@ -609,7 +616,7 @@ def lhost():
                 return socket.inet_ntoa(fcntl.ioctl(
                         s.fileno(),
                         0x8915,  # SIOCGIFADDR
-                        struct.pack('256s', str(ifname[:15]))
+                        struct.pack('256s', ifname[:15])
                     )[20:24])
             except IOError as e:
                 return ""
@@ -628,7 +635,7 @@ def lhost():
         for ifname in interfaces:
             if "lo" not in ifname:
                 try:
-                    ip = get_interface_ip(ifname) 
+                    ip = get_interface_ip(ifname)
                     if ip != "":
                         break
                 except:
@@ -641,11 +648,11 @@ def color(string, color=None):
     """
     Change text color for the Linux terminal.
     """
-    
+
     attr = []
     # bold
     attr.append('1')
-    
+
     if color:
         if color.lower() == "red":
             attr.append('31')
@@ -672,7 +679,7 @@ def color(string, color=None):
 def unique(seq, idfun=None):
     """
     Uniquifies a list, order preserving.
-    
+
     from http://www.peterbe.com/plog/uniqifiers-benchmark
     """
     if idfun is None:
@@ -693,7 +700,7 @@ def unique(seq, idfun=None):
 def uniquify_tuples(tuples):
     """
     Uniquifies Mimikatz tuples based on the password.
-    
+
     cred format- (credType, domain, username, password, hostname, sid)
     """
     seen = set()
@@ -738,7 +745,7 @@ def complete_path(text, line, arg=False):
     else:
         # if we have "command path"
         argData = line.split()[0:]
-    
+
     if not argData or len(argData) == 1:
         completions = os.listdir('./')
     else:
@@ -746,7 +753,7 @@ def complete_path(text, line, arg=False):
         if part == '':
             dir = './'
         elif dir == '':
-            dir = '/'            
+            dir = '/'
 
         completions = []
         for f in os.listdir(dir):
