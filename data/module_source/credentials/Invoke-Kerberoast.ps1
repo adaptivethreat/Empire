@@ -469,10 +469,6 @@ Specifies a PowerView.User object (result of Get-NetUser) to request the ticket 
 Either 'John' for John the Ripper style hash formatting, or 'Hashcat' for Hashcat format.
 Defaults to 'John'.
 
-.PARAMETER OutputHashesOnly
-True gives you just the hashes on copy/pastable format. False gives you a formatted list.
-Defaults to True
-
 .EXAMPLE
 
 Get-SPNTicket -SPN "HTTP/web.testlab.local"
@@ -577,7 +573,7 @@ Outputs a custom object containing the SamAccountName, DistinguishedName, Servic
                 if ($OutputFormat -match 'John') {
                     $HashFormat = '$krb5tgs$' + $SamAccountName + ':' + $Hash
                 }
-                else{
+                else {
                     # hashcat output format
                     $HashFormat = '$krb5tgs$23$*SamAccountName: ' + $SamAccountName + ' ServicePrincipalName: ' + $Ticket.ServicePrincipalName + '*$' + $Hash   
                 }
@@ -654,10 +650,6 @@ for connection to the target domain.
 
 Either 'John' for John the Ripper style hash formatting, or 'Hashcat' for Hashcat format.
 Defaults to 'John'.
-
-.PARAMETER OutputHashesOnly
-
-blah
 
 .EXAMPLE
 
@@ -760,7 +752,6 @@ Outputs a custom object containing the SamAccountName, DistinguishedName, Servic
 
         $GetSPNTicketArguments = @{}
         if ($PSBoundParameters['OutputFormat']) { $GetSPNTicketArguments['OutputFormat'] = $OutputFormat }
-        if ($PSBoundParameters['OutputHashesOnly']) { $GetSPNTicketArguments['OutputHashesOnly'] = $OutputHashesOnly }
 
     }
 
