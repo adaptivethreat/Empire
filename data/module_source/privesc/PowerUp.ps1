@@ -3854,7 +3854,7 @@ function Invoke-AllChecks {
 
     # DLL hijacking
 
-    "`n`n[*] Checking %PATH% for potentially hijackable DLL locations..."
+    "`n`n[*] Checking System %PATH% for potentially hijackable DLL locations..."
     $Results = Find-PathDLLHijack
     $Results | Where-Object {$_} | Foreach-Object {
         $AbuseString = "Write-HijackDll -DllPath '$($_.ModifiablePath)\wlbsctrl.dll'"
