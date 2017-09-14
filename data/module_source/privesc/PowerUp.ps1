@@ -1455,7 +1455,7 @@ function Get-ServiceUnquoted {
 
             $ModifiableFiles = $Service.pathname.split(' ') | Get-ModifiablePath
 
-            $ModifiableFiles | Where-Object {$_ -and $_.ModifiablePath -and ($_.ModifiablePath -ne '')} | Foreach-Object {
+            $ModifiableFiles | Where-Object -filterscript {$_ -and $_.ModifiablePath -and ($_.ModifiablePath -ne '') -and -not ($_.ModifiablePath.EndsWith('C:\'))} | Foreach-Object {
                 $ServiceRestart = Test-ServiceDaclPermission -PermissionSet 'Restart' -Name $Service.name
 
                 if($ServiceRestart) {
