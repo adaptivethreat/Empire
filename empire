@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2.7
 
 import sqlite3, argparse, sys, argparse, logging, json, string
 import os, re, time, signal, copy, base64, pickle
@@ -1160,8 +1160,8 @@ def start_restful_api(empireMenu, suppress=False, username=None, password=None, 
         return jsonify({'success': True})
 
 
-    if not os.path.exists('./data/empire.pem'):
-        print "[!] Error: cannot find certificate ./data/empire.pem"
+    if not os.path.exists('./data/empire-chain.pem'):
+        print "[!] Error: cannot find certificate ./data/empire-chain.pem"
         sys.exit()
 
 
