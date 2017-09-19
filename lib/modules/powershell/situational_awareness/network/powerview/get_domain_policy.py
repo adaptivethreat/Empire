@@ -61,6 +61,11 @@ class Module:
                 'Description'   :   'Switch. Return full subnet objects instead of just object names (the default).',
                 'Required'      :   False,
                 'Value'         :   ''
+            },
+            'ExpandObject' : {
+                'Description'   :   'Expand a specific object from the domain policy. For example \'System Access\', entered without quotes',
+                'Required'      :   False,
+                'Value'         :   ''
             }
         }
 
@@ -94,18 +99,25 @@ class Module:
         # get just the code needed for the specified function
         script = helpers.generate_dynamic_powershell_script(moduleCode, moduleName)
 
-        script += moduleName + " "
-
+        pscript = ""
+        expand = False
+        value_to_expand = ""
         for option,values in self.options.iteritems():
-            if option.lower() != "agent":
+            if option.lower() != "agent" and option.lower() != "expandobject":
                 if values['Value'] and values['Value'] != '':
                     if values['Value'].lower() == "true":
                         # if we're just adding a switch
-                        script += " -" + str(option)
+                        pscript += " -" + str(option)
                     else:
-                        script += " -" + str(option) + " " + str(values['Value']) 
+                        pscript += " -" + str(option) + " " + str(values['Value']) 
+            if option.lower() == "expandobject" and values['Value']:
+                expand = True
+                value_to_expand += values['Value']
 
-        script += ' | fl | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
+        if expand: 
+            script += "(" + moduleName + " " + pscript + ")." + "'" + value_to_expand + "'" + ' | fl | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
+        else:
+            script += moduleName + " " + pscript + ' | fl | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed! Use ExpandObject option to expand one of the objects above such as \'System Access\'"'
         if obfuscate:
             script = helpers.obfuscate(psScript=script, obfuscationCommand=obfuscationCommand)
         return script
