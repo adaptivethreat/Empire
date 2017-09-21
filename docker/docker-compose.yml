@@ -5,6 +5,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
+    image: frohoff/empire
     tty: true
     stdin_open: true
     volumes:
