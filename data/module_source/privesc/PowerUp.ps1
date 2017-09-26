@@ -2463,7 +2463,7 @@ function Find-PathDLLHijack {
     Param()
 
     # use -LiteralPaths so the spaces in %PATH% folders are not tokenized
-    Get-Item Env:Path | Select-Object -ExpandProperty Value | ForEach-Object { $_.split(';') } | Where-Object {$_ -and ($_ -ne '')} | ForEach-Object {
+     (get-itemproperty "HKLM:\System\CurrentControlSet\Control\Session Manager\Environment").path.split(';') | ForEach-Object {
         $TargetPath = $_
 
         $ModifidablePaths = $TargetPath | Get-ModifiablePath -LiteralPaths | Where-Object {$_ -and ($_ -ne $Null) -and ($_.ModifiablePath -ne $Null) -and ($_.ModifiablePath.Trim() -ne '')}
@@ -3854,7 +3854,7 @@ function Invoke-AllChecks {
 
     # DLL hijacking
 
-    "`n`n[*] Checking %PATH% for potentially hijackable DLL locations..."
+    "`n`n[*] Checking System %PATH% for potentially hijackable DLL locations..."
     $Results = Find-PathDLLHijack
     $Results | Where-Object {$_} | Foreach-Object {
         $AbuseString = "Write-HijackDll -DllPath '$($_.ModifiablePath)\wlbsctrl.dll'"
