@@ -628,8 +628,8 @@ class Listener:
                 app.run(host=bindIP, port=int(listenport), threaded=True)
 
         except Exception as e:
-            print helpers.color("[!] Listener startup on port %s failed: %s " % (port, e))
-            dispatcher.send("[!] Listener startup on port %s failed: %s " % (port, e), sender='listeners/http_com')
+            print helpers.color("[!] Listener startup on port %s failed: %s " % (listenport, e))
+            dispatcher.send("[!] Listener startup on port %s failed: %s " % (listenport, e), sender='listeners/http_com')
 
 
     def start(self, name=''):
