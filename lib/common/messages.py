@@ -237,6 +237,8 @@ def display_active_listeners(listeners):
             moduleName = listener['moduleName']
             if 'Host' in listener['options']:
                 host = listener['options']['Host']['Value']
+                if 'ListenPort' in listener['options'] and listener['options']['ListenPort']['Value'] != '':
+                    host += ' (%s)' % listener['options']['ListenPort']['Value']
             else:
                 host = ''
 
@@ -249,7 +251,7 @@ def display_active_listeners(listeners):
                 defaultJitter = listener['options']['DefaultJitter']['Value']
             else:
                 defaultJitter = ''
-            
+
             if defaultDelay == 'n/a':
                 connectInterval = 'n/a'
             else:

