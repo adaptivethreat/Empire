@@ -1,6 +1,11 @@
 Running
 --------
 - Fix Eternal Blue Issue #656
+- Merge Invoke-Kerberoast: Print hashes only. Formatting with a text editor is no longer required. #663
+- Fix Macro syntax error per @utkusen issue #664 
+- Fix Better powershell install, obfuscation bug fixes, fixed vbs/macro launchers #686 @cobbr
+- Fix creds manual add parsing with whitespace in password
+- Fix validate length parameter attribute for Invoke-PSInject.ps1
 
 8/28/2017
 --------

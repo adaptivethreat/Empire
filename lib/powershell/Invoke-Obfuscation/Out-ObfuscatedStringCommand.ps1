@@ -810,7 +810,7 @@ http://www.danielbohannon.com
     
     # Perform final check to remove ticks if they now precede lowercase special characters after the string is reversed.
     # E.g. "testin`G" in reverse would be "G`nitset" where `n would be interpreted as a newline character.
-    $SpecialCharacters = @('a','b','f','n','r','t','v','0')
+    $SpecialCharacters = @('a','b','f','n','r','u','t','v','0')
     ForEach($SpecialChar in $SpecialCharacters)
     {
         If($ScriptString.Contains("``"+$SpecialChar))

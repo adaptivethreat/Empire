@@ -39,7 +39,7 @@ class Module:
             },
             'GroupName' : {
                 'Description'   :   'The group name to query for users.',
-                'Required'      :   True,
+                'Required'      :   False,
                 'Value'         :   '"Domain Admins"'
             },
             'SID' : {

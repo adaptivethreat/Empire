@@ -2,6 +2,7 @@ import logging
 import base64
 import random
 import os
+import ssl
 import time
 import copy
 from pydispatch import dispatcher
@@ -254,6 +255,7 @@ class Listener:
         uris = [a.strip('/') for a in profile.split('|')[0].split(',')]
         stagingKey = listenerOptions['StagingKey']['Value']
         host = listenerOptions['Host']['Value']
+        workingHours = listenerOptions['WorkingHours']['Value']
         
         # select some random URIs for staging from the main profile
         stage1 = random.choice(uris)
@@ -275,6 +277,10 @@ class Listener:
             stager = stager.replace('REPLACE_STAGING_KEY', stagingKey)
             stager = stager.replace('index.jsp', stage1)
             stager = stager.replace('index.php', stage2)
+
+            #patch in working hours, if any
+            if workingHours != "":
+                stager = stager.replace('WORKING_HOURS_REPLACE', workingHours)
 
             randomizedStager = ''
 
@@ -319,7 +325,6 @@ class Listener:
         profile = listenerOptions['DefaultProfile']['Value']
         lostLimit = listenerOptions['DefaultLostLimit']['Value']
         killDate = listenerOptions['KillDate']['Value']
-        workingHours = listenerOptions['WorkingHours']['Value']
         b64DefaultResponse = base64.b64encode(self.default_response())
 
         if language == 'powershell':
@@ -345,8 +350,6 @@ class Listener:
             # patch in the killDate and workingHours if they're specified
             if killDate != "":
                 code = code.replace('$KillDate,', "$KillDate = '" + str(killDate) + "',")
-            if workingHours != "":
-                code = code.replace('$WorkingHours,', "$WorkingHours = '" + str(workingHours) + "',")
             if obfuscate:
                 code = helpers.obfuscate(code, self.mainMenu.installPath, obfuscationCommand=obfuscationCommand)
             return code
@@ -608,8 +611,9 @@ class Listener:
             certPath = listenerOptions['CertPath']['Value']
             host = listenerOptions['Host']['Value']
             if certPath.strip() != '' and host.startswith('https'):
-		certPath = os.path.abspath(certPath)
-		context = ("%s/empire-chain.pem" % (certPath), "%s/empire-priv.key"  % (certPath))
+                certPath = os.path.abspath(certPath)
+                context = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+                context.load_cert_chain("%s/empire-chain.pem" % (certPath), "%s/empire-priv.key"  % (certPath))
                 app.run(host=bindIP, port=int(port), threaded=True, ssl_context=context)
             else:
                 app.run(host=bindIP, port=int(port), threaded=True)

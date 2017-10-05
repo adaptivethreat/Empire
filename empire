@@ -3,10 +3,10 @@
 import sqlite3, argparse, sys, argparse, logging, json, string
 import os, re, time, signal, copy, base64, pickle
 from flask import Flask, request, jsonify, make_response, abort, url_for
-from time import localtime, strftime
+from time import localtime, strftime, sleep
 from OpenSSL import SSL
 from Crypto.Random import random
-
+import ssl
 # Empire imports
 from lib.common import empire
 from lib.common import helpers
@@ -34,7 +34,7 @@ def database_connect():
 
     except Exception:
         print helpers.color("[!] Could not connect to database")
-        print helpers.color("[!] Please run database_setup.py")
+        print helpers.color("[!] Please run setup_database.py")
         sys.exit()
 
 
@@ -140,11 +140,11 @@ def get_permanent_token(conn):
 #
 ####################################################################
 
-def start_restful_api(startEmpire=False, suppress=False, username=None, password=None, port=1337):
+def start_restful_api(empireMenu, suppress=False, username=None, password=None, port=1337):
     """
     Kick off the RESTful API with the given parameters.
 
-    startEmpire -   start a complete Empire instance in the backend as well
+    empireMenu  -   Main empire menu object
     suppress    -   suppress most console output
     username    -   optional username to use for the API, otherwise pulls from the empire.db config
     password    -   optional password to use for the API, otherwise pulls from the empire.db config
@@ -154,6 +154,8 @@ def start_restful_api(startEmpire=False, suppress=False, username=None, password
     app = Flask(__name__)
 
     conn = database_connect()
+
+    main = empireMenu
 
     global serverExitCommand
 
@@ -171,27 +173,7 @@ def start_restful_api(startEmpire=False, suppress=False, username=None, password
     else:
         execute_db_query(conn, "UPDATE config SET api_password=?", password)
 
-
-    class Namespace:
-        """
-        Temporary namespace to create the followin base argument object.
-        """
-        def __init__(self, **kwargs):
-            self.__dict__.update(kwargs)
-
-    # instantiate an Empire instance in case we need to interact with stagers or listeners
-    args = Namespace(debug=None, listener=None, stager=None, stager_options=None, version=False)
-
     print ''
-
-    if startEmpire:
-        # if we want to start a full-running empire instance
-        print " * Starting a full Empire instance"
-        main = empire.MainMenu(args=args)
-    else:
-        # if we just want the RESTful API, i.e. no listener/etc. startup
-        main = empire.MainMenu(args=args, restAPI=True)
-
 
     print " * Starting Empire RESTful API on port: %s" %(port)
 
@@ -210,7 +192,6 @@ def start_restful_api(startEmpire=False, suppress=False, username=None, password
 
         # suppress all stdout and don't initiate the main cmdloop
         sys.stdout = open(os.devnull, 'w')
-
 
     # validate API token before every request except for the login URI
     @app.before_request
@@ -865,12 +846,10 @@ def start_restful_api(startEmpire=False, suppress=False, username=None, password
         for agentNameID in agentNameIDs:
             [agentName, agentSessionID] = agentNameID
 
-            agentResults = execute_db_query(conn, 'SELECT id, agent, data FROM results WHERE agent=?', [agentSessionID])
+            agentResults = execute_db_query(conn, "SELECT results FROM agents WHERE session_id=?", [agentSessionID])
 
-            for result in agentResults:
-                [resultid, agent, data] = result
-
-                agentTaskResults.append({"taskID": result[0], "agentname": result[1], "results": result[2]})
+            if agentResults and agentResults[0] and agentResults[0] != '':
+                agentTaskResults.append({"AgentName":agentSessionID, "AgentResults":agentResults[0]})
               
         return jsonify({'results': agentTaskResults})
 
@@ -1033,7 +1012,7 @@ def start_restful_api(startEmpire=False, suppress=False, username=None, password
 
             # task the agent to exit
             msg = "tasked agent %s to exit" %(agentSessionID)
-            main.agents.save_agent_log(sessionID, msg)
+            main.agents.save_agent_log(agentSessionID, msg)
             main.agents.add_agent_task_db(agentSessionID, 'TASK_EXIT')
 
         return jsonify({'success': True})
@@ -1174,7 +1153,7 @@ def start_restful_api(startEmpire=False, suppress=False, username=None, password
         return jsonify({'success': True})
 
 
-    if not os.path.exists('./data/empire.pem'):
+    if not os.path.exists('./data/empire-chain.pem'):
         print "[!] Error: cannot find certificate ./data/empire.pem"
         sys.exit()
 
@@ -1195,7 +1174,7 @@ def start_restful_api(startEmpire=False, suppress=False, username=None, password
         if conn:
             conn.close()
 
-        if startEmpire:
+        if suppress:
             print " * Shutting down the Empire instance"
             main.shutdown()
 
@@ -1234,13 +1213,16 @@ def start_restful_api(startEmpire=False, suppress=False, username=None, password
         signal.signal(signal.SIGINT, signal.default_int_handler)
         sys.exit()
 
-
-    signal.signal(signal.SIGINT, signal_handler)
+    try:
+        signal.signal(signal.SIGINT, signal_handler)
+    except ValueError:
+        pass
 
     # wrap the Flask connection in SSL and start it
-    context = ('./data/empire-chain.pem', './data/empire-priv.key')
+    certPath = os.path.abspath("./data/")
+    context = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+    context.load_cert_chain("%s/empire-chain.pem" % (certPath), "%s/empire-priv.key" % (certPath))
     app.run(host='0.0.0.0', port=int(port), ssl_context=context, threaded=True)
-
 
 
 if __name__ == '__main__':
@@ -1258,7 +1240,7 @@ if __name__ == '__main__':
 
     restGroup = parser.add_argument_group('RESTful API Options')
     launchGroup = restGroup.add_mutually_exclusive_group()
-    launchGroup.add_argument('--rest', action='store_true', help='Run the Empire RESTful API.')
+    launchGroup.add_argument('--rest', action='store_true', help='Run Empire and the RESTful API.')
     launchGroup.add_argument('--headless', action='store_true', help='Run Empire and the RESTful API headless without the usual interface.')
     restGroup.add_argument('--restport', type=int, nargs=1, help='Port to run the Empire RESTful API on.')
     restGroup.add_argument('--username', nargs=1, help='Start the RESTful API with the specified username instead of pulling from empire.db')
@@ -1275,20 +1257,30 @@ if __name__ == '__main__':
         print empire.VERSION
 
     elif args.rest:
-        # start just the RESTful API
-        while serverExitCommand == 'restart':
-            try:
-                start_restful_api(startEmpire=False, suppress=False, username=args.username, password=args.password, port=args.restport)
-            except SystemExit as e:
-                pass
+        # start an Empire instance and RESTful API
+        main = empire.MainMenu(args=args)
+        def thread_api(empireMenu):
+            while serverExitCommand == 'restart':
+                try:
+                    start_restful_api(empireMenu=empireMenu, suppress=False, username=args.username, password=args.password, port=args.restport)
+                except SystemExit as e:
+                    pass
+
+        thread = helpers.KThread(target=thread_api, args=(main,))
+        thread.daemon = True
+        thread.start()
+        sleep(2)
+        main.cmdloop()
 
     elif args.headless:
         # start an Empire instance and RESTful API and suppress output
+        main = empire.MainMenu(args=args)
         while serverExitCommand == 'restart':
             try:
-                start_restful_api(startEmpire=True, suppress=True, username=args.username, password=args.password, port=args.restport)
+                start_restful_api(empireMenu=main, suppress=True, username=args.username, password=args.password, port=args.restport)
             except SystemExit as e:
                 pass
+
     else:
         # normal execution
         main = empire.MainMenu(args=args)
