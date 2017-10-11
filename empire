@@ -634,7 +634,7 @@ def start_restful_api(empireMenu, suppress=False, username=None, password=None, 
 
         for activeListener in activeListenersRaw:
             [ID, name, module, listener_type, listener_category, options] = activeListener
-            listeners.append({'ID':ID, 'name':name, 'module':module, 'listener_type':listener_type, 'listener_category':listener_category, 'options':pickle.loads(activeListener[5]) })  
+            listeners.append({'ID':ID, 'name':name, 'module':module, 'listener_type':listener_type, 'listener_category':listener_category, 'options':pickle.loads(activeListener[5]) })
 
 
         return jsonify({'listeners' : listeners})
@@ -709,7 +709,7 @@ def start_restful_api(empireMenu, suppress=False, username=None, password=None, 
             returnVal = main.listeners.set_listener_option(listener_type, option, values)
             if not returnVal:
                  return make_response(jsonify({'error': 'error setting listener value %s with option %s' %(option, values)}), 400)
-        
+
         main.listeners.start_listener(listener_type, listenerObject)
 
         #check to see if the listener was created
@@ -842,7 +842,7 @@ def start_restful_api(empireMenu, suppress=False, username=None, password=None, 
             agentNameIDs = execute_db_query(conn, "SELECT name, session_id FROM agents WHERE name like '%' OR session_id like '%'")
         else:
             agentNameIDs = execute_db_query(conn, 'SELECT name, session_id FROM agents WHERE name like ? OR session_id like ?', [agent_name, agent_name])
-        
+
         for agentNameID in agentNameIDs:
             [agentName, agentSessionID] = agentNameID
 
@@ -850,7 +850,7 @@ def start_restful_api(empireMenu, suppress=False, username=None, password=None, 
 
             if agentResults and agentResults[0] and agentResults[0] != '':
                 agentTaskResults.append({"AgentName":agentSessionID, "AgentResults":agentResults[0]})
-              
+
         return jsonify({'results': agentTaskResults})
 
 
@@ -871,7 +871,7 @@ def start_restful_api(empireMenu, suppress=False, username=None, password=None, 
         for agentNameID in agentNameIDs:
             (agentName, agentSessionID) = agentNameID
 
-            
+
             execute_db_query(conn, 'UPDATE agents SET results=? WHERE session_id=?', ['', agentSessionID])
 
         return jsonify({'success': True})
@@ -1220,7 +1220,7 @@ def start_restful_api(empireMenu, suppress=False, username=None, password=None, 
 
     # wrap the Flask connection in SSL and start it
     certPath = os.path.abspath("./data/")
-    context = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+    context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
     context.load_cert_chain("%s/empire-chain.pem" % (certPath), "%s/empire-priv.key" % (certPath))
     app.run(host='0.0.0.0', port=int(port), ssl_context=context, threaded=True)
 
