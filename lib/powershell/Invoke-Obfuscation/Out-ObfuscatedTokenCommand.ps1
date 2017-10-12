@@ -1032,7 +1032,7 @@ http://www.danielbohannon.com
     $CharIndexesToObfuscate = (Get-Random -InputObject (1..($TokenArray.Length-2)) -Count $NumberOfCharsToObfuscate)
     
     # Special characters in PowerShell must be upper-cased before adding a tick before the character.
-    $SpecialCharacters = @('a','b','f','n','r','t','v')
+    $SpecialCharacters = @('a','b','f','n','r','u','t','v','0')
  
     # Remove the possibility of a single tick being placed only before the token string.
     # This would leave the string value completely intact, thus defeating the purpose of the tick obfuscation.

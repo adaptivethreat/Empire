@@ -9,7 +9,7 @@ class Stager:
 
             'Author': ['@kisasondi','@harmj0y'],
 
-            'Description': ('Generates a bunny script that runes a one-liner stage0 launcher for Empire.'),
+            'Description': ('Generates a bunny script that runs a one-liner stage0 launcher for Empire.'),
 
             'Comments': [
                 'This stager is modification of the ducky stager by @harmj0y,',

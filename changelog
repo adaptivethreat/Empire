@@ -14,18 +14,24 @@ Running
 - Improved ScriptBlock logging bypasses #740 @cobbr_io
 - Slack Integration - Notification for new Agents #737 @dchrastil
 - Improve Get-ChromeDump #734 @ThePirateWhoSmellsOfSunFlowers
+- Fix Eternal Blue Issue #656
+- Merge Invoke-Kerberoast: Print hashes only. Formatting with a text editor is no longer required. #663
+- Fix Macro syntax error per @utkusen issue #664 
+- Fix Better powershell install, obfuscation bug fixes, fixed vbs/macro launchers #686 @cobbr
+- Fix creds manual add parsing with whitespace in password
+- Fix validate length parameter attribute for Invoke-PSInject.ps1d
 
 8/28/2017
 --------
 - Version 2.1 Master Release
 	-Add get schwifty trollsploit module @424f424f
 	-Add -sta flag to launcher @xorrior
-	-Fixed hardoced cert path @xorrior
+	-Fixed hardcoded cert path @xorrior
 	-Fix for #567
 	-Merge Capture OSX credentials from Prompt Module in Empire DB @malcomvetter.
-	-Rest Api fixups #526 @byt3bl33d3r
+	-Rest API fixups #526 @byt3bl33d3r
 	-Added MS16-135 exploit module @ThePirateWhoSmellsOfSunflowers
-	-Updated Bloodhound Ingestion module @rvrsh3ll
+	-Updated Bloodhound Ingestion module @424f424f
 	-Added Dropbox exfil module @ktevora1
 	-Added EternalBlue module @ktevora1
 	-Fix SSL certificate issue with Flask @diskonnect
@@ -37,7 +43,7 @@ Running
 	-Add ‘SandboxMode’ to evade Apple Sandbox protection on applescript #578 @dchrastil
 	-Add Obfuscated Empire #597 @cobbr
 	-Add Bypass ScriptBlock Logging #603 @cobbr
-	-Add mimipenguin module @rvrsh3ll
+	-Add mimipenguin module @424f424f
 	-Add dyld_print_to_file Mac privesc @checkyfuntime
 	-Added manual proxy specifications @xorrior
 	-Fix libssl-dev and libssl1.0.0 packages @xorrior

@@ -200,7 +200,6 @@ def start_restful_api(empireMenu, suppress=False, username=None, password=None, 
         # suppress all stdout and don't initiate the main cmdloop
         sys.stdout = open(os.devnull, 'w')
 
-
     # validate API token before every request except for the login URI
     @app.before_request
     def check_token():
@@ -1221,7 +1220,6 @@ def start_restful_api(empireMenu, suppress=False, username=None, password=None, 
         signal.signal(signal.SIGINT, signal.default_int_handler)
         sys.exit()
 
-
     try:
         signal.signal(signal.SIGINT, signal_handler)
     except ValueError:
@@ -1232,7 +1230,6 @@ def start_restful_api(empireMenu, suppress=False, username=None, password=None, 
     context = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
     context.load_cert_chain("%s/empire-chain.pem" % (certPath), "%s/empire-priv.key" % (certPath))
     app.run(host='0.0.0.0', port=int(port), ssl_context=context, threaded=True)
-
 
 
 if __name__ == '__main__':

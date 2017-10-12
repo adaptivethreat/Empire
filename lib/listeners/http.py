@@ -7,7 +7,6 @@ import time
 import copy
 from pydispatch import dispatcher
 from flask import Flask, request, make_response
-import pdb
 # Empire imports
 from lib.common import helpers
 from lib.common import agents

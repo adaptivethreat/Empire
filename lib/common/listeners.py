@@ -13,7 +13,6 @@ import pickle
 import hashlib
 import copy
 
-
 class Listeners:
     """
     Listener handling class.
