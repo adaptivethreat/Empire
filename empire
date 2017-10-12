@@ -1227,7 +1227,7 @@ def start_restful_api(empireMenu, suppress=False, username=None, password=None, 
 
     # wrap the Flask connection in SSL and start it
     certPath = os.path.abspath("./data/")
-    context = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS)
     context.load_cert_chain("%s/empire-chain.pem" % (certPath), "%s/empire-priv.key" % (certPath))
     app.run(host='0.0.0.0', port=int(port), ssl_context=context, threaded=True)
 
