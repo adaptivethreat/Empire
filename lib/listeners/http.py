@@ -87,7 +87,7 @@ class Listener:
                 'Value'         :   "/admin/get.php,/news.php,/login/process.php|Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko"
             },
             'CertPath' : {
-                'Description'   :   'Certificate path for https listeners.',
+                'Description'   :   'Directory path of X.509 certificates for https listeners. Must contain empire-chain.pem and empire-priv.key',
                 'Required'      :   False,
                 'Value'         :   ''
             },
@@ -961,7 +961,7 @@ def send_message(packets=None):
             host = listenerOptions['Host']['Value']
             if certPath.strip() != '' and host.startswith('https'):
                 certPath = os.path.abspath(certPath)
-                context = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+                context = ssl.SSLContext(ssl.PROTOCOL_TLS)
                 context.load_cert_chain("%s/empire-chain.pem" % (certPath), "%s/empire-priv.key"  % (certPath))
                 app.run(host=bindIP, port=int(port), threaded=True, ssl_context=context)
             else:
