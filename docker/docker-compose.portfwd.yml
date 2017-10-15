@@ -1,0 +1,9 @@
+# network_mode: host doesn't work properly on mac
+# https://github.com/docker/for-mac/issues/1031
+# use this file to port forward instead
+
+version: "3"
+services:
+  empire:
+    network_mode: bridge
+    ports: ["80"]

@@ -6,6 +6,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     image: frohoff/empire
+    network_mode: host
     tty: true
     stdin_open: true
     volumes:
