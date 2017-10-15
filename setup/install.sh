@@ -12,8 +12,10 @@ then
     cd ./setup
 fi
 
-wget https://bootstrap.pypa.io/get-pip.py
-python get-pip.py
+if ! which pip > /dev/null; then
+    wget https://bootstrap.pypa.io/get-pip.py
+    python get-pip.py
+fi
 
 version=$( lsb_release -r | grep -oP "[0-9]+" | head -1 )
 if lsb_release -d | grep -q "Fedora"; then
@@ -82,10 +84,9 @@ elif lsb_release -d | grep -q "Ubuntu"; then
 	pip install iptools
 	pip install pydispatcher
 	pip install flask
-	pip install pyOpenSSL
+	pip install 'pyopenssl==17.2.0'
 	pip install macholib
 	pip install dropbox
-	pip install 'pyopenssl==17.2.0'
 	pip install pyinstaller
 	pip install zlib_wrapper
 	pip install netifaces
@@ -114,8 +115,8 @@ else
 	 pip install macholib
 	 pip install dropbox
 	 pip install cryptography
-	 pip install pyOpenSSL
 	 pip install 'pyopenssl==17.2.0'
+	 pip install pyinstaller
 	 pip install zlib_wrapper
 	 pip install netifaces
 	 pip install M2Crypto

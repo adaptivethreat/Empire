@@ -13,7 +13,7 @@ ADD ./setup /opt/empire/setup
 # allow db/cert to be created
 RUN mkdir /opt/empire/data
 
-RUN apt update && apt -y install lsb-release python-pip libssl-dev libxml2-dev libffi-dev git
+RUN apt-get update && apt-get -y install lsb-release python-pip libssl-dev libxml2-dev libffi-dev git
 RUN pip install --upgrade pip
 
 RUN bash ./setup/install.sh
