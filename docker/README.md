@@ -15,11 +15,11 @@ Prerequisites and caveats
 
 A note about networking
 ---------------------
-The default docker-compose.override.yml is configured for `host` networking mode which 
+The default `docker-compose.yml` is configured for `host` networking mode which 
 will allow all empire listener ports to automatically be exposed on the host system.
 This mode [isn't currently supported on mac](https://github.com/docker/for-mac/issues/1031)
-so the default network mode will need to be used with 
-[explicit port forwards](#use-port-forwards-for-listeners).
+so the default `bridge` network mode will need to be used with 
+[explicit port forwards (see below)](#use-port-forwards-for-listeners).
 
 Start container
 ---------------
@@ -37,6 +37,7 @@ $ docker attach empire
 
 Detach from container
 ---------------------
+Use the `[ctrl-p][ctrl-q]` hotkey sequence to break out of the Empire shell and drop back the system shell.
 ```console
 (Empire) >[ctrl-p][ctrl-q]
 $
@@ -50,10 +51,10 @@ $ docker-compose down
 
 Use port forward(s) for listeners
 ---------------------------------
-This is only required if not using `host` network mode (i.e. on Mac). In `docker-compose.override.yml` 
-comment out `network_mode: host` and uncomment `ports: ...` line and edit with desired port forwards
+This is only required using `bridge` network mode and not `host` network mode (i.e. on Mac). Rename `docker-compose.portfwd.yml` to `docker-compose.override.yml`
+and modify `ports:` entry as appropriate with desired port forwards.
 ```console
-$ cp docker-compose.override.yml.example docker-compose.override.yml
+$ cp docker-compose.portfwd.yml docker-compose.override.yml
 $ vim docker-compose.override.yml
 $ docker-compose up -d
 Recreating empire ...
