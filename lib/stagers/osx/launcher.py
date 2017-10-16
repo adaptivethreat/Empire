@@ -71,13 +71,14 @@ class Stager:
         base64 = self.options['Base64']['Value']
         userAgent = self.options['UserAgent']['Value']
         safeChecks = self.options['SafeChecks']['Value']
+        agent_id = self.options['agent_id']['Value']
 
         encode = False
         if base64.lower() == "true":
             encode = True
 
         # generate the launcher code
-        launcher = self.mainMenu.stagers.generate_launcher(listenerName, language=language, encode=encode, userAgent=userAgent, safeChecks=safeChecks)
+        launcher = self.mainMenu.stagers.generate_launcher(listenerName, language=language, encode=encode, userAgent=userAgent, safeChecks=safeChecks, agent_id=agent_id)
 
         if launcher == "":
             print helpers.color("[!] Error in launcher command generation.")
