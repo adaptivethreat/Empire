@@ -133,7 +133,7 @@ class Agents:
         return sessionID in self.agents
 
 
-    def add_agent(self, sessionID, externalIP, delay, jitter, profile, killDate, workingHours, lostLimit, sessionKey=None, nonce='', listener='', language=''):
+    def add_agent(self, sessionID, externalIP, delay, jitter, profile, killDate, workingHours, lostLimit, sessionKey=None, nonce='', listener='', language='', agent_id=''):
         """
         Add an agent to the internal cache and database.
         """
@@ -155,7 +155,7 @@ class Agents:
             self.lock.acquire()
             cur = conn.cursor()
             # add the agent and report the initial checkin in the reporting database
-            cur.execute("INSERT INTO agents (name, session_id, delay, jitter, external_ip, session_key, nonce, checkin_time, lastseen_time, profile, kill_date, working_hours, lost_limit, listener, language) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (sessionID, sessionID, delay, jitter, externalIP, sessionKey, nonce, checkinTime, lastSeenTime, profile, killDate, workingHours, lostLimit, listener, language))
+            cur.execute("INSERT INTO agents (name, session_id, delay, jitter, external_ip, session_key, nonce, checkin_time, lastseen_time, profile, kill_date, working_hours, lost_limit, listener, language, agent_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (sessionID, sessionID, delay, jitter, externalIP, sessionKey, nonce, checkinTime, lastSeenTime, profile, killDate, workingHours, lostLimit, listener, language, agent_id))
             cur.execute("INSERT INTO reporting (name, event_type, message, time_stamp) VALUES (?,?,?,?)", (sessionID, "checkin", checkinTime, helpers.get_datetime()))
             cur.close()
 
@@ -1159,7 +1159,7 @@ class Agents:
     #
     ###############################################################
 
-    def handle_agent_staging(self, sessionID, language, meta, additional, encData, stagingKey, listenerOptions, clientIP='0.0.0.0'):
+    def handle_agent_staging(self, sessionID, language, meta, additional, encData, stagingKey, listenerOptions, clientIP='0.0.0.0', agent_id=''):
         """
         Handles agent staging/key-negotiation.
 
@@ -1209,7 +1209,7 @@ class Agents:
                         lostLimit = listenerOptions['DefaultLostLimit']['Value']
 
                         # add the agent to the database now that it's "checked in"
-                        self.mainMenu.agents.add_agent(sessionID, clientIP, delay, jitter, profile, killDate, workingHours, lostLimit, nonce=nonce, listener=listenerName)
+                        self.mainMenu.agents.add_agent(sessionID, clientIP, delay, jitter, profile, killDate, workingHours, lostLimit, nonce=nonce, listener=listenerName, agent_id=agent_id)
 
                         clientSessionKey = self.mainMenu.agents.get_agent_session_key_db(sessionID)
                         data = "%s%s" % (nonce, clientSessionKey)
@@ -1255,7 +1255,7 @@ class Agents:
                     lostLimit = listenerOptions['DefaultLostLimit']['Value']
 
                     # add the agent to the database now that it's "checked in"
-                    self.mainMenu.agents.add_agent(sessionID, clientIP, delay, jitter, profile, killDate, workingHours, lostLimit, sessionKey=serverPub.key, nonce=nonce, listener=listenerName)
+                    self.mainMenu.agents.add_agent(sessionID, clientIP, delay, jitter, profile, killDate, workingHours, lostLimit, sessionKey=serverPub.key, nonce=nonce, listener=listenerName, agent_id=agent_id)
 
                     # step 4 of negotiation -> server returns HMAC(AESn(nonce+PUBs))
                     data = "%s%s" % (nonce, serverPub.publicKey)
@@ -1349,7 +1349,7 @@ class Agents:
             dispatcher.send("[!] Invalid staging request packet from %s at %s : %s" % (sessionID, clientIP, meta), sender='Agents')
 
 
-    def handle_agent_data(self, stagingKey, routingPacket, listenerOptions, clientIP='0.0.0.0'):
+    def handle_agent_data(self, stagingKey, routingPacket, listenerOptions, clientIP='0.0.0.0', agent_id=''):
         """
         Take the routing packet w/ raw encrypted data from an agent and
         process as appropriately.
@@ -1373,7 +1373,7 @@ class Agents:
 
             if meta == 'STAGE0' or meta == 'STAGE1' or meta == 'STAGE2':
                 dispatcher.send("[*] handle_agent_data(): sessionID %s issued a %s request" % (sessionID, meta), sender='Agents')
-                dataToReturn.append((language, self.handle_agent_staging(sessionID, language, meta, additional, encData, stagingKey, listenerOptions, clientIP)))
+                dataToReturn.append((language, self.handle_agent_staging(sessionID, language, meta, additional, encData, stagingKey, listenerOptions, clientIP, agent_id=agent_id)))
 
             elif sessionID not in self.agents:
                 dispatcher.send("[!] handle_agent_data(): sessionID %s not present" % (sessionID), sender='Agents')

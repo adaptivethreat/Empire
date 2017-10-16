@@ -103,6 +103,7 @@ c.execute('''CREATE TABLE "agents" (
     "name" text,
     "language" text,
     "language_version" text,
+    "agent_id" text,
     "delay" integer,
     "jitter" real,
     "external_ip" text,
