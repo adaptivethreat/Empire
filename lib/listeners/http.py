@@ -494,7 +494,7 @@ class Listener:
                         randomizedStager += line
 
             if obfuscate:
-                randomizedStager = helpers.obfuscate(randomizedStager, obfuscationCommand=obfuscationCommand)
+                randomizedStager = helpers.obfuscate(self.mainMenu.installPath, randomizedStager, obfuscationCommand=obfuscationCommand)
             # base64 encode the stager and return it
             if encode:
                 return helpers.enc_powershell(randomizedStager)
