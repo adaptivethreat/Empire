@@ -1,0 +1,17 @@
+version: "3"
+services:
+  empire:
+    container_name: empire
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: frohoff/empire
+    network_mode: host
+    tty: true
+    stdin_open: true
+    volumes:
+      - ./downloads:/opt/empire/downloads
+      #- ./empire:/opt/empire/empire
+      #- ./lib:/opt/empire/lib
+      #- ./data/module_source:/opt/empire/data/module_source
+

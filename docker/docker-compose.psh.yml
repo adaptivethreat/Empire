@@ -1,0 +1,7 @@
+version: "3"
+services:
+  powershell:
+    image: microsoft/powershell
+    container_name: psh
+    tty: true
+    stdin_open: true
