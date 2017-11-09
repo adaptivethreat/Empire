@@ -55,14 +55,9 @@ for name, ID in ADDITIONAL.items(): ADDITIONAL_IDS[ID] = name
 
 # If a secure random number generator is unavailable, exit with an error.
 try:
-    try:
-        import ssl
-        random_function = ssl.RAND_bytes
-        random_provider = "Python SSL"
-    except (AttributeError, ImportError):
-        import OpenSSL
-        random_function = OpenSSL.rand.bytes
-        random_provider = "OpenSSL"
+    import ssl
+    random_function = ssl.RAND_bytes
+    random_provider = "Python SSL"
 except:
     random_function = os.urandom
     random_provider = "os.urandom"

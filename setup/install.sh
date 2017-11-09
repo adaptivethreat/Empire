@@ -27,7 +27,7 @@ if lsb_release -d | grep -q "Fedora"; then
 	pip install flask
 	pip install macholib
 	pip install dropbox
-	pip install 'pyopenssl==17.2.0'
+	pip install pyopenssl
 	pip install pyinstaller
 	pip install zlib_wrapper
 	pip install netifaces
@@ -44,7 +44,7 @@ elif lsb_release -d | grep -q "Kali"; then
 	pip install flask
 	pip install macholib
 	pip install dropbox
-	pip install 'pyopenssl==17.2.0'
+	pip install pyopenssl
 	pip install pyinstaller
 	pip install zlib_wrapper
 	pip install netifaces
@@ -85,7 +85,7 @@ elif lsb_release -d | grep -q "Ubuntu"; then
 	pip install pyOpenSSL
 	pip install macholib
 	pip install dropbox
-	pip install 'pyopenssl==17.2.0'
+	pip install pyopenssl
 	pip install pyinstaller
 	pip install zlib_wrapper
 	pip install netifaces
@@ -115,7 +115,7 @@ else
 	 pip install dropbox
 	 pip install cryptography
 	 pip install pyOpenSSL
-	 pip install 'pyopenssl==17.2.0'
+	 pip install pyopenssl
 	 pip install zlib_wrapper
 	 pip install netifaces
 	 pip install M2Crypto

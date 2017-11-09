@@ -22,6 +22,7 @@ Includes:
 import base64
 import hashlib
 import hmac
+import os
 import string
 import M2Crypto
 
@@ -57,11 +58,9 @@ try:
     import ssl
     random_function = ssl.RAND_bytes
     random_provider = "Python SSL"
-except (AttributeError, ImportError):
-    import OpenSSL
-    random_function = OpenSSL.rand.bytes
-    random_provider = "OpenSSL"
-
+except:
+    random_function = os.urandom
+    random_provider = "os.urandom"
 
 def pad(data):
     """
@@ -285,7 +284,7 @@ class DiffieHellman(object):
                 _rand = int.from_bytes(random_function(_bytes), byteorder='big')
             except:
                 # Python 2
-                _rand = int(OpenSSL.rand.bytes(_bytes).encode('hex'), 16)
+                _rand = int(random_function(_bytes).encode('hex'), 16)
 
         return _rand
 
