@@ -40,6 +40,7 @@
 	- Fix Better powershell install, obfuscation bug fixes, fixed vbs/macro launchers #686 @cobbr
 	- Fix creds manual add parsing with whitespace in password
 	- Fix validate length parameter attribute for Invoke-PSInject.ps1d
+	- Generate Stager bashrc And Automatic implementation of to Stager Via Drop the file in File Home in System The Target @homjxi0e
 
 8/28/2017
 --------
