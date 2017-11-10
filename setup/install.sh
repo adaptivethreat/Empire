@@ -12,13 +12,16 @@ then
     cd ./setup
 fi
 
-wget https://bootstrap.pypa.io/get-pip.py
-python get-pip.py
+if [[ ! -f get-pip.py ]] 
+then
+   wget https://bootstrap.pypa.io/get-pip.py
+   python get-pip.py
+fi
 
 version=$( lsb_release -r | grep -oP "[0-9]+" | head -1 )
 if lsb_release -d | grep -q "Fedora"; then
 	Release=Fedora
-	dnf install -y make g++ python-devel m2crypto python-m2ext swig python-iptools python3-iptools libxml2-devel default-jdk openssl-devel libssl1.0.0 libssl-dev
+	dnf install -y make g++ python-devel m2crypto python-m2ext swig python-iptools python3-iptools libxml2-devel default-jdk openssl-devel libssl1.0-dev
 	pip install --upgrade urllib3
 	pip install setuptools
 	pip install pycrypto
@@ -33,9 +36,12 @@ if lsb_release -d | grep -q "Fedora"; then
 	pip install netifaces
 elif lsb_release -d | grep -q "Kali"; then
 	Release=Kali
+    if ! grep "deb http://security.debian.org/debian-security wheezy/updates main" /etc/apt/sources.list; then
+      echo "deb http://security.debian.org/debian-security wheezy/updates main" >> /etc/apt/sources.list
+    fi
     echo "deb http://security.debian.org/debian-security wheezy/updates main" >> /etc/apt/sources.list
     apt-get update
-	apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk libssl1.0.0 libssl-dev
+	apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk libssl1.0-dev
 	pip install --upgrade urllib3
 	pip install setuptools
 	pip install pycrypto
@@ -51,18 +57,12 @@ elif lsb_release -d | grep -q "Kali"; then
         if ! which powershell > /dev/null; then
             if uname -a | grep -q amd64; then
                 wget http://archive.ubuntu.com/ubuntu/pool/main/i/icu/libicu52_52.1-3_amd64.deb
-                wget http://ftp.debian.org/debian/pool/main/o/openssl/libssl1.0.0_1.0.1t-1+deb8u6_amd64.deb
                 dpkg -i libicu52_52.1-3_amd64.deb
-                dpkg -i libssl1.0.0_1.0.1t-1+deb8u6_amd64.deb
                 rm libicu52_52.1-3_amd64.deb
-                rm libssl1.0.0_1.0.1t-1+deb8u6_amd64.deb
             elif uname -a | grep -q i386; then
                 wget http://archive.ubuntu.com/ubuntu/pool/main/i/icu/libicu52_52.1-3_i386.deb
-                wget http://ftp.debian.org/debian/pool/main/o/openssl/libssl1.0.0_1.0.1t-1+deb8u6_i386.deb
                 dpkg -i libicu52_52.1-3_i386.deb
-                dpkg -i libssl1.0.0_1.0.1t-1+deb8u6_i386.deb
                 rm libicu52_52.1-3_i386.deb
-                rm libssl1.0.0_1.0.1t-1+deb8u6_i386.deb
             fi
             curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
             curl https://packages.microsoft.com/config/ubuntu/14.04/prod.list | sudo tee /etc/apt/sources.list.d/microsoft.list
@@ -75,7 +75,7 @@ elif lsb_release -d | grep -q "Kali"; then
         cp -r ../lib/powershell/Invoke-Obfuscation /usr/local/share/powershell/Modules
 elif lsb_release -d | grep -q "Ubuntu"; then
 	Release=Ubuntu
-	apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk libssl1.0.0 libssl-dev
+	apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk libssl1.0-dev
 	pip install --upgrade urllib3
 	pip install setuptools
 	pip install pycrypto
@@ -104,7 +104,7 @@ elif lsb_release -d | grep -q "Ubuntu"; then
         cp -r ../lib/powershell/Invoke-Obfuscation /usr/local/share/powershell/Modules
 else
 	echo "Unknown distro - Debian/Ubuntu Fallback"
-	 apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk libffi-dev libssl1.0.0 libssl-dev
+	 apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk libffi-dev libssl1.0-dev
 	 pip install --upgrade urllib3
 	 pip install setuptools
 	 pip install pycrypto
@@ -123,18 +123,12 @@ else
             if lsb_release -d | grep -q Debian | grep 9; then
               if uname -a | grep -q amd64; then
                   wget http://archive.ubuntu.com/ubuntu/pool/main/i/icu/libicu52_52.1-3_amd64.deb
-                  wget http://ftp.debian.org/debian/pool/main/o/openssl/libssl1.0.0_1.0.1t-1+deb8u6_amd64.deb
                   dpkg -i libicu52_52.1-3_amd64.deb
-                  dpkg -i libssl1.0.0_1.0.1t-1+deb8u6_amd64.deb
                   rm libicu52_52.1-3_amd64.deb
-                  rm libssl1.0.0_1.0.1t-1+deb8u6_amd64.deb
               elif uname -a | grep -q i386; then
                   wget http://archive.ubuntu.com/ubuntu/pool/main/i/icu/libicu52_52.1-3_i386.deb
-                  wget http://ftp.debian.org/debian/pool/main/o/openssl/libssl1.0.0_1.0.1t-1+deb8u6_i386.deb
                   dpkg -i libicu52_52.1-3_i386.deb
-                  dpkg -i libssl1.0.0_1.0.1t-1+deb8u6_i386.deb
                   rm libicu52_52.1-3_i386.deb
-                  rm libssl1.0.0_1.0.1t-1+deb8u6_i386.deb
               fi
             fi
             curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
