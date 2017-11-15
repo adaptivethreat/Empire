@@ -21,7 +21,7 @@ fi
 version=$( lsb_release -r | grep -oP "[0-9]+" | head -1 )
 if lsb_release -d | grep -q "Fedora"; then
 	Release=Fedora
-	dnf install -y make g++ python-devel m2crypto python-m2ext swig python-iptools python3-iptools libxml2-devel default-jdk openssl-devel libssl1.0.0 libssl-dev gcc-mingw-w64-i686 osslsigncode
+	dnf install -y make g++ python-devel m2crypto python-m2ext swig python-iptools python3-iptools libxml2-devel default-jdk openssl-devel libssl1.0.0 libssl-dev mingw32-gcc osslsigncode
 	pip install --upgrade urllib3
 	pip install setuptools
 	pip install pycrypto
