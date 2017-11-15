@@ -21,7 +21,7 @@ fi
 version=$( lsb_release -r | grep -oP "[0-9]+" | head -1 )
 if lsb_release -d | grep -q "Fedora"; then
 	Release=Fedora
-	dnf install -y make g++ python-devel m2crypto python-m2ext swig python-iptools python3-iptools libxml2-devel default-jdk openssl-devel libssl1.0.0 libssl-dev
+	dnf install -y make g++ python-devel m2crypto python-m2ext swig python-iptools python3-iptools libxml2-devel default-jdk openssl-devel libssl1.0.0 libssl-dev gcc-mingw-w64-i686
 	pip install --upgrade urllib3
 	pip install setuptools
 	pip install pycrypto
@@ -40,7 +40,7 @@ elif lsb_release -d | grep -q "Kali"; then
       echo "deb http://security.debian.org/debian-security wheezy/updates main" >> /etc/apt/sources.list
     fi
     apt-get update
-	apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk libssl1.0.0 libssl-dev
+	apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk libssl1.0.0 libssl-dev gcc-mingw-w64-i686
 	pip install --upgrade urllib3
 	pip install setuptools
 	pip install pycrypto
@@ -80,7 +80,7 @@ elif lsb_release -d | grep -q "Kali"; then
         cp -r ../lib/powershell/Invoke-Obfuscation /usr/local/share/powershell/Modules
 elif lsb_release -d | grep -q "Ubuntu"; then
 	Release=Ubuntu
-	apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk libssl1.0.0 libssl-dev
+	apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk libssl1.0.0 libssl-dev gcc-mingw-w64-i686
 	pip install --upgrade urllib3
 	pip install setuptools
 	pip install pycrypto
@@ -109,7 +109,7 @@ elif lsb_release -d | grep -q "Ubuntu"; then
         cp -r ../lib/powershell/Invoke-Obfuscation /usr/local/share/powershell/Modules
 else
 	echo "Unknown distro - Debian/Ubuntu Fallback"
-	 apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk libffi-dev libssl1.0.0 libssl-dev
+	 apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk libffi-dev libssl1.0.0 libssl-dev gcc-mingw-w64-i686
 	 pip install --upgrade urllib3
 	 pip install setuptools
 	 pip install pycrypto
