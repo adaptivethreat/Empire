@@ -97,7 +97,7 @@ class Module:
         userName = self.options['UserName']['Value']
         password = self.options['Password']['Value']
 
-        script = """Invoke-Command """
+        script = """Invoke-Command -AsJob """
 
         # if a credential ID is specified, try to parse
         credID = self.options["CredID"]['Value']
