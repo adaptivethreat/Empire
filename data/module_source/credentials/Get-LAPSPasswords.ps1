@@ -136,10 +136,9 @@ function Get-LAPSPasswords
                 # Add domain computer to data table
                 $TableAdsComputers.Rows.Add($CurrentHost,$PasswordStored,$PasswordAvailable,$CurrentPassword, $CurrentExpiration) | Out-Null
             }
-
-            # Display results
-            $TableAdsComputers | Sort-Object {$_.Hostname} -Descending
          }
+        # Display results
+        $TableAdsComputers | Sort-Object {$_.Hostname} -Descending
     }
     End
     {
