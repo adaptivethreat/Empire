@@ -56,6 +56,7 @@ from Crypto.Random import random
 import subprocess
 import fnmatch
 import urllib, urllib2
+import hashlib
 
 ###############################################################
 #
