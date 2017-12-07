@@ -788,7 +788,7 @@ class MainMenu(cmd.Cmd):
             if obfuscate_all:
                 files = [file for file in helpers.get_module_source_files()]
             else:
-                files = [self.installPath + 'data/module_source/' + module]
+                files = ['data/module_source/' + module]
             for file in files:
                 file = self.installPath + file
                 if reobfuscate or not helpers.is_obfuscated(file):
