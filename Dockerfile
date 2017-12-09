@@ -2,59 +2,39 @@
 #       else use `docker pull empireproject\empire:{VERSION}`
 #       all image versions can be found at: https://hub.docker.com/r/empireproject/empire/
 
-# -----BUILD COMMANDS----
+# BUILD COMMANDS :
 # 1) build command: `docker build -t empireproject/empire .`
 # 2) create volume storage: `docker create -v /opt/Empire --name data empireproject/empire`
 # 3) run out container: `docker run -ti --volumes-from data empireproject/empire /bin/bash`
 
-# -----RELEASE COMMANDS----
-# 1) `USERNAME=empireproject`
-# 2) `IMAGE=empire`
-# 3) `git pull`
-# 4) `export VERSION="$(curl -s https://raw.githubusercontent.com/EmpireProject/Empire/master/lib/common/empire.py | grep "VERSION =" | cut -d '"' -f2)"`
-# 5) `docker tag $USERNAME/$IMAGE:latest $USERNAME/$IMAGE:$VERSION`
-# 1) `docker push $USERNAME/$IMAGE:latest`
-# 2) `docker push $USERNAME/$IMAGE:$VERSION`
+FROM debian:stretch
 
-# -----BUILD ENTRY-----
+MAINTAINER EmpireProject
 
-# image base
-FROM ubuntu:16.04
+ENV DEBIAN_FRONTEND noninteractive
+ENV EMPIRE_VERSION 2.3
+ENV STAGING_KEY RANDOM
 
-# author
-MAINTAINER Killswitch-GUI
+RUN apt update -qq && apt-get install -qy \
+		apt-transport-https \
+    wget \
+    lsb-release \
+    python2.7 \
+    python-pip \
+    python-m2crypto \
+    sudo \
+  && wget -nv https://github.com/EmpireProject/Empire/archive/$EMPIRE_VERSION.tar.gz --output-document /empire.tar.gz \
+  && mkdir -p /empire \
+  && tar zxf empire.tar.gz -C /empire --strip-components=1 \
+  && cd /empire/setup/ && ./install.sh \
+  && chmod +x /empire/empire \
+  && rm /empire.tar.gz \
+  && apt autoremove -y \
+    apt-transport-https \
+    build-essential \
+    git \
+    wget \
+  && rm -rf /var/lib/apt/lists/*
 
-# extra metadata
-LABEL version="1.0"
-LABEL description="Dockerfile base for Empire server."
-
-# expose ports for Empire C2 listerners
-# EXPOSE 80,443
-
-# update repo sources
-RUN apt-get clean
-RUN apt-get update
-
-# build depends
-RUN apt-get install -qy apt-utils
-RUN apt-get install -qy git
-RUN apt-get install -qy wget
-RUN apt-get install -qy curl
-RUN apt-get install -qy sudo
-RUN apt-get install -qy lsb-core
-RUN apt-get install -qy python2.7
-RUN apt-get install -qy python-pip
-
-# cleanup image
-RUN apt-get -qy autoremove
-
-# build empire
-RUN git clone https://github.com/EmpireProject/Empire.git /opt/Empire
-ENV STAGING_KEY=RANDOM
-RUN cd /opt/Empire/setup/ && ./install.sh
-
-# -----END OF BUILD-----
-
-
-
-
+WORKDIR /empire
+ENTRYPOINT ["./empire"]
