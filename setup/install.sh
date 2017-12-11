@@ -12,7 +12,13 @@ then
     cd ./setup
 fi
 
-wget https://bootstrap.pypa.io/get-pip.py
+if [ -f get-pip.py ]
+then
+       echo "[*] get-pip.py exists; ignoring re-download with wget" # get-pip.py last updated 06-Nov-2016 19:30
+else
+       wget https://bootstrap.pypa.io/get-pip.py
+fi
+
 python get-pip.py
 
 version=$( lsb_release -r | grep -oP "[0-9]+" | head -1 )
