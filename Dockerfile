@@ -9,7 +9,7 @@
 
 FROM debian:stretch
 
-MAINTAINER EmpireProject
+LABEL maintainer="EmpireProject"
 
 ENV DEBIAN_FRONTEND noninteractive
 ENV EMPIRE_VERSION 2.3
