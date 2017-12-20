@@ -12,29 +12,35 @@ FROM debian:stretch
 LABEL maintainer="EmpireProject"
 
 ENV DEBIAN_FRONTEND noninteractive
-ENV EMPIRE_VERSION 2.3
 ENV STAGING_KEY RANDOM
+ENV APP_HOME /usr/src/empire
+
+WORKDIR $APP_HOME
+
+COPY data $APP_HOME/data
+COPY lib $APP_HOME/lib
+COPY plugins $APP_HOME/plugins
+COPY setup $APP_HOME/setup
+COPY empire $APP_HOME/empire
 
 RUN apt update -qq && apt-get install -qy \
-		apt-transport-https \
-    wget \
     lsb-release \
-    python2.7 \
-    python-pip \
-    python-m2crypto \
-    sudo \
-  && wget -nv https://github.com/EmpireProject/Empire/archive/$EMPIRE_VERSION.tar.gz --output-document /empire.tar.gz \
-  && mkdir -p /empire \
-  && tar zxf empire.tar.gz -C /empire --strip-components=1 \
-  && cd /empire/setup/ && ./install.sh \
-  && chmod +x /empire/empire \
-  && rm /empire.tar.gz \
-  && apt autoremove -y \
-    apt-transport-https \
-    build-essential \
-    git \
-    wget \
-  && rm -rf /var/lib/apt/lists/*
+		python \
+		python-pip \
+		sudo \
+		wget \
+		curl \
+		git \
+		libcrypto++-dev \
+		libz-dev \
+		libxml2-dev \
+		libssl1.0-dev \
+    && cd setup/ && ./install.sh \
+    && chmod +x $APP_HOME/empire \
+    && apt autoremove -y \
+      git \
+  		curl \
+  		wget \
+    && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /empire
 ENTRYPOINT ["./empire"]
