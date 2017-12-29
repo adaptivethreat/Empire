@@ -563,9 +563,9 @@ Outputs a custom object containing the SamAccountName, ServicePrincipalName, and
             if ($TicketByteStream) {
                 $TicketHexStream = [System.BitConverter]::ToString($TicketByteStream) -replace '-'
                 $encType =  [Convert]::ToInt32(($TicketHexStream -replace ".*A0030201")[0..1] -join "", 16)
-                [System.Collections.ArrayList]$Parts = ($TicketHexStream -replace '^(.*?)04820...(.*)','$2') -Split 'A48201'
+                [System.Collections.ArrayList]$Parts = ($TicketHexStream -replace '^(.*?)04820...(.*)','$2') -Split 'A4820.'
                 $Parts.RemoveAt($Parts.Count - 1)
-                $Hash = $Parts -join 'A48201'
+                $Hash = $Parts -join 'A4820.'
                 $Hash = $Hash.Insert(32, '$')
 
                 $Out = New-Object PSObject
