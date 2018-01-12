@@ -864,26 +864,16 @@ def start_restful_api(empireMenu, suppress=False, username=None, password=None, 
         for agentNameID in agentNameIDs:
             [agentName, agentSessionID] = agentNameID
 
-            agentResults = execute_db_query(conn, "SELECT results FROM agents WHERE session_id=?", [agentSessionID])
-            taskIDs = execute_db_query(conn, "SELECT id from taskings where agent=?", [agentSessionID])
+            agentResults = execute_db_query(conn, "SELECT results.id,taskings.data AS command,results.data AS response FROM results INNER JOIN taskings ON results.id = taskings.id AND results.agent = taskings.agent where results.agent=?;", [agentSessionID])
 
-            if agentResults[0][0] and len(agentResults[0][0]) > 0:
-                try:
-                    agentResults = ast.literal_eval(agentResults[0][0])
-                except ValueError:
-                    break
+            results = []
+            if len(agentResults) > 0:
+                for taskID, command, result in agentResults:
+                    results.append({'taskID': taskID, 'command': command, 'results': result})
 
-                results = []
-                if len(agentResults) > 0:
-                    job_outputs = [x.strip() for x in agentResults if not x.startswith('Job')]
-
-                    for taskID, result in zip(taskIDs, job_outputs):
-                        if not (len(result.split('\n')) == 1 and result.endswith('completed!')):
-                            results.append({'taskID': taskID[0], 'results': result})
-                        else:
-                            results.append({'taskID': taskID[0], 'results': ''})
-
-                    agentTaskResults.append({"AgentName": agentSessionID, "AgentResults": results})
+                agentTaskResults.append({"AgentName": agentSessionID, "AgentResults": results})
+            else:
+                agentTaskResults.append({"AgentName": agentSessionID, "AgentResults": []})
 
         return jsonify({'results': agentTaskResults})
 
