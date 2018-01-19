@@ -115,9 +115,16 @@ if ! which pip > /dev/null; then
 	python get-pip.py
 fi
 
+# Detect if we're in a virtualenv
+if python -c 'import sys; print sys.real_prefix' 2>/dev/null; then
+	pip_cmd="pip"
+else
+	pip_cmd="sudo pip"
+fi
+
 if uname | grep -q "Darwin"; then
 	install_powershell
-	sudo pip install -r requirements.txt --global-option=build_ext \
+	$pip_cmd install -r requirements.txt --global-option=build_ext \
 		--global-option="-L/usr/local/opt/openssl/lib" \
 		--global-option="-I/usr/local/opt/openssl/include"
 	# In order to build dependencies these should be exproted. 
@@ -129,25 +136,25 @@ else
 	if lsb_release -d | grep -q "Fedora"; then
 		Release=Fedora
 		sudo dnf install -y make g++ python-devel m2crypto python-m2ext swig python-iptools python3-iptools libxml2-devel default-jdk openssl-devel libssl1.0.0 libssl-dev build-essential
-		pip install --upgrade pip
-		sudo pip install -r requirements.txt 
+		$pip_cmd install --upgrade pip
+		$pip_cmd install -r requirements.txt 
 	elif lsb_release -d | grep -q "Kali"; then
 		Release=Kali
 		sudo apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk libssl1.0.0 libssl-dev build-essential
-		pip install --upgrade pip
-		sudo pip install -r requirements.txt 
+		$pip_cmd install --upgrade pip
+		$pip_cmd install -r requirements.txt 
 		install_powershell
 	elif lsb_release -d | grep -q "Ubuntu"; then
 		Release=Ubuntu
 		sudo apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk libssl1.0.0 libssl-dev build-essential
-		pip install --upgrade pip
-		sudo pip install -r requirements.txt 
+		$pip_cmd install --upgrade pip
+		$pip_cmd install -r requirements.txt 
 		install_powershell
 	else
 		echo "Unknown distro - Debian/Ubuntu Fallback"
 		sudo apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk libffi-dev libssl1.0.0 libssl-dev build-essential
-		pip install --upgrade pip
-		sudo pip install -r requirements.txt 
+		$pip_cmd install --upgrade pip
+		$pip_cmd install -r requirements.txt 
 		install_powershell
 	fi
 fi
