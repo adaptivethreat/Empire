@@ -85,10 +85,12 @@ function install_powershell() {
 		if cat /etc/lsb-release | grep -i 'Kali'; then
 			# Install prerequisites
 			apt-get install libunwind8 libicu55
-			wget http://security.debian.org/debian-security/pool/updates/main/o/openssl/libssl1.0.0_1.0.1t-1+deb8u6_amd64.deb
-			dpkg -i libssl1.0.0_1.0.1t-1+deb8u6_amd64.deb
+			wget http://security.debian.org/debian-security/pool/updates/main/o/openssl/libssl1.0.0_1.0.1t-1+deb8u7_amd64.deb
+			dpkg -i libssl1.0.0_1.0.1t-1+deb8u7_amd64.deb
 			# Install PowerShell
-			dpkg -i powershell_6.0.0-rc.2-1.ubuntu.16.04_amd64.deb
+			wget https://github.com/PowerShell/PowerShell/releases/download/v6.0.0/powershell_6.0.0-1.ubuntu.16.04_amd64.deb
+			dpkg -i powershell_6.0.0-1.ubuntu.16.04_amd64.deb
+			
        		fi
 	 fi
         if ls /opt/microsoft/powershell/*/DELETE_ME_TO_DISABLE_CONSOLEHOST_TELEMETRY; then
@@ -133,7 +135,9 @@ else
 		sudo pip install -r requirements.txt 
 	elif lsb_release -d | grep -q "Kali"; then
 		Release=Kali
-		sudo apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk libssl1.0.0 libssl-dev build-essential
+		wget http://ftp.us.debian.org/debian/pool/main/o/openssl/libssl1.0.0_1.0.1t-1+deb8u7_amd64.deb
+		dpkg -i libssl1.0.0_1.0.1t-1+deb8u7_amd64.deb
+		sudo apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk zlib1g-dev libssl1.0-dev build-essential
 		pip install --upgrade pip
 		sudo pip install -r requirements.txt 
 		install_powershell

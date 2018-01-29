@@ -127,6 +127,7 @@ c.execute('''CREATE TABLE "listeners" (
     "module" text,
     "listener_type" text,
     "listener_category" text,
+    "enabled" boolean,
     "options" blob
     )''')
 

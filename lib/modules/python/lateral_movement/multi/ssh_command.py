@@ -14,7 +14,7 @@ class Module:
             'Description': 'This module will send a command via ssh.',
 
             # True if the module needs to run in the background
-            'Background' : False,
+            'Background' : True,
 
             # File extension to save the file as
             'OutputExtension' : "",
@@ -107,7 +107,7 @@ def wall(host, pw):
     while True:
         try:
             data = os.read(fd, 1024)
-            if data == "Password:":
+            if data[:8] == "Password" and data[-1:] == ":":
                 os.write(fd, pw + '\\n')
 
         except OSError:

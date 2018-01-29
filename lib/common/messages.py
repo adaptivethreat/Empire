@@ -220,14 +220,14 @@ def display_agent(agent, returnAsString=False):
         print ''
 
 
-def display_active_listeners(listeners):
+def display_listeners(listeners, type = "Active"):
     """
     Take an active listeners list and display everything nicely.
     """
 
     if len(listeners) > 0:
         print ''
-        print helpers.color("[*] Active listeners:\n")
+        print helpers.color("[*] %s listeners:\n" % type)
 
         print "  Name              Module          Host                                 Delay/Jitter   KillDate"
         print "  ----              ------          ----                                 ------------   --------"
@@ -265,7 +265,8 @@ def display_active_listeners(listeners):
         print ''
 
     else:
-        print helpers.color("[!] No listeners currently active ")
+        if(type.lower() != "inactive"):
+            print helpers.color("[!] No listeners currently %s " % type.lower())
 
 
 def display_active_listener(listener):

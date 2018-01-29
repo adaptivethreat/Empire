@@ -87,11 +87,12 @@ def get_permanent_token(conn):
     """
 
     permanentToken = execute_db_query(conn, "SELECT api_permanent_token FROM config")[0]
-    if not permanentToken[0]:
+    permanentToken = permanentToken[0]
+    if not permanentToken:
         permanentToken = ''.join(random.choice(string.ascii_lowercase + string.digits) for x in range(40))
         execute_db_query(conn, "UPDATE config SET api_permanent_token=?", [permanentToken])
 
-    return permanentToken[0]
+    return permanentToken
 
 
 ####################################################################
@@ -223,6 +224,11 @@ def start_restful_api(empireMenu, suppress=False, username=None, password=None, 
                 return make_response('', 401)
             if (token != apiToken) and (token != permanentApiToken):
                 return make_response('', 401)
+
+    @app.after_request
+    def add_cors(response):
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        return response
 
 
     @app.errorhandler(Exception)

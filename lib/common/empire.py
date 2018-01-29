@@ -155,7 +155,9 @@ class MainMenu(cmd.Cmd):
             # if we're displaying listeners/stagers or generating a stager
             if self.args.listener:
                 if self.args.listener == 'list':
-                    messages.display_active_listeners(self.listeners.activeListeners)
+                    messages.display_listeners(self.listeners.activeListeners)
+                    messages.display_listeners(self.listeners.get_inactive_listeners(), "Inactive")
+
                 else:
                     activeListeners = self.listeners.activeListeners
                     targetListener = [l for l in activeListeners if self.args.listener in l[1]]
@@ -783,7 +785,8 @@ class MainMenu(cmd.Cmd):
 
 
         elif parts[0].lower() == 'listeners':
-            messages.display_active_listeners(self.listeners.activeListeners)
+            messages.display_listeners(self.listeners.activeListeners)
+            messages.display_listeners(self.listeners.get_inactive_listeners(), "Inactive")
 
 
     def do_interact(self, line):
@@ -2912,7 +2915,8 @@ class ListenersMenu(SubMenu):
         self.prompt = '(Empire: ' + helpers.color('listeners', color='blue') + ') > '
 
         # display all active listeners on menu startup
-        messages.display_active_listeners(self.mainMenu.listeners.activeListeners)
+        messages.display_listeners(self.mainMenu.listeners.activeListeners)
+        messages.display_listeners(self.mainMenu.listeners.get_inactive_listeners(), "Inactive")
 
     def do_back(self, line):
         "Go back to the main menu."
@@ -2945,6 +2949,21 @@ class ListenersMenu(SubMenu):
         else:
             self.mainMenu.listeners.kill_listener(listenerID)
 
+    def do_delete(self, line):
+        "Delete listener(s) from the database"
+
+        listener_id = line.strip()
+
+        if listener_id.lower() == "all":
+            try:
+                choice = raw_input(helpers.color("[>] Delete all listeners? [y/N] ", "red"))
+                if choice.lower() != '' and choice.lower()[0] == 'y':
+                    self.mainMenu.listeners.delete_listener("all")
+            except KeyboardInterrupt:
+                print ''
+
+        else:
+            self.mainMenu.listeners.delete_listener(listener_id)
 
     def do_usestager(self, line):
         "Use an Empire stager."
@@ -3027,6 +3046,52 @@ class ListenersMenu(SubMenu):
         else:
             print helpers.color("[!] Please enter a valid listenerName")
 
+    def do_enable(self, line):
+        "Enables and starts one or all listners."
+
+        listenerID = line.strip()
+
+        if listenerID == '':
+            print helpers.color("[!] Please provide a listener name")
+        elif listenerID.lower() == 'all':
+            try:
+                choice = raw_input(helpers.color('[>] Start all listeners? [y/N] ', 'red'))
+                if choice.lower() != '' and choice.lower()[0] == 'y':
+                    self.mainMenu.listeners.enable_listener('all')
+            except KeyboardInterrupt:
+                print ''
+
+        else:
+            self.mainMenu.listeners.enable_listener(listenerID)
+
+    def do_disable(self, line):
+        "Disables (stops) one or all listeners. The listener(s) will not start automatically with Empire"
+
+        listenerID = line.strip()
+
+        if listenerID.lower() == 'all':
+            try:
+                choice = raw_input(helpers.color('[>] Stop all listeners? [y/N] ', 'red'))
+                if choice.lower() != '' and choice.lower()[0] == 'y':
+                    self.mainMenu.listeners.shutdown_listener('all')
+            except KeyboardInterrupt:
+                print ''
+
+        else:
+            self.mainMenu.listeners.disable_listener(listenerID)
+
+    def do_edit(self,line):
+        "Change a listener option, will not take effect until the listener is restarted"
+
+        arguments = line.strip().split(" ")
+        if len(arguments) < 2:
+            print helpers.color("[!] edit <listener name> <option name> <option value> (leave value blank to unset)")
+            return
+        if len(arguments) == 2:
+            arguments.append("")
+        self.mainMenu.listeners.update_listener_options(arguments[0], arguments[1], arguments[2])
+        if arguments[0] in self.activeListeners.keys():
+            print helpers.color("[*] This change will not take effect until the listener is restarted")
 
     def complete_usestager(self, text, line, begidx, endidx):
         "Tab-complete an Empire stager module path."
@@ -3042,6 +3107,30 @@ class ListenersMenu(SubMenu):
         offs = len(mline) - len(text)
         return [s[offs:] for s in names if s.startswith(mline)]
 
+    def complete_enable(self, text, line, begidx, endidx):
+        # tab complete for inactive listener names
+
+        inactive = self.mainMenu.listeners.get_inactive_listeners()
+        names = inactive.keys()
+        mline = line.partition(' ')[2]
+        offs = len(mline) - len(text)
+        return [s[offs:] for s in names if s.startswith(mline)]
+
+    def complete_disable(self, text, line, begidx, endidx):
+        # tab complete for listener names
+        # get all the listener names
+        names = self.mainMenu.listeners.activeListeners.keys() + ["all"]
+        mline = line.partition(' ')[2]
+        offs = len(mline) - len(text)
+        return [s[offs:] for s in names if s.startswith(mline)]
+
+    def complete_delete(self, text, line, begidx, endidx):
+        # tab complete for listener names
+        # get all the listener names
+        names = self.mainMenu.listeners.activeListeners.keys() + ["all"]
+        mline = line.partition(' ')[2]
+        offs = len(mline) - len(text)
+        return [s[offs:] for s in names if s.startswith(mline)]
 
     def complete_launcher(self, text, line, begidx, endidx):
         "Tab-complete language types and listener names/IDs"
