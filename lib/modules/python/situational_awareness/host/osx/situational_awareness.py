@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 class Module:
     def __init__(self, mainMenu, params=[]):
         # metadata info about the module, not modified during runtime
@@ -75,7 +75,7 @@ class Module:
                 if option in self.options:
                     self.options[option]['Value'] = value
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         script = ''
         if self.options['Debug']['Value']:
             debug = self.options['Debug']['Value']

@@ -5,7 +5,7 @@ class Module:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Invoke-ProcessHunter',
+            'Name': 'Find-DomainProcess',
 
             'Author': ['@harmj0y'],
 
@@ -42,8 +42,38 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'ComputerFilter' : {
+            'ComputerDomain' : {
+                'Description'   :   'Specifies the domain to query for computers, defaults to the current domain.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'ComputerLDAPFilter' : {
                 'Description'   :   'Host filter name to query AD for, wildcards accepted.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'ComputerSearchBase' : {
+                'Description'   :   'Specifies the LDAP source to search through for computers',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'ComputerUnconstrained' : {
+                'Description'   :   'Switch. Search computer objects that have unconstrained delegation.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'ComputerOperatingSystem' : {
+                'Description'   :   'Return computers with a specific operating system, wildcards accepted.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'ComputerServicePack' : {
+                'Description'   :   'Return computers with the specified service pack, wildcards accepted.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'ComputerSiteName' : {
+                'Description'   :   'Return computers in the specific AD Site name, wildcards accepted.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
@@ -52,33 +82,33 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'GroupName' : {
-                'Description'   :   'Group name to query for target users.',
+            'UserGroupIdentity' : {
+                'Description'   :   'Specifies a group identity to query for target users, defaults to "Domain Admins".',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'TargetServer' : {
-                'Description'   :   'Hunt for users who are effective local admins on a target server.',
+            'UserAdminCount' : {
+                'Description'   :   'Switch. Search for users with "(adminCount=1)" (meaning are/were privileged)',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'UserName' : {
-                'Description'   :   'Specific username to search for.',
+            'UserIdentity' : {
+                'Description'   :   'Specifies one or more user identities to search for.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'UserFilter' : {
+            'UserLDAPFilter' : {
                 'Description'   :   'A customized ldap filter string to use for user enumeration, e.g. "(description=*admin*)"',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'UserSearchBase' : {
+                'Description'   :   'Specifies the LDAP source to search through for target users.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
             'StopOnSuccess' : {
                 'Description'   :   'Switch. Stop hunting after finding after finding a target user.',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'NoPing' : {
-                'Description'   :   "Don't ping each host to ensure it's up before enumerating.",
                 'Required'      :   False,
                 'Value'         :   ''
             },
@@ -92,8 +122,33 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'DomainController' : {
-                'Description'   :   'Domain controller to reflect LDAP queries through.',
+            'Server' : {
+                'Description'   :   'Specifies an active directory server (domain controller) to bind to',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'SearchScope' : {
+                'Description'   :   'Specifies the scope to search under, Base/OneLevel/Subtree (default of Subtree)',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'ResultPageSize' : {
+                'Description'   :   'Specifies the PageSize to set for the LDAP searcher object.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'ServerTimeLimit' : {
+                'Description'   :   'Specifies the maximum amount of time the server spends searching. Default of 120 seconds.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'Tombstone' : {
+                'Description'   :   'Switch. Specifies that the search should also return deleted/tombstoned objects.',
+                'Required'      :   False,
+                'Value'         :   'False'
+            },
+            'Jitter' : {
+                'Description'   :   'Specifies the jitter (0-1.0) to apply to any specified -Delay, defaults to +/- 0.3.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
@@ -115,7 +170,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         moduleName = self.info["Name"]
         
@@ -146,5 +201,6 @@ class Module:
                         script += " -" + str(option) + " " + str(values['Value']) 
 
         script += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
-        
+        if obfuscate:
+            script = helpers.obfuscate(self.mainMenu.installPath, psScript=script, obfuscationCommand=obfuscationCommand)
         return script

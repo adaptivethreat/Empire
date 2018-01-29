@@ -1,7 +1,6 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
-import sqlite3, os, string, hashlib
-from Crypto.Random import random
+import sqlite3, os, string, hashlib, random
 
 
 ###################################################
@@ -30,21 +29,9 @@ if STAGING_KEY == "BLANK":
 elif STAGING_KEY == "RANDOM":
     STAGING_KEY = ''.join(random.sample(string.ascii_letters + string.digits + punctuation, 32))
 
-# os-dependable path delimiter (separator) 
-delimiter = os.path.sep
-
-# the installation path for Empire, defaults to auto-calculating it
-#   set manually if issues arise
-currentPath = os.path.dirname(os.path.realpath(__file__))
-empireIndex = currentPath.rfind("Empire")
-if empireIndex < 0:
-    empireIndex = currentPath.rfind("empire")
-if empireIndex < 0:
-    INSTALL_PATH = delimiter.join(os.getcwd().split(delimiter)[0:-1])+delimiter
-else:
-    endIndex = currentPath.find(delimiter, empireIndex)
-    endIndex = None if endIndex < 0 else endIndex
-    INSTALL_PATH = currentPath[0:endIndex] + delimiter
+# Calculate the install path. We know the project directory will always be the parent of the current directory. Any modifications of the folder structure will
+# need to be applied here.
+INSTALL_PATH = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + "/"
 
 # an IP white list to ONLY accept clients from
 #   format is "192.168.1.1,192.168.1.10-192.168.1.100,10.0.0.0/8"
@@ -61,14 +48,18 @@ API_PASSWORD = ''.join(random.sample(string.ascii_letters + string.digits + punc
 # the 'permanent' API token (doesn't change)
 API_PERMANENT_TOKEN = ''.join(random.choice(string.ascii_lowercase + string.digits) for x in range(40))
 
+# default obfuscation setting
+OBFUSCATE = 0
 
+# default obfuscation command
+OBFUSCATE_COMMAND = r'Token\All\1'
 ###################################################
 #
 # Database setup.
 #
 ###################################################
 
-conn = sqlite3.connect('../data/empire.db')
+conn = sqlite3.connect('%s/data/empire.db'%INSTALL_PATH)
 
 c = conn.cursor()
 
@@ -87,11 +78,13 @@ c.execute('''CREATE TABLE config (
     "api_username" text,
     "api_password" text,
     "api_current_token" text,
-    "api_permanent_token" text
+    "api_permanent_token" text,
+    "obfuscate" integer,
+    "obfuscate_command" text
     )''')
 
 # kick off the config component of the database
-c.execute("INSERT INTO config VALUES (?,?,?,?,?,?,?,?,?,?,?)", (STAGING_KEY, INSTALL_PATH, IP_WHITELIST, IP_BLACKLIST, '', '', False, API_USERNAME, API_PASSWORD, '', API_PERMANENT_TOKEN))
+c.execute("INSERT INTO config VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", (STAGING_KEY, INSTALL_PATH, IP_WHITELIST, IP_BLACKLIST, '', '', False, API_USERNAME, API_PASSWORD, '', API_PERMANENT_TOKEN, OBFUSCATE, OBFUSCATE_COMMAND))
 
 c.execute('''CREATE TABLE "agents" (
     "id" integer PRIMARY KEY,
@@ -137,7 +130,6 @@ c.execute('''CREATE TABLE "listeners" (
     "options" blob
     )''')
 
-
 # type = hash, plaintext, token
 #   for krbtgt, the domain SID is stored in misc
 #   for tokens, the data is base64'ed and stored in pass
@@ -152,7 +144,6 @@ c.execute('''CREATE TABLE "credentials" (
     "sid" text,
     "notes" text
     )''')
-
 
 c.execute( '''CREATE TABLE "taskings" (
     "id" integer,
@@ -176,8 +167,8 @@ c.execute('''CREATE TABLE "reporting" (
     "message" text,
     "time_stamp" text,
     "taskID" integer,
-    foreign key("taskID") references results(id)
-    )''')
+    FOREIGN KEY(taskID) REFERENCES results(id)
+)''')
 
 # commit the changes and close everything off
 conn.commit()

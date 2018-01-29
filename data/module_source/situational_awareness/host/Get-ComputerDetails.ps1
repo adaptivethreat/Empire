@@ -20,6 +20,10 @@ This script is used to get useful information from a computer. Currently, the sc
 -PowerShell logs to find PowerShell scripts which have been executed
 -RDP Client Saved Servers, which indicates what servers the user typically RDP's in to
 
+.PARAMETER Limit
+
+Limit the number of event log entries returned.
+
 .PARAMETER ToString
 
 Switch: Outputs the data as text instead of objects, good if you are using this script through a backdoor.
@@ -44,7 +48,10 @@ Github repo: https://github.com/clymb3r/PowerShell
 #>
 
     Param(
-        [Parameter(Position=0)]
+        [Parameter(Mandatory=$false)]
+        [int]$Limit,
+        
+        [Parameter(Mandatory=$false)]
         [Switch]
         $ToString
     )
@@ -52,8 +59,7 @@ Github repo: https://github.com/clymb3r/PowerShell
     Set-StrictMode -Version 2
 
 
-
-    $SecurityLog = Get-EventLog -LogName Security
+    $SecurityLog = Get-EventLog -LogName Security -Newest $Limit
     $Filtered4624 = Find-4624Logons $SecurityLog
     $Filtered4648 = Find-4648Logons $SecurityLog
     $AppLockerLogs = Find-AppLockerLogs

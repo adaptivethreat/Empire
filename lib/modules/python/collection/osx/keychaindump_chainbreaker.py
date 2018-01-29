@@ -82,7 +82,7 @@ class Module:
                 if option in self.options:
                     self.options[option]['Value'] = value
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         keyChain = self.options['KeyChain']['Value']
         password = self.options['Password']['Value']
@@ -1206,7 +1206,7 @@ def __profile__():
 
 
 
-#!/usr/bin/python
+#!/usr/bin/env python
 
 # A simple implementation of pbkdf2 using stock python modules. See RFC2898
 # for details. Basically, it derives a key from a password and salt.
@@ -1283,7 +1283,7 @@ def test():
 
 
 
-#!/usr/bin/python
+#!/usr/bin/env python
 
 # Author : n0fate
 # E-Mail rapfer@gmail.com, n0fate@n0fate.com

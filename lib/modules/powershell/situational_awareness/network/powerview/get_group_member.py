@@ -5,7 +5,7 @@ class Module:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Get-NetGroupMember',
+            'Name': 'Get-DomainGroupMember',
 
             'Author': ['@harmj0y'],
 
@@ -37,18 +37,8 @@ class Module:
                 'Required'      :   True,
                 'Value'         :   ''
             },
-            'GroupName' : {
-                'Description'   :   'The group name to query for users.',
-                'Required'      :   True,
-                'Value'         :   '"Domain Admins"'
-            },
-            'SID' : {
-                'Description'   :   'The Group SID to query for users.',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'Filter' : {
-                'Description'   :   'A customized ldap filter string to use, e.g. "(description=*admin*)"',
+            'Identity' : {
+                'Description'   :   'A SamAccountName, DistinguishedName, SID, GUID, or a dns host name, wildcards accepted.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
@@ -57,25 +47,55 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'DomainController' : {
-                'Description'   :   'Domain controller to reflect LDAP queries through.',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'FullData' : {
-                'Description'   :   'Return full group objects instead of just object names (the default).',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
             'Recurse' : {
                 'Description'   :   'Switch. If the group member is a group, recursively try to query its members as well.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'UseMatchingRule' : {
+            'RecurseUsingMatchingRule' : {
                 'Description'   :   'Switch. Use LDAP_MATCHING_RULE_IN_CHAIN in the LDAP search query when -Recurse is specified.',
                 'Required'      :   False,
                 'Value'         :   ''
+            },
+            'LDAPFilter' : {
+                'Description'   :   'Specifies an LDAP query string that is used to filter Active Directory objects.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'SearchBase' : {
+                'Description'   :   'The LDAP source to search through, e.g. "LDAP://OU=secret,DC=testlab,DC=local" Useful for OU queries.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'Server' : {
+                'Description'   :   'Specifies an active directory server (domain controller) to bind to',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'SearchScope' : {
+                'Description'   :   'Specifies the scope to search under, Base/OneLevel/Subtree (default of Subtree)',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'ResultPageSize' : {
+                'Description'   :   'Specifies the PageSize to set for the LDAP searcher object.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'ServerTimeLimit' : {
+                'Description'   :   'Specifies the maximum amount of time the server spends searching. Default of 120 seconds.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'SecurityMasks' : {
+                'Description'   :   'Specifies an option for examining security information of a directory object. One of "Dacl", "Group", "None", "Owner", "Sacl".',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'Tombstone' : {
+                'Description'   :   'Switch. Specifies that the search should also return deleted/tombstoned objects.',
+                'Required'      :   False,
+                'Value'         :   'False'
             }
         }
 
@@ -90,7 +110,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         moduleName = self.info["Name"]
         
@@ -121,5 +141,6 @@ class Module:
                         script += " -" + str(option) + " " + str(values['Value']) 
 
         script += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
-        
+        if obfuscate:
+            script = helpers.obfuscate(self.mainMenu.installPath, psScript=script, obfuscationCommand=obfuscationCommand)
         return script

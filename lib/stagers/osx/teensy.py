@@ -10,7 +10,7 @@ class Stager:
 
             'Author': ['Matt @matterpreter Hand'],
 
-            'Description': ('Generates a Teensy script that runs a one-liner stage0 launcher for EmPyre.'),
+            'Description': ('Generates a Teensy script that runs a one-liner stage0 launcher for Empire.'),
 
             'Comments': [
                 ''
@@ -116,7 +116,7 @@ class Stager:
             teensyCode += "    Keyboard.send_now();\n"
             teensyCode += "    clearKeys();\n"
             teensyCode += "}\n\n"
-            teensyCode += "void empyre(void) {\n"
+            teensyCode += "void empire(void) {\n"
             teensyCode += "    delay(500);\n"
             teensyCode += "    mac_minWindows();\n"
             teensyCode += "    mac_minWindows();\n"
@@ -132,7 +132,7 @@ class Stager:
             teensyCode += "    Keyboard.println(\"exit\");\n"
             teensyCode += "}\n\n"
             teensyCode += "void setup(void) {\n"
-            teensyCode += "    empyre();\n"
+            teensyCode += "    empire();\n"
             teensyCode += "}\n\n"
             teensyCode += "void loop() {}"
 

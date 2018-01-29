@@ -13,7 +13,7 @@ class Module:
             'Author': ['@xorrior'],
 
             # more verbose multi-line description of the module
-            'Description': ('Remove an EmPyre Launch Daemon.'),
+            'Description': ('Remove an Empire Launch Daemon.'),
 
             # True if the module needs to run in the background
             'Background' : False,
@@ -76,7 +76,7 @@ class Module:
                     self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         plistpath = self.options['PlistPath']['Value']
         programpath = self.options['ProgramPath']['Value']

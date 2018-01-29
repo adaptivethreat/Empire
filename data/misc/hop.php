@@ -11,6 +11,10 @@ function do_get_request($url, $optionalHeaders = null)
     'http' => array(
       'method' => 'GET'
     ),
+    'ssl'=>array(
+      "verify_peer"=>false,
+      "verify_peer_name"=>false,
+    ),
   );
   $headers = array('Hop-Name' => $hopName);
   if ($optionalHeaders !== null) {
@@ -25,10 +29,16 @@ function do_get_request($url, $optionalHeaders = null)
 function do_post_request($url, $data, $optionalHeaders = null)
 {
   global $hopName;
-  $params = array('http' => array(
-              'method' => 'POST',
-              'content' => $data
-            ));
+  $params = array(
+    'http' => array(
+      'method' => 'POST',
+      'content' => $data
+    ),
+    'ssl'=>array(
+      'verify_peer'=>false,
+      'verify_peer_name'=>false,
+    ),
+  );
   $headers = array('Hop-Name' => $hopName);
   if ($optionalHeaders !== null) {
     $headers['Cookie'] = $optionalHeaders;

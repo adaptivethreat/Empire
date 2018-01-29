@@ -71,7 +71,7 @@ class Module:
                     self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         # the Python script itself, with the command to invoke
         #   for execution appended to the end. Scripts should output

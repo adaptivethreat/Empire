@@ -8,12 +8,12 @@ Includes:
     depad()                     -   Performs PKCS#7 depadding
     rsa_xml_to_key()            -   parses a PowerShell RSA xml import and builds a M2Crypto object
     rsa_encrypt()               -   encrypts data using the M2Crypto crypto object
-    aes_encrypt()               -   encrypts data using a pyCrypto AES object
-    aes_encrypt_then_hmac()     -   encrypts and SHA256 HMACs data using a pyCrypto AES object
-    aes_decrypt()               -   decrypts data using a pyCrypto AES object
+    aes_encrypt()               -   encrypts data using a Cryptography AES object
+    aes_encrypt_then_hmac()     -   encrypts and SHA256 HMACs data using a Cryptography AES object
+    aes_decrypt()               -   decrypts data using a Cryptography AES object
     verify_hmac()               -   verifies a SHA256 HMAC for a data blob
     aes_decrypt_and_verify()    -   AES decrypts data if the HMAC is validated
-    generate_aes_key()          -   generates a ranodm AES key using pyCrypto's Random functionality
+    generate_aes_key()          -   generates a ranodm AES key using the OS' Random functionality
     rc4()                       -   encrypt/decrypt a data blob using an RC4 key
     DiffieHellman()             -   Mark Loiseau's DiffieHellman implementation, see ./data/licenses/ for license info
 
@@ -22,13 +22,15 @@ Includes:
 import base64
 import hashlib
 import hmac
+import os
 import string
 import M2Crypto
+import os
+import random
 
 from xml.dom.minidom import parseString
-from Crypto.Cipher import AES
-from Crypto import Random
-from Crypto.Random import random
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
 from binascii import hexlify
 
 
@@ -57,11 +59,9 @@ try:
     import ssl
     random_function = ssl.RAND_bytes
     random_provider = "Python SSL"
-except (AttributeError, ImportError):
-    import OpenSSL
-    random_function = OpenSSL.rand.bytes
-    random_provider = "OpenSSL"
-
+except:
+    random_function = os.urandom
+    random_provider = "os.urandom"
 
 def pad(data):
     """
@@ -126,9 +126,12 @@ def aes_encrypt(key, data):
     Generate a random IV and new AES cipher object with the given
     key, and return IV + encryptedData.
     """
-    IV = Random.new().read(16)
-    cipher = AES.new(key, AES.MODE_CBC, IV)
-    return IV + cipher.encrypt(pad(data))
+    backend = default_backend()
+    IV = os.urandom(16)
+    cipher = Cipher(algorithms.AES(key), modes.CBC(IV), backend=backend)
+    encryptor = cipher.encryptor()
+    ct = encryptor.update(pad(data))+encryptor.finalize()
+    return IV + ct
 
 
 def aes_encrypt_then_hmac(key, data):
@@ -146,9 +149,12 @@ def aes_decrypt(key, data):
     and return the unencrypted data.
     """
     if len(data) > 16:
+        backend = default_backend()
         IV = data[0:16]
-        cipher = AES.new(key, AES.MODE_CBC, IV)
-        return depad(cipher.decrypt(data[16:]))
+        cipher = Cipher(algorithms.AES(key), modes.CBC(IV), backend=backend)
+        decryptor = cipher.decryptor()
+        pt = depad(decryptor.update(data[16:])+decryptor.finalize())
+        return pt
 
 
 def verify_hmac(key, data):
@@ -177,7 +183,7 @@ def aes_decrypt_and_verify(key, data):
 
 def generate_aes_key():
     """
-    Generate a random new 128-bit AES key using Pycrypto's secure Random functions.
+    Generate a random new 128-bit AES key using OS' secure Random functions.
     """
     punctuation = '!#$%&()*+,-./:;<=>?@[\]^_`{|}~'
     return ''.join(random.sample(string.ascii_letters + string.digits + '!#$%&()*+,-./:;<=>?@[\]^_`{|}~', 32))
@@ -285,7 +291,7 @@ class DiffieHellman(object):
                 _rand = int.from_bytes(random_function(_bytes), byteorder='big')
             except:
                 # Python 2
-                _rand = int(OpenSSL.rand.bytes(_bytes).encode('hex'), 16)
+                _rand = int(random_function(_bytes).encode('hex'), 16)
 
         return _rand
 

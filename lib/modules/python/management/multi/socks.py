@@ -77,7 +77,7 @@ class Module:
                 if option in self.options:
                     self.options[option]['Value'] = value
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         module_path = os.path.join(self.mainMenu.installPath, 
             'data/module_source/python/lateral_movement/socks_source.py')
 

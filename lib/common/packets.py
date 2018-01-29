@@ -64,7 +64,6 @@ import base64
 import os
 import hashlib
 import hmac
-from Crypto import Random
 from pydispatch import dispatcher
 
 # Empire imports
@@ -97,6 +96,9 @@ PACKET_NAMES = {
 
     "TASK_GETJOBS" : 50,
     "TASK_STOPJOB" : 51,
+
+    "TASK_GETDOWNLOADS" : 52,
+    "TASK_STOPDOWNLOAD" : 53,
 
     "TASK_CMD_WAIT" : 100,
     "TASK_CMD_WAIT_SAVE" : 101,
@@ -328,8 +330,7 @@ def build_routing_packet(stagingKey, sessionID, language, meta="NONE", additiona
     #   B == 1 byte unsigned char, H == 2 byte unsigned short, L == 4 byte unsigned long
     data = sessionID + struct.pack("=BBHL", LANGUAGE.get(language.upper(), 0), META.get(meta.upper(), 0), ADDITIONAL.get(additional.upper(), 0), len(encData))
 
-    # RC4IV = os.urandom(4)
-    RC4IV = Random.new().read(4)
+    RC4IV = os.urandom(4)
     stagingKey = str(stagingKey)
     key = RC4IV + stagingKey
     rc4EncData = encryption.rc4(key, data)

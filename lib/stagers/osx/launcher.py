@@ -10,7 +10,7 @@ class Stager:
 
             'Author': ['@harmj0y'],
 
-            'Description': ('Generates a one-liner stage0 launcher for EmPyre.'),
+            'Description': ('Generates a one-liner stage0 launcher for Empire.'),
 
             'Comments': [
                 ''

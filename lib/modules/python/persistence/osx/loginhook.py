@@ -11,7 +11,7 @@ class Module:
             'Author': ['@Killswitch-GUI'],
 
             # more verbose multi-line description of the module
-            'Description': ('Installs EmPyre agent via LoginHook.'),
+            'Description': ('Installs Empire agent via LoginHook.'),
 
             # True if the module needs to run in the background
             'Background' : False,
@@ -72,7 +72,7 @@ class Module:
                 if option in self.options:
                     self.options[option]['Value'] = value
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         loginhookScriptPath = self.options['LoginHookScript']['Value']
         password = self.options['Password']['Value']

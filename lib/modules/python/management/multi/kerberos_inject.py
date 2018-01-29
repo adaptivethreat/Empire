@@ -80,7 +80,7 @@ class Module:
                     self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         keytab = self.options['Keytab']['Value']
         principal = self.options['Principal']['Value']
         ntlmhash = self.options['Hash']['Value']

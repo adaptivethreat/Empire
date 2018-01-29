@@ -14,7 +14,7 @@ class Module:
             'Author': ['@n00py'],
 
             # more verbose multi-line description of the module
-            'Description': ('Spawns a new EmPyre agent using an existing sudo session.  This works up until El Capitan.'),
+            'Description': ('Spawns a new Empire agent using an existing sudo session.  This works up until El Capitan.'),
 
             # True if the module needs to run in the background
             'Background' : False,
@@ -79,7 +79,7 @@ class Module:
                 if option in self.options:
                     self.options[option]['Value'] = value
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         # extract all of our options
         listenerName = self.options['Listener']['Value']

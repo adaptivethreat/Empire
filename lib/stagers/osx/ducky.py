@@ -9,7 +9,7 @@ class Stager:
 
             'Author': ['@xorrior'],
 
-            'Description': ('Generates a ducky script that runs a one-liner stage0 launcher for EmPyre.'),
+            'Description': ('Generates a ducky script that runs a one-liner stage0 launcher for Empire.'),
 
             'Comments': [
                 ''

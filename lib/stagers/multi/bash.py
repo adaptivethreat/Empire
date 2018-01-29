@@ -10,7 +10,7 @@ class Stager:
 
             'Author': ['@harmj0y'],
 
-            'Description': ('Generates self-deleting Bash script to execute the EmPyre stage0 launcher.'),
+            'Description': ('Generates self-deleting Bash script to execute the Empire stage0 launcher.'),
 
             'Comments': [
                 ''

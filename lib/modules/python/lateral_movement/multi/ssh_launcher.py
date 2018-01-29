@@ -89,7 +89,7 @@ class Module:
                 if option in self.options:
                     self.options[option]['Value'] = value
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         login = self.options['Login']['Value']
         password = self.options['Password']['Value']
         listenerName = self.options['Listener']['Value']

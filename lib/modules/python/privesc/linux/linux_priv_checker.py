@@ -64,7 +64,7 @@ class Module:
                 if option in self.options:
                     self.options[option]['Value'] = value
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         ###############################################################################################################
         ## [Title]: linuxprivchecker.py -- a Linux Privilege Escalation Check Script
         ## [Author]: Mike Czumak (T_v3rn1x) -- @SecuritySift

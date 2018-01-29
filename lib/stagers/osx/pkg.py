@@ -9,7 +9,7 @@ class Stager:
 
             'Author': ['@xorrior'],
 
-            'Description': ('Generates a pkg installer. The installer will copy a custom (empty) application to the /Applications folder. The postinstall script will execute an EmPyre launcher.'),
+            'Description': ('Generates a pkg installer. The installer will copy a custom (empty) application to the /Applications folder. The postinstall script will execute an Empire launcher.'),
 
             'Comments': [
                 ''

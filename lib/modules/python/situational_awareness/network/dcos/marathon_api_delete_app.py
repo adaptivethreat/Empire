@@ -82,7 +82,7 @@ class Module:
                     self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         target = self.options['Target']['Value']
         port = self.options['Port']['Value']
         appId = self.options['ID']['Value']

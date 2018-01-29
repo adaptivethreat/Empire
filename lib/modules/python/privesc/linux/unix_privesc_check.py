@@ -84,7 +84,7 @@ class Module:
                 if option in self.options:
                     self.options[option]['Value'] = value
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         ip = self.options['Ip']['Value']
         port = self.options['Port']['Value']
         serveCount = self.options['ServeCount']['Value']

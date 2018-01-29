@@ -10,7 +10,7 @@ class Stager:
 
             'Author': ['@harmj0y'],
 
-            'Description': ('Generates AppleScript to execute the EmPyre stage0 launcher.'),
+            'Description': ('Generates AppleScript to execute the Empire stage0 launcher.'),
 
             'Comments': [
                 ''

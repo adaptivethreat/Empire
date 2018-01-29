@@ -1,6 +1,107 @@
-Running
+01/04/2018
+------------
+- Version 2.4 Master Release
+	- Added Kevin Robertson's Invoke-SMBExec.ps1
+	- Update Invoke-DCOM
+	- Added Dockerfile, Docker Hub images, Build/Release scripts (@killswitch-gui)
+	- Updated README for cleaner install instructions with new options
+	- Support for plugins (@DakotaNelson)
+	- Fixed module output bug #792 (@clr2of8)
+	- Added MSBuild XML Launcher (@p3nt4)
+	- Added module to extract private keys (@mlinton)
+	- Added cross-platform macro (@malcomvetter)
+	- Proxy settings fix #788 (@m7x)
+	- Updated mimikatz binary in Invoke-Mimikatz to version 2.1.1 20171106
+	- Updated install.sh
+	- Updated PowerView.ps1 source and all related modules 
+	- powershell install fix, Invoke-obfuscation updates, Improve ScriptBlockLogging bypass (@cobbr)
+	- Custom header support for http_com listener (@leeloobeek)
+	- Allow for distinct values between the Host and Port options (@jetsecurity) 
+	- Added pwd and cat aliases for the python agent (@xorrior)
+	- Added redirector listener, formerly known as the redirector module (@xorrior)
+	- Added exception handling for wmi call in powershell stager #827
+	- Get Agent Results REST API call returns taskID #854 (@byt3bl33d3r)
+	- Added templating engine (@DakotaNelson)
+	- Removed pyCrypto dependencies (@elitest)
+	- http listener update: Updated defaults response logic and default page to match IIS 7.5 #890 (@s0lst1c3)
+	- Added module for nix aws ec2 metadata (@TweekFawkes)
+
+10/29/2017
+------------
+- Version 2.3 Master Release
+	— Fix for #755
+	— Merge PR from byt3bl33d3r for TLS version
+	— Removed option to set chunk size for file downloads
+	— Fix for #729 (Unable to download files with spaces)
+	— Fix renegotiation in powershell agent. Patched python agent to exit on 401 response.
+	— Fix for #774 (Fix pyinstaller module)
+	— Added resource scripts capability (Carrie Roberts)
+	— Fix for #749 (Fix external agent modules)
+	— Fix for #369 (Fixed http_hop listener with ssl and self-signed certificate)
+	— Merge Invoke-PowerDump fix
+	— Merge fixes for 718 (Fix generate function signature for module @nikaiw)
+	— Merge fixes for 762 (Code cleanup from EmPyre @elitest)
+	— Merge ntds execution module (@hightopfade)
+	— Updated generate function signatures in all modules
+	— Fixed stagerURI option (rvrsh3ll)
+
+10/12/2017
 --------
-- Added Trollsploit module Get-Schwifty
+- Version 2.2 Master Release
+	- Update crontab to work hourly #667
+	- Update keylogger to log to disk on server side by @clr2of8 
+	- Fix macro launcher #681
+	- Fixes vbscript string literal quoting. #702
+	- Add option to host a stager payload in the http listener @424f424f
+	- Add @enigma0x3 Token Manipulation script as a BypassUAC module @424f424f
+	- Hide true host name when using domain fronting #730 @clr2of8
+	- Fixed custom proxy config in launcher code #728 @dirkjanm
+	- generate_upload function added to Stagers #722 @hightopfade
+	- Aes kerberoast #725 @elitest
+	- DBX Improvements (SOCKS, Hide window via WindowHandler) #721 @IljaSchumacher
+	- Improved ScriptBlock logging bypasses #740 @cobbr_io
+	- Slack Integration - Notification for new Agents #737 @dchrastil
+	- Improve Get-ChromeDump #734 @ThePirateWhoSmellsOfSunFlowers
+	- Fix Eternal Blue Issue #656
+	- Merge Invoke-Kerberoast: Print hashes only. Formatting with a text editor is no longer required. #663
+	- Fix Macro syntax error per @utkusen issue #664 
+	- Fix Better powershell install, obfuscation bug fixes, fixed vbs/macro launchers #686 @cobbr
+	- Fix creds manual add parsing with whitespace in password
+	- Fix validate length parameter attribute for Invoke-PSInject.ps1d
+
+8/28/2017
+--------
+- Version 2.1 Master Release
+	-Add get schwifty trollsploit module @424f424f
+	-Add -sta flag to launcher @xorrior
+	-Fixed hardcoded cert path @xorrior
+	-Fix for #567
+	-Merge Capture OSX credentials from Prompt Module in Empire DB @malcomvetter.
+	-Rest API fixups #526 @byt3bl33d3r
+	-Added MS16-135 exploit module @ThePirateWhoSmellsOfSunflowers
+	-Updated Bloodhound Ingestion module @424f424f
+	-Added Dropbox exfil module @ktevora1
+	-Added EternalBlue module @ktevora1
+	-Fix SSL certificate issue with Flask @diskonnect
+	-Modify staging to handle unicode characters @killswitch-GUI
+	-Add wmi_updater module #509 @tristandostaler
+	-Add DropBox exfil module #557 @e0x70i
+	-Fix Unexpected error: <class 'struct.error'> run empire #567
+	-Fix SSL Intermediate Certificates to support Domain Fronting #569 @dchrastil
+	-Add ‘SandboxMode’ to evade Apple Sandbox protection on applescript #578 @dchrastil
+	-Add Obfuscated Empire #597 @cobbr
+	-Add Bypass ScriptBlock Logging #603 @cobbr
+	-Add mimipenguin module @424f424f
+	-Add dyld_print_to_file Mac privesc @checkyfuntime
+	-Added manual proxy specifications @xorrior
+	-Fix libssl-dev and libssl1.0.0 packages @xorrior
+	-Add backgrounding for downloads in PowerShell agent @xorrior
+	-Fix warning patch in http listener @viss
+	-Update Invoke-Kerberoast @424f424f
+	-Tab complete shows elevated modules: #599
+	- Additional bypassUAC modules added: #596
+	- Added show uac level module #609
+	- Fixed shebangs: #640
 
 5/15/2017
 ---------

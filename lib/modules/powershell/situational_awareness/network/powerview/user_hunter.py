@@ -5,7 +5,7 @@ class Module:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Invoke-UserHunter',
+            'Name': 'Find-DomainUserLocation',
 
             'Author': ['@harmj0y'],
 
@@ -43,38 +43,68 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'ComputerFilter' : {
+            'ComputerLDAPFilter' : {
                 'Description'   :   'Host filter name to query AD for, wildcards accepted.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'GroupName' : {
+            'ComputerSearchBase' : {
+                'Description'   :   'Specifies the LDAP source to search through for computers',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'ComputerOperatingSystem' : {
+                'Description'   :   'Return computers with a specific operating system, wildcards accepted.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'ComputerServicePack' : {
+                'Description'   :   'Return computers with the specified service pack, wildcards accepted.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'ComputerSiteName' : {
+                'Description'   :   'Return computers in the specific AD Site name, wildcards accepted.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'UserGroupIdentity' : {
                 'Description'   :   'Group name to query for target users.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'TargetServer' : {
-                'Description'   :   'Hunt for users who are effective local admins on a target server.',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'UserName' : {
+            'UserIdentity' : {
                 'Description'   :   'Specific username to search for.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'UserFilter' : {
+            'UserDomain' : {
+                'Description'   :   'Specifies the domain to query for users to search for, defaults to the current domain.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'UserLDAPFilter' : {
                 'Description'   :   'A customized ldap filter string to use for user enumeration, e.g. "(description=*admin*)"',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'UserAllowDelegation' : {
+                'Description'   :   'Switch. Return user accounts that are not marked as \'sensitive and not allowed for delegation\'',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'UserAdminCount' : {
+                'Description'   :   'Switch. Search for users users with \'(adminCount=1)\' (meaning are/were privileged).',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'UserSearchBase' : {
+                'Description'   :   'Specifies the LDAP source to search through for target users.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
             'StopOnSuccess' : {
                 'Description'   :   'Switch. Stop hunting after finding after finding a target user.',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'NoPing' : {
-                'Description'   :   "Don't ping each host to ensure it's up before enumerating.",
                 'Required'      :   False,
                 'Value'         :   ''
             },
@@ -93,18 +123,48 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'DomainController' : {
-                'Description'   :   'Domain controller to reflect LDAP queries through.',
+            'Server' : {
+                'Description'   :   'Active Directory server (domain controller) to reflect LDAP queries through.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'ShowAll' : {
-                'Description'   :   'Switch. Return all user location results without filtering.',
+            'SearchScope' : {
+                'Description'   :   'Specifies the scope to search under, Base/OneLevel/Subtree (default of Subtree)',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'ResultPageSize' : {
+                'Description'   :   'Specifies the PageSize to set for the LDAP searcher object.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'ServerTimeLimit' : {
+                'Description'   :   'Specifies the maximum amount of time the server spends searching. Default of 120 seconds.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'Tombstone' : {
+                'Description'   :   'Switch. Specifies that the search should also return deleted/tombstoned objects.',
+                'Required'      :   False,
+                'Value'         :   'False'
+            },
+            'Jitter' : {
+                'Description'   :   'Specifies the jitter (0-1.0) to apply to any specified -Delay, defaults to +/- 0.3.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
             'Stealth' : {
                 'Description'   :   'Switch. Only enumerate sessions from connonly used target servers.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'StealthSource' : {
+                'Description'   :   'The source of target servers to use, \'DFS\' (distributed file servers),',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'ShowAll' : {
+                'Description'   :   'Switch. Return all user location results without filtering.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
@@ -126,7 +186,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
         
         moduleName = self.info["Name"]
         
@@ -157,5 +217,6 @@ class Module:
                         script += " -" + str(option) + " " + str(values['Value']) 
 
         script += ' | fl | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
-        
+        if obfuscate:
+            script = helpers.obfuscate(self.mainMenu.installPath, psScript=script, obfuscationCommand=obfuscationCommand)
         return script

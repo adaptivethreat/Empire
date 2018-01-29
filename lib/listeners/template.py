@@ -32,14 +32,19 @@ class Listener:
             #   value_name : {description, required, default_value}
 
             'Name' : {
-                'Description'   :   'Listener name.',
+                'Description'   :   'Name for the listener.',
                 'Required'      :   True,
-                'Value'         :   'http_foreign'
+                'Value'         :   'http'
             },
             'Host' : {
                 'Description'   :   'Hostname/IP for staging.',
                 'Required'      :   True,
                 'Value'         :   "http://%s:%s" % (helpers.lhost(), 80)
+            },
+            'BindIP' : {
+                'Description'   :   'The IP to bind to on the control server.',
+                'Required'      :   True,
+                'Value'         :   '0.0.0.0'
             },
             'Port' : {
                 'Description'   :   'Port for the listener.',
@@ -76,6 +81,11 @@ class Listener:
                 'Required'      :   True,
                 'Value'         :   "/admin/get.php,/news.php,/login/process.php|Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko"
             },
+            'CertPath' : {
+                'Description'   :   'Certificate path for https listeners.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
             'KillDate' : {
                 'Description'   :   'Date for the listener to exit (MM/dd/yyyy).',
                 'Required'      :   False,
@@ -85,6 +95,41 @@ class Listener:
                 'Description'   :   'Hours for the agent to operate (09:00-17:00).',
                 'Required'      :   False,
                 'Value'         :   ''
+            },
+            'ServerVersion' : {
+                'Description'   :   'Server header for the control server.',
+                'Required'      :   True,
+                'Value'         :   'Microsoft-IIS/7.5'
+            },
+            'StagerURI' : {
+                'Description'   :   'URI for the stager. Example: stager.php',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'UserAgent' : {
+                'Description'   :   'User-agent string to use for the staging request (default, none, or other).',
+                'Required'      :   False,
+                'Value'         :   'default'
+            },
+            'Proxy' : {
+                'Description'   :   'Proxy to use for request (default, none, or other).',
+                'Required'      :   False,
+                'Value'         :   'default'
+            },
+            'ProxyCreds' : {
+                'Description'   :   'Proxy credentials ([domain\]username:password) to use for request (default, none, or other).',
+                'Required'      :   False,
+                'Value'         :   'default'
+            },
+            'SlackToken' : {
+                'Description'   :   'Your SlackBot API token to communicate with your Slack instance.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },
+            'SlackChannel' : {
+                'Description'   :   'The Slack channel or DM that notifications will be sent to.',
+                'Required'      :   False,
+                'Value'         :   '#general'
             }
         }
 
@@ -121,7 +166,7 @@ class Listener:
         return True
 
 
-    def generate_launcher(self, encode=True, userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', language=None, safeChecks='', listenerName=None):
+    def generate_launcher(self, encode=True, obfuscate=False, obfuscationCommand="", userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', language=None, safeChecks='', listenerName=None):
         """
         Generate a basic launcher for the specified listener.
         """
@@ -156,7 +201,7 @@ class Listener:
             print helpers.color("[!] listeners/template generate_launcher(): invalid listener name specification!")
 
 
-    def generate_stager(self, listenerOptions, encode=False, encrypt=True, language=None):
+    def generate_stager(self, listenerOptions, encode=False, encrypt=True, obfuscate=False, obfuscationCommand="", language=None):
         """
         If you want to support staging for the listener module, generate_stager must be
         implemented to return the stage1 key-negotiation stager code.
@@ -165,7 +210,7 @@ class Listener:
         return ''
 
 
-    def generate_agent(self, listenerOptions, language=None):
+    def generate_agent(self, listenerOptions, language=None, obfuscate=False, obfuscationCommand=""):
         """
         If you want to support staging for the listener module, generate_agent must be
         implemented to return the actual staged agent code.

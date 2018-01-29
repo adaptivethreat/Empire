@@ -1,6 +1,6 @@
 from lib.common import helpers
-
-
+ 
+ 
 class Module:
 
     def __init__(self, mainMenu, params=[]):
@@ -8,7 +8,7 @@ class Module:
         # metadata info about the module, not modified during runtime
         self.info = {
             # name for the module that will appear in module menus
-            'Name': 'ls',
+            'Name': 'ls_m',
 
             # list of one or more authors for the module
             'Author': ['@xorrior'],
@@ -37,7 +37,7 @@ class Module:
             # list of any references/other comments
             'Comments': [
                 'Link:',
-                'http://stackoverflow.com/questions/17809386/how-to-convert-a-stat-output-to-a-unix-permissions-string'
+                'http://stackoverflow.com/questions/17809386/howtoconvertastat-output-to-a-unix-permissions-string'
             ]
         }
 
@@ -73,7 +73,7 @@ class Module:
                 if option in self.options:
                     self.options[option]['Value'] = value
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         filePath = self.options['Path']['Value']
         filePath += '/'

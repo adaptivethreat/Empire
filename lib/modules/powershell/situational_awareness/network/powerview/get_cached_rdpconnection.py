@@ -5,7 +5,7 @@ class Module:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'Get-CachedRDPConnection',
+            'Name': 'Get-WMIRegCachedRDPConnection',
 
             'Author': ['@harmj0y'],
 
@@ -42,16 +42,6 @@ class Module:
                 'Description'   :   'The hostname or IP to query for local group users.',
                 'Required'      :   False,
                 'Value'         :   'localhost'
-            },
-            'RemoteUserName' : {
-                'Description'   :   'The "domain\username" to use for the WMI call on the remote system.',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'RemotePassword' : {
-                'Description'   :   'The password to use for the WMI call on a remote system.',
-                'Required'      :   False,
-                'Value'         :   ''
             }
         }
 
@@ -66,7 +56,7 @@ class Module:
                 self.options[option]['Value'] = value
 
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         moduleName = self.info["Name"]
         
@@ -97,5 +87,6 @@ class Module:
                         script += " -" + str(option) + " " + str(values['Value']) 
 
         script += ' | Out-String | %{$_ + \"`n\"};"`n'+str(moduleName)+' completed!"'
-
+        if obfuscate:
+            script = helpers.obfuscate(self.mainMenu.installPath, psScript=script, obfuscationCommand=obfuscationCommand)
         return script

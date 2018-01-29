@@ -10,7 +10,7 @@ class Stager:
 
             'Author': ['@424f424f'],
 
-            'Description': ('Generates an HTML payload launcher for EmPyre.'),
+            'Description': ('Generates an HTML payload launcher for Empire.'),
 
             'Comments': [
                 'https://www.exploit-db.com/exploits/38535/'
