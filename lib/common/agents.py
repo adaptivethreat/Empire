@@ -230,8 +230,8 @@ class Agents:
         parts
 
         # construct the appropriate save path
-        save_path = "%sdownloads/%s/%s" % (self.installPath, sessionID, "/".join(parts[0:-1]))
-        filename = os.path.basename(parts[-1])
+        save_path = "%sdownloads/%s/%s" % (self.installPath, sessionID, ("/".join(parts[0:-1])).decode('utf-8'))
+        filename = os.path.basename((parts[-1]).decode('utf-8'))
 
         try:
             self.lock.acquire()
