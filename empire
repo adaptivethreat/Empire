@@ -721,6 +721,8 @@ def start_restful_api(empireMenu, suppress=False, username=None, password=None, 
         listenerObject = main.listeners.loadedListeners[listener_type]
         # set all passed options
         for option, values in request.json.iteritems():
+            if type(values) != int:
+                values = values.encode('utf8')
             if option == "Name":
                 listenerName = values
 
