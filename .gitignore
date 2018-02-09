@@ -12,6 +12,7 @@ data/obfuscated_module_source/*.ps1
 data/misc/ToObfuscate.ps1
 data/misc/Obfuscated.ps1
 setup/xar/
+setup/xar-1.5.2/
 setup/bomutils/
 .venv
 .DS_Store
