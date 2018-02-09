@@ -857,6 +857,9 @@ def run_command(command):
     elif ">" in command or ">>" in command or "<" in command or "<<" in command:
         p = subprocess.Popen(command,stdin=None, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         return ''.join(list(iter(p.stdout.readline, b'')))
+    elif ";" in command or "&&" in command:
+        p = subprocess.Popen(command,stdin=None, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+        return p.communicate()[0].strip()
     else:
         command_parts = []
         command_parts.append(command)
