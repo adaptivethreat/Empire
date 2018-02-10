@@ -47,10 +47,14 @@ class Module:
                 'Value'         :   ''
             },
             'Command' : {
-                # The 'Agent' option is the only one that MUST be in a module
                 'Description'   :   'Command to execute.',
                 'Required'      :   True,
                 'Value'         :   ''
+            },
+            'Path' : {
+                'Description'   :   'Path command should execute in',
+                'Required'      :   True,
+                'Value'         :   '/'
             }
         }
 
@@ -69,14 +73,16 @@ class Module:
                 if option in self.options:
                     self.options[option]['Value'] = value
 
-    def generate(self):
+    def generate(self, obfuscate=False, obfuscationCommand=""):
 
         cmdstring = self.options['Command']['Value']
+        path = self.options['Path']['Value']
         script = """
 import shlex
 arg = shlex.split("%s")
-p = subprocess.Popen(arg, stdout=PIPE)
+path = "%s"
+p = subprocess.Popen(arg, shell=True, cwd=path, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 res = p.stdout.read()
 print res
-""" % (cmdstring)
+""" % (cmdstring,path)
         return script
