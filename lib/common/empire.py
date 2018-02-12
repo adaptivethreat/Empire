@@ -2825,17 +2825,15 @@ except Exception as e:
             print helpers.color("[!] Please provide a valid zipfile path", color="red")
 
     def do_shellb(self, line):
-        """Execute a shell command as a background job"""
+        """Execute a shell command as a background job""" #shellb -p /root/ ls
         cmd = line.split()
         if self.mainMenu.modules.modules['python/management/osx/shellb']:
             module = self.mainMenu.modules.modules['python/management/osx/shellb']
-            if len(cmd) >= 3 and cmd[0]=="-p":
+            if len(cmd) >= 2 and cmd[0]=="-p":
                 # we have a path, set it and remove the values from the cmd
                 module.options['Path']['Value'] = cmd[1]
-                #remove -p and path
-                cmd.remove(cmd[0])
-                cmd.remove(cmd[0])
-            if len(cmd) > 0: # make sure we have a command
+                cmd = cmd[2:]
+            if len(cmd) > 0: # make sure we have a command as it is possible to enter -p and path without command or -p and no command
                 module.options['Command']['Value'] = " ".join(cmd)
                 module.options['Agent']['Value'] = self.mainMenu.agents.get_agent_name_db(self.sessionID)
                 module_menu = ModuleMenu(self.mainMenu, 'python/management/osx/shellb')
@@ -2844,7 +2842,7 @@ except Exception as e:
                 self.mainMenu.agents.save_agent_log(self.sessionID, msg)
                 module_menu.do_execute("")
             else:
-                print helpers.color("[!] Command parameter not found")
+                print helpers.color("[!] Command or Path parameter value not found")
         else:
             print helpers.color("[!] python/management/osx/shellb module not loaded")
             
