@@ -2907,20 +2907,24 @@ except Exception as e:
             print helpers.color("[!] Please provide a valid zipfile path", color="red")
 
     def do_shellb(self, line):
-        """Execute a shell command as a background job"""
-        cmd = line.strip()
+        """Execute a shell command as a background job""" #shellb -p /root/ ls
+        cmd = line.split()
         if self.mainMenu.modules.modules['python/management/osx/shellb']:
             module = self.mainMenu.modules.modules['python/management/osx/shellb']
-            if line.strip() != '':
-                module.options['Command']['Value'] = line.strip()
-
-            module.options['Agent']['Value'] = self.mainMenu.agents.get_agent_name_db(self.sessionID)
-            module_menu = ModuleMenu(self.mainMenu, 'python/management/osx/shellb')
-            msg = "[*] Tasked agent to execute %s in the background" % (str(module.options['Path']['Value']))
-            print helpers.color(msg,color="green")
-            self.mainMenu.agents.save_agent_log(self.sessionID, msg)
-            module_menu.do_execute("")
-
+            if len(cmd) >= 2 and cmd[0]=="-p":
+                # we have a path, set it and remove the values from the cmd
+                module.options['Path']['Value'] = cmd[1]
+                cmd = cmd[2:]
+            if len(cmd) > 0: # make sure we have a command as it is possible to enter -p and path without command or -p and no command
+                module.options['Command']['Value'] = " ".join(cmd)
+                module.options['Agent']['Value'] = self.mainMenu.agents.get_agent_name_db(self.sessionID)
+                module_menu = ModuleMenu(self.mainMenu, 'python/management/osx/shellb')
+                msg = "[*] Tasked agent to execute %s in the background on path %s" % (str(module.options['Command']['Value']),str(module.options['Path']['Value']))
+                print helpers.color(msg,color="green")
+                self.mainMenu.agents.save_agent_log(self.sessionID, msg)
+                module_menu.do_execute("")
+            else:
+                print helpers.color("[!] Command or Path parameter value not found")
         else:
             print helpers.color("[!] python/management/osx/shellb module not loaded")
             
