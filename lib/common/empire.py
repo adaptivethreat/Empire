@@ -2674,7 +2674,7 @@ class PythonAgentMenu(SubMenu):
 
 
     def do_shell(self, line):
-        "Task an agent to use a shell command."
+        "Task an agent to use a shell command. Use flag -raw to run a raw shell command (no result returned)"
 
         line = line.strip()
 

@@ -852,7 +852,14 @@ def data_webserver(data, ip, port, serveCount):
 
 # additional implementation methods
 def run_command(command):
-    if "|" in command:
+    if "-raw" in command:
+        command = command.replace("-raw","")
+        result = subprocess.call(command, shell=True)
+        if not result:
+            return "%s returned an exit code of zero" % command
+        else:
+            return "%s returned a non-zero exit status" % command        
+    elif "|" in command:
         command_parts = command.split('|')
     elif ">" in command or ">>" in command or "<" in command or "<<" in command:
         p = subprocess.Popen(command,stdin=None, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
