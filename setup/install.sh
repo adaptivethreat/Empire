@@ -84,14 +84,17 @@ function install_powershell() {
 		#Kali Linux
 		if cat /etc/lsb-release | grep -i 'Kali'; then
 			# Install prerequisites
-			apt-get install libunwind8 libicu55
-			wget http://security.debian.org/debian-security/pool/updates/main/o/openssl/libssl1.0.0_1.0.1t-1+deb8u7_amd64.deb
-			dpkg -i libssl1.0.0_1.0.1t-1+deb8u7_amd64.deb
+			apt-get update
+			apt-get install -y curl gnupg apt-transport-https
+			# Import the public repository GPG keys
+			curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+			# Register the Microsoft Product feed
+			sh -c 'echo "deb [arch=amd64] https://packages.microsoft.com/repos/microsoft-debian-stretch-prod stretch main" > /etc/apt/sources.list.d/microsoft.list'
+			# Update the list of products
+			apt-get update
 			# Install PowerShell
-			wget https://github.com/PowerShell/PowerShell/releases/download/v6.0.0/powershell_6.0.0-1.ubuntu.16.04_amd64.deb
-			dpkg -i powershell_6.0.0-1.ubuntu.16.04_amd64.deb
-			
-       		fi
+			apt-get install -y powershell
+		fi
 	 fi
         if ls /opt/microsoft/powershell/*/DELETE_ME_TO_DISABLE_CONSOLEHOST_TELEMETRY; then
             rm /opt/microsoft/powershell/*/DELETE_ME_TO_DISABLE_CONSOLEHOST_TELEMETRY

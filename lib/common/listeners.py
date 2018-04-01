@@ -422,6 +422,7 @@ class Listeners:
     def disable_listener(self, listenerName):
         "Wrapper for shutdown_listener(), also marks listener as 'disabled' so it won't autostart"
 
+        activeListenerModuleName = self.activeListeners[listenerName]['moduleName']
         cur = self.conn.cursor()
         if listenerName.lower() == "all":
             cur.execute("UPDATE listeners SET enabled=? WHERE NOT module=?", [False, "redirector"])
@@ -430,7 +431,6 @@ class Listeners:
         cur.close()
         self.shutdown_listener(listenerName)
         # dispatch this event
-        activeListenerModuleName = self.activeListeners[listenerName]['module']
         message = "[*] Listener {} killed".format(listenerName)
         signal = json.dumps({
             'print': True,

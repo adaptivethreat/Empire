@@ -9,7 +9,7 @@ menu loops.
 """
 
 # make version for Empire
-VERSION = "2.4"
+VERSION = "2.5"
 
 from pydispatch import dispatcher
 
@@ -157,6 +157,11 @@ class MainMenu(cmd.Cmd):
         if 'task_id' in signal_data:
             task_id = signal_data['task_id']
 
+        if 'event_type' in signal_data:
+            event_type = signal_data['event_type']
+        else:
+            event_type = 'dispatched_event'
+
         event_data = json.dumps({'signal': signal_data, 'sender': sender})
 
         # print any signal that indicates we should
@@ -166,7 +171,7 @@ class MainMenu(cmd.Cmd):
         # get a db cursor, log this event to the DB, then close the cursor
         cur = self.conn.cursor()
         # TODO instead of "dispatched_event" put something useful in the "event_type" column
-        log_event(cur, sender, 'dispatched_event', json.dumps(signal_data), signal_data['timestamp'], task_id=task_id)
+        log_event(cur, sender, event_type, json.dumps(signal_data), signal_data['timestamp'], task_id=task_id)
         cur.close()
 
         # if --debug X is passed, log out all dispatcher signals
@@ -4442,7 +4447,7 @@ class StagerMenu(SubMenu):
             signal = json.dumps({
                 'print': False,
                 'message': message,
-                'options': stager.options
+                'options': self.stager.options
             })
             dispatcher.send(signal, sender="empire")
         else:

@@ -12,7 +12,7 @@
 	- Overhaul events system to provide more descriptive messages and accurate logging of events (@DakotaNelson)
 	- Added macro that backdoors lnk files (@G0ldenGunSec)
 	- Bug fix for invoke_psexec module when using custom commands (@ThePirateWhoSmellsOfSunflowers)
-	- Added capability to generate a vs studio project file to generate a csharp launcher (@elitest)
+	- Added capability to generate a vs studio project file to compile a csharp executable/launcher (@elitest)
 	- Added capability to enable/disable/delete listeners (@mr64bit)
 	- Added report generation (@bneg)
 	- Updated http_com listener to server IIS7 default page and added response headers to evade nessus scans (@s0lst1c3)

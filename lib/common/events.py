@@ -29,7 +29,8 @@ def agent_rename(old_name, new_name):
         'print': False,
         'message': message,
         'old_name': old_name,
-        'new_name': new_name
+        'new_name': new_name,
+        'event_type' : 'rename'
     })
     # signal twice, once for each name (that way, if you search by sender,
     # the last thing in the old agent and the first thing in the new is that

