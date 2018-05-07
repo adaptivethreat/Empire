@@ -153,7 +153,7 @@ def random_string(length=-1, charset=string.ascii_letters):
     return random_string
 
 
-def generate_random_script_var_name(origvariname,globDebug=False):
+def generate_random_script_var_name(origvariname,globDebug=True):
     if globDebug:
     	hash_object=hashlib.sha1(str(origvariname)+str(globentropy)).hexdigest()
 	return hash_object[:-datetime.datetime.today().day]
