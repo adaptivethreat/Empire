@@ -70,6 +70,7 @@ import helpers
 import packets
 import messages
 import events
+from files import fetcher
 
 
 class Agents:
@@ -281,12 +282,12 @@ class Agents:
                 dec_data = d.dec_data(data)
                 print helpers.color("[*] Final size of %s wrote: %s" %(filename, helpers.get_file_size(dec_data['data'])), color="green")
                 if not dec_data['crc32_check']:
-                    message = "[!] WARNING: File agent {} failed crc32 check during decompression!\n[!] HEADER: Start crc32: %s -- Received crc32: %s -- Crc32 pass: %s!".format(nameid, dec_data['header_crc32'], dec_data['dec_crc32'], dec_data['crc32_check'])
+                    message = "[!] WARNING: File agent {} failed crc32 check during decompression!\n[!] HEADER: Start crc32: {} -- Received crc32: {} -- Crc32 pass: {}!".format(sessionID, dec_data['header_crc32'], dec_data['dec_crc32'], dec_data['crc32_check'])
                     signal = json.dumps({
                         'print': True,
                         'message': message
                     })
-                    dispatcher.send(signal, sender="agents/{}".format(nameid))
+                    dispatcher.send(signal, sender="agents/{}".format(sessionID))
                 data = dec_data['data']
 
             f.write(data)
@@ -322,12 +323,12 @@ class Agents:
             dec_data = d.dec_data(data)
             print helpers.color("[*] Final size of %s wrote: %s" %(filename, helpers.get_file_size(dec_data['data'])), color="green")
             if not dec_data['crc32_check']:
-                message = "[!] WARNING: File agent {} failed crc32 check during decompression!\n[!] HEADER: Start crc32: %s -- Received crc32: %s -- Crc32 pass: %s!".format(nameid, dec_data['header_crc32'], dec_data['dec_crc32'], dec_data['crc32_check'])
+                message = "[!] WARNING: File agent {} failed crc32 check during decompression!\n[!] HEADER: Start crc32: {} -- Received crc32: {} -- Crc32 pass: {}!".format(sessionID, dec_data['header_crc32'], dec_data['dec_crc32'], dec_data['crc32_check'])
                 signal = json.dumps({
                     'print': True,
                     'message': message
                 })
-                dispatcher.send(signal, sender="agents/{}".format(nameid))
+                dispatcher.send(signal, sender="agents/{}".format(sessionID))
             data = dec_data['data']
 
         try:
@@ -878,7 +879,7 @@ class Agents:
             finally:
                 self.lock.release()
         else:
-            message = "[!] Non-existent agent %s returned results".format(sessionID)
+            message = "[!] Non-existent agent {} returned results".format(sessionID)
             signal = json.dumps({
                 'print': True,
                 'message': message
@@ -1513,7 +1514,7 @@ class Agents:
         """
 
         if len(routingPacket) < 20:
-            message = "[!] handle_agent_data(): routingPacket wrong length: {}".format(routingPacket)
+            message = "[!] handle_agent_data(): routingPacket wrong length: {}".format(len(routingPacket))
             signal = json.dumps({
                 'print': False,
                 'message': message
@@ -1854,6 +1855,7 @@ class Agents:
 
                 if index == "0":
                     self.save_file(name, path, file_data)
+                    self.mainMenu.fetcher.add_file(sessionID, path, "download")
                 else:
                     self.save_file(name, path, file_data, append=True)
                 # update the agent log
@@ -1933,6 +1935,7 @@ class Agents:
             # save the file off to the appropriate path
             save_path = "%s/%s_%s.%s" % (prefix, self.get_agent_hostname_db(sessionID), helpers.get_file_datetime(), extension)
             final_save_path = self.save_module_file(name, save_path, file_data)
+            self.mainMenu.fetcher.add_file(sessionID, save_path, "screenshot")
 
             # update the agent log
             msg = "Output saved to .%s" % (final_save_path)
@@ -1946,12 +1949,12 @@ class Agents:
                 safePath = os.path.abspath("%sdownloads/" % self.mainMenu.installPath)
                 savePath = "%sdownloads/%s/keystrokes.txt" % (self.mainMenu.installPath,sessionID)
                 if not os.path.abspath(savePath).startswith(safePath):
-                    message = "[!] WARNING: agent {} attempted skywalker exploit!".format(self.sessionID)
+                    message = "[!] WARNING: agent {} attempted skywalker exploit!".format(sessionID)
                     signal = json.dumps({
                         'print': True,
                         'message': message
                     })
-                    dispatcher.send(signal, sender="agents/{}".format(self.sessionID))
+                    dispatcher.send(signal, sender="agents/{}".format(sessionID))
                     return
 
                 with open(savePath,"a+") as f:

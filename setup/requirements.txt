@@ -4,6 +4,8 @@ setuptools
 iptools
 pydispatcher
 flask
+flask_socketio
+flask_login
 macholib
 dropbox
 pyOpenSSL==17.2.0

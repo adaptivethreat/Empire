@@ -37,6 +37,7 @@ import modules
 import stagers
 import credentials
 import plugins
+from files import fetcher
 from events import log_event
 from zlib_wrapper import compress
 from zlib_wrapper import decompress
@@ -107,6 +108,7 @@ class MainMenu(cmd.Cmd):
         self.stagers = stagers.Stagers(self, args=args)
         self.modules = modules.Modules(self, args=args)
         self.listeners = listeners.Listeners(self, args=args)
+        self.fetcher = fetcher(self, args=args)
         self.resourceQueue = []
         #A hashtable of autruns based on agent language
         self.autoRuns = {}

@@ -22,7 +22,7 @@ class Module:
             'OutputExtension' : None,
 
             # if the module needs administrative privileges
-            'NeedsAdmin' : True,
+            'NeedsAdmin' : False,
 
             # True if the method doesn't touch disk/is reasonably opsec safe
             'OpsecSafe' : True,
@@ -77,14 +77,14 @@ class Module:
 
 
     def generate(self, obfuscate=False, obfuscationCommand=""):
-        
+
         plistpath = self.options['PlistPath']['Value']
         programpath = self.options['ProgramPath']['Value']
 
 
 
         script = """
-import subprocess 
+import subprocess
 
 process = subprocess.Popen('launchctl unload %s', stdout=subprocess.PIPE, shell=True)
 process.communicate()

@@ -36,7 +36,7 @@ Includes:
     dict_factory() - helper that returns the SQLite query results as a dictionary
     KThread() - a subclass of threading.Thread, with a kill() method
     slackMessage() - send notifications to the Slack API
-
+    generate_random_script_var_name() - use in scripts to generate random variable names
 """
 
 import re
@@ -52,11 +52,22 @@ import threading
 import pickle
 import netifaces
 import random
-from datetime import datetime
 import subprocess
 import fnmatch
 import urllib, urllib2
+import hashlib
+import datetime
+import uuid
+import ipaddress
 
+###############################################################
+#
+# Global Variables
+#
+################################################################
+
+globentropy=random.randint(1,datetime.datetime.today().day)
+globDebug=False
 ###############################################################
 #
 # Validation methods
@@ -131,7 +142,6 @@ def generate_ip_list(s):
 # Randomizers/obfuscators
 #
 ####################################################################################
-
 def random_string(length=-1, charset=string.ascii_letters):
     """
     Returns a random string of "length" characters.
@@ -143,17 +153,28 @@ def random_string(length=-1, charset=string.ascii_letters):
     return random_string
 
 
+def generate_random_script_var_name(origvariname,globDebug=False):
+    if globDebug:
+    	hash_object=hashlib.sha1(str(origvariname)+str(globentropy)).hexdigest()
+	return hash_object[:-datetime.datetime.today().day]
+    else:
+	return origvariname
+
 def randomize_capitalization(data):
     """
     Randomize the capitalization of a string.
     """
     return "".join( random.choice([k.upper(), k ]) for k in data )
 
+def obfuscate_call_home_address(data):
+    """
+    Poowershell script to base64 encode variable contents and execute on command as if clear text in powershell
+    """
+    return '$('+randomize_capitalization('[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String(\'') + enc_powershell(data) +'\')))'
 
 def chunks(l, n):
     """
     Generator to split a string l into chunks of size n.
-
     Used by macro modules.
     """
     for i in xrange(0, len(l), n):
@@ -223,7 +244,6 @@ def strip_powershell_comments(data):
     strippedCode = "\n".join([line for line in strippedCode.split('\n') if ((line.strip() != '') and (not line.strip().startswith("#")) and (not line.strip().lower().startswith("write-verbose ")) and (not line.strip().lower().startswith("write-debug ")) )])
 
     return strippedCode
-
 
 ####################################################################################
 #
@@ -584,7 +604,7 @@ def get_datetime():
     """
     Return the current date/time
     """
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 def utc_to_local(utc):
@@ -592,14 +612,14 @@ def utc_to_local(utc):
     Converts a datetime object in UTC to local time
     """
 
-    offset = datetime.now() - datetime.utcnow()
+    offset = datetime.datetime.now() - datetime.datetime.utcnow()
     return (utc + offset).strftime("%Y-%m-%d %H:%M:%S")
 
 def get_file_datetime():
     """
     Return the current date/time in a format workable for a file name.
     """
-    return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    return datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 
 def get_file_size(file):

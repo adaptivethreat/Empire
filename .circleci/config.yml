@@ -1,0 +1,16 @@
+version: 2
+jobs:
+   build:
+     docker:
+       - image: circleci/python:2.7
+     steps:
+       - checkout
+       - run:
+            name: update apt
+            command: 'sudo apt-get update'
+       - run:
+            name: Run install.sh
+            command: 'cd setup/ && sudo -E -H ./install.sh'
+       - run:
+            name: Start Empire
+            command: 'sudo ./empire --headless &'

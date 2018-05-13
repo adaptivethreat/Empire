@@ -27,7 +27,7 @@ namespace cmd
 
             pipeline.Commands.AddScript(decodedScript);
 
-            pipeline.Commands.Add("Out-String");
+            pipeline.Commands.Add("Out-Default");
             pipeline.Invoke();
         }
 	}
