@@ -53,10 +53,9 @@ def get_sysinfo(nonce='00000000'):
 
     language = 'python'
     cmd = 'ps %s' % (os.getpid())
-    ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
-    out = ps.stdout.read()
+    ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out, err = ps.communicate()
     parts = out.split("\n")
-    ps.stdout.close()
     if len(parts) > 2:
         processName = " ".join(parts[1].split()[4:])
     else:

