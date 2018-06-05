@@ -54,9 +54,6 @@ import pickle
 import netifaces
 import random
 
-
-
-
 import subprocess
 import fnmatch
 import urllib, urllib2
