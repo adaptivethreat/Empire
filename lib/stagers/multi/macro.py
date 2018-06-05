@@ -140,6 +140,11 @@ class Stager:
     #End If
 #End If
 
+Sub AutoOpen()
+    'MsgBox("AutoOpen()")
+    Debugging
+End Sub
+
 Sub Auto_Open()
     'MsgBox("Auto_Open()")
     Debugging

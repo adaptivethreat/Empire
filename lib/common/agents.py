@@ -1513,7 +1513,7 @@ class Agents:
         """
 
         if len(routingPacket) < 20:
-            message = "[!] handle_agent_data(): routingPacket wrong length: {}".format(routingPacket)
+            message = "[!] handle_agent_data(): routingPacket wrong length: {}".format(len(routingPacket))
             signal = json.dumps({
                 'print': False,
                 'message': message

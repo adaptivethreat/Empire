@@ -1119,7 +1119,7 @@ function Invoke-CredentialInjection
 	        $UnsafeNativeMethods = $SystemAssembly.GetType('Microsoft.Win32.UnsafeNativeMethods')
 	        # Get a reference to the GetModuleHandle and GetProcAddress methods
 	        $GetModuleHandle = $UnsafeNativeMethods.GetMethod('GetModuleHandle')
-	        $GetProcAddress = $UnsafeNativeMethods.GetMethod('GetProcAddress')
+	        $GetProcAddress = $UnsafeNativeMethods.GetMethod('GetProcAddress', [Type[]]@([System.Runtime.InteropServices.HandleRef], [String]))
 	        # Get a handle to the module specified
 	        $Kern32Handle = $GetModuleHandle.Invoke($null, @($Module))
 	        $tmpPtr = New-Object IntPtr
@@ -3021,7 +3021,7 @@ function Invoke-CredentialInjection
 	    $UnsafeNativeMethods = $SystemAssembly.GetType('Microsoft.Win32.UnsafeNativeMethods')
 	    # Get a reference to the GetModuleHandle and GetProcAddress methods
 	    $GetModuleHandle = $UnsafeNativeMethods.GetMethod('GetModuleHandle')
-	    $GetProcAddress = $UnsafeNativeMethods.GetMethod('GetProcAddress')
+	    $GetProcAddress = $UnsafeNativeMethods.GetMethod('GetProcAddress', [Type[]]@([System.Runtime.InteropServices.HandleRef], [String]))
 	    # Get a handle to the module specified
 	    $Kern32Handle = $GetModuleHandle.Invoke($null, @($Module))
 	    $tmpPtr = New-Object IntPtr

