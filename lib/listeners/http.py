@@ -106,7 +106,12 @@ class Listener:
                 'Description'   :   'Hours for the agent to operate (09:00-17:00).',
                 'Required'      :   False,
                 'Value'         :   ''
-            },          
+            },
+            'HostPath' : {
+                'Description'   :   'Directory path for hosting files.',
+                'Required'      :   False,
+                'Value'         :   ''
+            },                       
             'Headers' : {
                 'Description'   :   'Headers for the control server.',
                 'Required'      :   True,
@@ -1016,6 +1021,18 @@ def send_message(packets=None):
                 except Exception as e:
                     routingPacket = None
                     pass
+
+            # handler hosting file
+            static_dir = self.options['HostPath']['Value']
+
+            if static_dir != '':
+                # make dynamic request uri                
+                host_file = request_uri.split('/')[-1]
+                packages = static_dir + host_file
+
+                # host a packages file, will return valid file if exist
+                if os.path.isfile(packages) and os.path.exists(packages):                  
+                    return send_from_directory(static_dir, host_file)
 
             if routingPacket:
                 # parse the routing packet and process the results
