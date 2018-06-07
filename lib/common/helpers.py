@@ -52,6 +52,7 @@ import threading
 import pickle
 import netifaces
 import random
+
 import subprocess
 import fnmatch
 import urllib, urllib2
@@ -156,10 +157,10 @@ def random_string(length=-1, charset=string.ascii_letters):
 
 def generate_random_script_var_name(origvariname,globDebug=False):
     if globDebug:
-	return origvariname
+	    return origvariname
     else:
-	hash_object=hashlib.sha1(str(origvariname)+str(globentropy)).hexdigest()
-	return hash_object[:-datetime.today().day]
+	    hash_object=hashlib.sha1(str(origvariname)+str(globentropy)).hexdigest()
+    return hash_object[:-datetime.today().day]
 
 def randomize_capitalization(data):
     """
