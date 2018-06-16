@@ -133,7 +133,11 @@ class Listener:
         self.threads = {} # used to keep track of any threaded instances of this server
 
         # optional/specific for this module
-
+        self.options['ChannelComms_ID'] = {
+                                            'Description' : 'channel internal ID that slack uses',
+                                            'Required'    : False,
+                                            'Value'       : 'tbc'
+                                          }
 
         # set the default staging key to the controller db default
         self.options['StagingKey']['Value'] = str(helpers.get_config('staging_key')[0])
@@ -165,6 +169,7 @@ class Listener:
         # if the token is unable to retrieve the list of channels return exact error, most common is bad API token
         if 'error' in SlackChannels:
             print helpers.color('[!] An error was returned from Slack: ' + SlackChannels['error'])
+            return False
         else:
 
             CommsName   = self.options['ChannelComms']['Value']
@@ -187,6 +192,8 @@ class Listener:
             elif not CommsChannel['is_member']:
                 print helpers.color('[!] Bot is not a member of channel "' + CommsName + '", bots can\'t join channels so please fix manually.')
                 return False
+
+            self.options['ChannelComms_ID']['Value'] = CommsChannel['id']
 
         return True
 
@@ -298,7 +305,7 @@ class Listener:
                 if event["type"] == "message" and not "subtype" in event:
 
                     # split format of {{AGENT_NAME}}:{{BASE64_RC4}}
-                    if ':' in event["text"]:
+                    if ':' in event["text"] and not event["user"] == bot_id:
                         agent, message = event["text"].split(':')
                         return agent, message
 
@@ -320,20 +327,20 @@ class Listener:
         staging_key = listener_options['StagingKey']['Value']
         poll_interval = listener_options['PollInterval']['Value']
         api_token = listener_options['APIToken']['Value']
+        channel_id = listener_options['ChannelComms_ID']['Value']
+
         slack_client = SlackClient(api_token)
 
         if slack_client.rtm_connect(with_team_state=False,auto_reconnect=True):
 
-            # bot connected to slack ok
-            message = "[*] Slack listener '{}'' has started.".format(listener_name)
-            signal = json.dumps({
-                'print' : True,
-                'message': message
-            })
-            dispatcher.send(signal, sender="listeners/slack/{}".format(listener_name))
-            
             # Read bot's user ID by calling Web API method `auth.test`
             bot_id = slack_client.api_call("auth.test")["user_id"]
+            slack_client.api_call(
+                "chat.postMessage",
+                channel=channel_id,
+                as_user=True,
+                text='An Empire listener for slack has started. :raised_hands:'
+            )
             
             # Set the listener in a while loop
             while True:
@@ -345,6 +352,12 @@ class Listener:
                 try:
                     agent, message = parse_commands(slack_client.rtm_read(),bot_id)
                     if message:
+                        slack_client.api_call(
+                            "chat.postMessage",
+                            channel=channel_id,
+                            as_user=True,
+                            text='Not implemented.'
+                        )
                         print helpers.color('[!] Not implemented... message from "{}": {}'.format(agent,message))
                    
                 except Exception as e:
