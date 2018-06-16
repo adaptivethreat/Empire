@@ -61,6 +61,11 @@ class Listener:
                 'Required'      :   True,
                 'Value'         :   1
             },
+            'StartMessage' : {
+                'Description'   :   'When the listener starts it will post this message to the Slack channel, just a bit of fun.',
+                'Required'      :   False,
+                'Value'         :   'An Empire listener for Slack has started. :point_up:'
+            },
             'Launcher' : {
                 'Description'   :   'Launcher string.',
                 'Required'      :   True,
@@ -328,6 +333,7 @@ class Listener:
         poll_interval = listener_options['PollInterval']['Value']
         api_token = listener_options['APIToken']['Value']
         channel_id = listener_options['ChannelComms_ID']['Value']
+        startup_message = listener_options['StartMessage']['Value']
 
         slack_client = SlackClient(api_token)
 
@@ -335,12 +341,15 @@ class Listener:
 
             # Read bot's user ID by calling Web API method `auth.test`
             bot_id = slack_client.api_call("auth.test")["user_id"]
-            slack_client.api_call(
-                "chat.postMessage",
-                channel=channel_id,
-                as_user=True,
-                text='An Empire listener for slack has started. :raised_hands:'
-            )
+
+            # post a message if present
+            if startup_message:
+                slack_client.api_call(
+                    "chat.postMessage",
+                    channel=channel_id,
+                    as_user=True,
+                    text=startup_message
+                )
             
             # Set the listener in a while loop
             while True:
