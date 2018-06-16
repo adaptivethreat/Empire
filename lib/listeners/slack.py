@@ -1,5 +1,14 @@
 import base64
 import random
+import os
+import re
+import time
+from datetime import datetime
+import copy
+import traceback
+import sys
+import json
+from pydispatch import dispatcher
 from slackclient import SlackClient
 
 # Empire imports
@@ -289,16 +298,16 @@ class Listener:
                 if event["type"] == "message" and not "subtype" in event:
 
                     # split format of {{AGENT_NAME}}:{{BASE64_RC4}}
-                    agent, message = event["text"].split(':')
-
-                    return agent, message
+                    if ':' in event["text"]:
+                        agent, message = event["text"].split(':')
+                        return agent, message
 
             return None, None
 
         # utility functions for handling Empire
         def upload_launcher():
             pass
-        
+
         def upload_stager():
             pass
 
@@ -316,7 +325,7 @@ class Listener:
         if slack_client.rtm_connect(with_team_state=False,auto_reconnect=True):
 
             # bot connected to slack ok
-            message = "[*] Slack listener {} has started.".format(listener_name)
+            message = "[*] Slack listener '{}'' has started.".format(listener_name)
             signal = json.dumps({
                 'print' : True,
                 'message': message
@@ -335,7 +344,7 @@ class Listener:
                 # try to process command sent if fails then simply wait until next poll interval and try again
                 try:
                     agent, message = parse_commands(slack_client.rtm_read(),bot_id)
-                    if command:
+                    if message:
                         print helpers.color('[!] Not implemented... message from "{}": {}'.format(agent,message))
                    
                 except Exception as e:
@@ -377,11 +386,11 @@ class Listener:
         named listener here.
         """
 
-        # if name and name != '':
-        #     print helpers.color("[!] Killing listener '%s'" % (name))
-        #     self.threads[name].kill()
-        # else:
-        #     print helpers.color("[!] Killing listener '%s'" % (self.options['Name']['Value']))
-        #     self.threads[self.options['Name']['Value']].kill()
+        if name and name != '':
+            print helpers.color("[!] Killing listener '%s'" % (name))
+            self.threads[name].kill()
+        else:
+            print helpers.color("[!] Killing listener '%s'" % (self.options['Name']['Value']))
+            self.threads[self.options['Name']['Value']].kill()
 
         pass
