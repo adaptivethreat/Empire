@@ -1,5 +1,15 @@
 import base64
 import random
+import os
+import re
+import time
+from datetime import datetime
+import copy
+import traceback
+import sys
+import json
+from pydispatch import dispatcher
+from slackclient import SlackClient
 
 # Empire imports
 from lib.common import helpers
@@ -36,20 +46,25 @@ class Listener:
                 'Required'      :   True,
                 'Value'         :   'slack'
             },
-            'Host' : {
+            'APIToken' : {
                 'Description'   :   'API Token, visit https://slack.com/apps/A0F7YS25R to get one.',
                 'Required'      :   True,
-                'Value'         :   "http://%s" % (helpers.lhost())
+                'Value'         :   'xoxb-123456789123-123456789123-ExampleSlackAPIToken'
             },
-            'BindIP' : {
+            'ChannelComms' : {
                 'Description'   :   'The Slack channel to use for comms.',
                 'Required'      :   True,
-                'Value'         :   'empire_apt'
+                'Value'         :   'empire_comms'
             },
-            'Port' : {
-                'Description'   :   'Port for the listener.',
+            'PollInterval' : {
+                'Description'   :   'How often to check Slack for new messages (Empire instance/server side). Recommended is 1 second.',
                 'Required'      :   True,
-                'Value'         :   ''
+                'Value'         :   1
+            },
+            'StartMessage' : {
+                'Description'   :   'When the listener starts it will post this message to the Slack channel, just a bit of fun.',
+                'Required'      :   False,
+                'Value'         :   'An Empire listener for Slack has started. :point_up:'
             },
             'Launcher' : {
                 'Description'   :   'Launcher string.',
@@ -59,7 +74,7 @@ class Listener:
             'StagingKey' : {
                 'Description'   :   'Staging key for initial agent negotiation.',
                 'Required'      :   True,
-                'Value'         :   '2c103f2c4ed1e59c0b4e2e01821770fa'
+                'Value'         :   'ec1a0eab303df7f47caaed136561a960'
             },
             'DefaultDelay' : {
                 'Description'   :   'Agent delay/reach back interval (in seconds).',
@@ -79,7 +94,7 @@ class Listener:
             'DefaultProfile' : {
                 'Description'   :   'Default communication profile for the agent.',
                 'Required'      :   True,
-                'Value'         :   "/admin/get.php,/news.php,/login/process.php|Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko"
+                'Value'         :   "N/A|Slackbot 1.0(+https://api.slack.com/robots)"
             },
             'CertPath' : {
                 'Description'   :   'Certificate path for https listeners.',
@@ -95,21 +110,6 @@ class Listener:
                 'Description'   :   'Hours for the agent to operate (09:00-17:00).',
                 'Required'      :   False,
                 'Value'         :   ''
-            },
-            'ServerVersion' : {
-                'Description'   :   'Server header for the control server.',
-                'Required'      :   True,
-                'Value'         :   'Microsoft-IIS/7.5'
-            },
-            'StagerURI' : {
-                'Description'   :   'URI for the stager. Example: stager.php',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
-            'UserAgent' : {
-                'Description'   :   'User-agent string to use for the staging request (default, none, or other).',
-                'Required'      :   False,
-                'Value'         :   'default'
             },
             'Proxy' : {
                 'Description'   :   'Proxy to use for request (default, none, or other).',
@@ -138,7 +138,11 @@ class Listener:
         self.threads = {} # used to keep track of any threaded instances of this server
 
         # optional/specific for this module
-
+        self.options['ChannelComms_ID'] = {
+                                            'Description' : 'channel internal ID that slack uses',
+                                            'Required'    : False,
+                                            'Value'       : 'tbc'
+                                          }
 
         # set the default staging key to the controller db default
         self.options['StagingKey']['Value'] = str(helpers.get_config('staging_key')[0])
@@ -162,6 +166,39 @@ class Listener:
             if self.options[key]['Required'] and (str(self.options[key]['Value']).strip() == ''):
                 print helpers.color("[!] Option \"%s\" is required." % (key))
                 return False
+
+        # validate Slack API token and configuration
+        sc = SlackClient(self.options['APIToken']['Value'])
+        SlackChannels = sc.api_call('channels.list')
+
+        # if the token is unable to retrieve the list of channels return exact error, most common is bad API token
+        if 'error' in SlackChannels:
+            print helpers.color('[!] An error was returned from Slack: ' + SlackChannels['error'])
+            return False
+        else:
+
+            CommsName   = self.options['ChannelComms']['Value']
+
+            # build a list of channel names and store the channel info for later use
+            ChannelNames = []
+            CommsChannel = None
+
+            for channel in SlackChannels['channels']:
+                ChannelNames.append(channel['name'])
+                if CommsName == channel['name']:
+                    CommsChannel = channel
+
+            if not CommsName in ChannelNames or CommsChannel == None:
+                print helpers.color('[!] No channel "' + CommsName + '", bots can\'t create channels so please fix manually.')
+                return False
+            elif CommsChannel['is_archived']:
+                print helpers.color('[!] Channel "' + CommsName + '" is archived, bots can\'t unarchive channels so please fix manually.')
+                return False
+            elif not CommsChannel['is_member']:
+                print helpers.color('[!] Bot is not a member of channel "' + CommsName + '", bots can\'t join channels so please fix manually.')
+                return False
+
+            self.options['ChannelComms_ID']['Value'] = CommsChannel['id']
 
         return True
 
@@ -263,6 +300,83 @@ class Listener:
             print helpers.color('[!] listeners/template generate_comms(): no language specified!')
 
 
+    def start_server(self, listenerOptions):
+
+        # utility function for handling commands
+        def parse_commands(slack_events,bot_id):
+
+            # Parses a list of events coming from the Slack RTM API to find commands.
+            for event in slack_events:
+                if event["type"] == "message" and not "subtype" in event:
+
+                    # split format of {{AGENT_NAME}}:{{BASE64_RC4}}
+                    if ':' in event["text"] and not event["user"] == bot_id:
+                        agent, message = event["text"].split(':')
+                        return agent, message
+
+            return None, None
+
+        # utility functions for handling Empire
+        def upload_launcher():
+            pass
+
+        def upload_stager():
+            pass
+
+        def handle_stager():
+            pass
+
+        listener_options = copy.deepcopy(listenerOptions)
+
+        listener_name = listener_options['Name']['Value']
+        staging_key = listener_options['StagingKey']['Value']
+        poll_interval = listener_options['PollInterval']['Value']
+        api_token = listener_options['APIToken']['Value']
+        channel_id = listener_options['ChannelComms_ID']['Value']
+        startup_message = listener_options['StartMessage']['Value']
+
+        slack_client = SlackClient(api_token)
+
+        if slack_client.rtm_connect(with_team_state=False,auto_reconnect=True):
+
+            # Read bot's user ID by calling Web API method `auth.test`
+            bot_id = slack_client.api_call("auth.test")["user_id"]
+
+            # post a message if present
+            if startup_message:
+                slack_client.api_call(
+                    "chat.postMessage",
+                    channel=channel_id,
+                    as_user=True,
+                    text=startup_message
+                )
+            
+            # Set the listener in a while loop
+            while True:
+
+                # sleep for poll interval
+                time.sleep(int(poll_interval))
+
+                # try to process command sent if fails then simply wait until next poll interval and try again
+                try:
+                    agent, message = parse_commands(slack_client.rtm_read(),bot_id)
+                    if message:
+                        slack_client.api_call(
+                            "chat.postMessage",
+                            channel=channel_id,
+                            as_user=True,
+                            text='Not implemented.'
+                        )
+                        print helpers.color('[!] Not implemented... message from "{}": {}'.format(agent,message))
+                   
+                except Exception as e:
+                    print helpers.color("[!] The command '" + str(command) + "' was sent by '" + str(user) + "' but failed. Exception is '" + str(e) + "'")
+                
+        else:
+            print helpers.color("[!] Connection failed. Exception printed above.")
+        
+
+
     def start(self, name=''):
         """
         If a server component needs to be started, implement the kick off logic
@@ -270,20 +384,20 @@ class Listener:
         (i.e. start_server() in the http listener).
         """
 
-        # listenerOptions = self.options
-        # if name and name != '':
-        #     self.threads[name] = helpers.KThread(target=self.start_server, args=(listenerOptions,))
-        #     self.threads[name].start()
-        #     time.sleep(1)
-        #     # returns True if the listener successfully started, false otherwise
-        #     return self.threads[name].is_alive()
-        # else:
-        #     name = listenerOptions['Name']['Value']
-        #     self.threads[name] = helpers.KThread(target=self.start_server, args=(listenerOptions,))
-        #     self.threads[name].start()
-        #     time.sleep(1)
-        #     # returns True if the listener successfully started, false otherwise
-        #     return self.threads[name].is_alive()
+        listenerOptions = self.options
+        if name and name != '':
+            self.threads[name] = helpers.KThread(target=self.start_server, args=(listenerOptions,))
+            self.threads[name].start()
+            time.sleep(1)
+            # returns True if the listener successfully started, false otherwise
+            return self.threads[name].is_alive()
+        else:
+            name = listenerOptions['Name']['Value']
+            self.threads[name] = helpers.KThread(target=self.start_server, args=(listenerOptions,))
+            self.threads[name].start()
+            time.sleep(1)
+            # returns True if the listener successfully started, false otherwise
+            return self.threads[name].is_alive()
 
         return True
 
@@ -294,11 +408,11 @@ class Listener:
         named listener here.
         """
 
-        # if name and name != '':
-        #     print helpers.color("[!] Killing listener '%s'" % (name))
-        #     self.threads[name].kill()
-        # else:
-        #     print helpers.color("[!] Killing listener '%s'" % (self.options['Name']['Value']))
-        #     self.threads[self.options['Name']['Value']].kill()
+        if name and name != '':
+            print helpers.color("[!] Killing listener '%s'" % (name))
+            self.threads[name].kill()
+        else:
+            print helpers.color("[!] Killing listener '%s'" % (self.options['Name']['Value']))
+            self.threads[self.options['Name']['Value']].kill()
 
         pass

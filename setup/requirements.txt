@@ -16,3 +16,4 @@ cryptography
 pyminifier==2.1
 xlutils
 pycrypto
+slackclient
