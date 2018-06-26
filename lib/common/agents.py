@@ -841,6 +841,46 @@ class Agents:
         return autoruns
 
 
+    def filter_agents(self, line):
+        conn = self.get_db_connection()
+        results = None
+        column = line[line.index("--search")+1]
+        sqlcmd_end = ""
+
+        if "--startswith" in line:
+            starts_with = line[line.index("--startswith")+1]
+            sqlcmd_end =  "WHERE %s LIKE '%s" % (column, starts_with)
+            sqlcmd_end += "%' --case-insensitive"
+        elif "--contains" in line:
+            contains = line[line.index("--contains")+1]
+            sqlcmd_end =  "WHERE %s LIKE " % column
+            sqlcmd_end += "'%"
+            sqlcmd_end += "%s" % contains
+            sqlcmd_end += "%' --case-insensitive"
+
+        try:
+            self.lock.acquire()
+            oldFactory = conn.row_factory
+            conn.row_factory = helpers.dict_factory
+            cur = conn.cursor()
+
+            sqlcmd =  "SELECT nonce, jitter, results, servers, internal_ip, "
+            sqlcmd += "working_hours, session_key, children, functions, checkin_time, "
+            sqlcmd += "hostname, id, delay, username, kill_date, parent, process_name, "
+            sqlcmd += "listener, process_id, profile, os_details, taskings, name, "
+            sqlcmd += "language, external_ip, session_id, lastseen_time, language_version, "
+            sqlcmd += "high_integrity FROM agents "
+            sqlcmd += sqlcmd_end
+
+            cur.execute(sqlcmd)
+            results = cur.fetchall()
+            cur.close()
+            conn.row_factory = oldFactory
+        finally:
+            self.lock.release()
+
+        return results
+
     ###############################################################
     #
     # Methods to update agent information fields.

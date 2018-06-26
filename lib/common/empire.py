@@ -791,7 +791,28 @@ class MainMenu(cmd.Cmd):
         if parts[0].lower() == 'agents':
 
             line = ' '.join(parts[1:])
-            allAgents = self.agents.get_agents_db()
+            allAgents = []
+
+            if "--search" in parts:
+                agentsToDisplay = []
+                allAgents = self.agents.filter_agents(parts)
+                for agent in allAgents:
+                    intervalMax = (agent['delay'] + agent['delay'] * agent['jitter']) + 30
+                    agentTime = time.mktime(time.strptime(agent['lastseen_time'], "%Y-%m-%d %H:%M:%S"))
+                    if agentTime < time.mktime(time.localtime()) - intervalMax:
+                        agentsToDisplay.append(agent)
+                messages.display_agents(agentsToDisplay)
+            else:
+                allAgents = self.agents.get_agents_db()
+
+            if line.strip().lower() == 'help':
+                print helpers.color("[*] Help menu for searching agents")  
+                print "\t--search\tWhat column to search (name, language, internal_ip, hostname, username, process_name)"
+                print "\t--startswith\tWhat does the value startwith?"
+                print "\t--contains\tWhat does the value contain?\r\n"
+                print "Example:"
+                print "\tlist agents --search name --startswith ABC"
+                print "\tlist agents --search hostname --contains ABC\r\n"
 
             if line.strip().lower() == 'stale':
 
@@ -826,12 +847,14 @@ class MainMenu(cmd.Cmd):
 
                     messages.display_agents(agentsToDisplay)
 
-                except Exception:
-                    print helpers.color("[!] Please enter the minute window for agent checkin.")
+                # really really ugly
+                except Exception as e:
+                    z = e
+                #except Exception:
+                    #print helpers.color("[!] Please enter the minute window for agent checkin.")
 
             else:
                 messages.display_agents(allAgents)
-
 
         elif parts[0].lower() == 'listeners':
             messages.display_listeners(self.listeners.activeListeners)
