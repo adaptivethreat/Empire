@@ -64,9 +64,9 @@ class Listener:
                 'Value'         :   'empire_comms'
             },
             'PollInterval' : {
-                'Description'   :   'How often to check Slack for new messages (Empire instance/server side). Recommended is 0.1 second.',
+                'Description'   :   'How often to check Slack for new messages (Empire instance/server side). Recommended is 0.5 second.',
                 'Required'      :   True,
-                'Value'         :   0.1
+                'Value'         :   0.5
             },
             'StartMessage' : {
                 'Description'   :   'When the listener starts it will post this message to the Slack channel, just a bit of fun.',
@@ -875,7 +875,7 @@ class Listener:
 
                             message = "[*] Processing stage 3 of the staging process for agent {}, total base64 string length is {}".format(agent,str(len(stage_data)))
                             signal = json.dumps({
-                                'print' : True,
+                                'print' : False,
                                 'message': message
                             })
                             dispatcher.send(signal, sender="listeners/slack/{}".format(listener_name))
@@ -894,7 +894,7 @@ class Listener:
 
                             message = "[*] Processing stage 5 of the staging process for agent {}, total base64 string length is {}".format(agent,str(len(agent_upload)))
                             signal = json.dumps({
-                                'print' : True,
+                                'print' : False,
                                 'message': message
                             })
                             dispatcher.send(signal, sender="listeners/slack/{}".format(listener_name))
@@ -917,7 +917,7 @@ class Listener:
                    
                 except Exception as e:
                     print helpers.color("[!] Something went wrong with the Slack bot: " + str(e))
-                    print traceback.format_exc()
+                    print helpers.color("[!] {}".format(traceback.format_exc()))
 
         else:
             print helpers.color("[!] Connection failed. Exception printed above.")

