@@ -203,7 +203,7 @@ class Listener:
 
             if not CommsName in ChannelNames or CommsChannel == None:
                 print helpers.color('[!] No channel "' + CommsName + '", please create channel.')
-        return False
+                return False
 
             self.options['ChannelComms_ID']['Value'] = CommsChannel['id']
 
@@ -786,7 +786,7 @@ class Listener:
 
         # validate Slack API token and configuration
         SlackChannels = user_slack_client.api_call('channels.list')
-    PrivateChannels = user_slack_client.api_call('groups.list')
+        PrivateChannels = user_slack_client.api_call('groups.list')
 
         # if the token is unable to retrieve the list of channels return exact error, most common is bad API token
         if 'error' in SlackChannels:
