@@ -175,8 +175,9 @@ class Listener:
                 return False
 
         # validate Slack API token and configuration
-        sc = SlackClient(self.options['APIToken']['Value'])
+        sc = SlackClient(self.options['UserAPIToken']['Value'])
         SlackChannels = sc.api_call('channels.list')
+        PrivateChannels = sc.api_call('groups.list')
 
         # if the token is unable to retrieve the list of channels return exact error, most common is bad API token
         if 'error' in SlackChannels:
@@ -195,8 +196,14 @@ class Listener:
                 if CommsName == channel['name']:
                     CommsChannel = channel
 
+            for channel in PrivateChannels['groups']:
+                ChannelNames.append(channel['name'])
+                if CommsName == channel['name']:
+                    CommsChannel = channel
+
             if not CommsName in ChannelNames or CommsChannel == None:
                 print helpers.color('[!] No channel "' + CommsName + '", please create channel.')
+        return False
 
             self.options['ChannelComms_ID']['Value'] = CommsChannel['id']
 
@@ -681,10 +688,11 @@ class Listener:
                                         agent_sent = True
                                     else:
                                         agent_sent = None
-                                        data = base64.b64decode(raw_message)
+                                        data = None
 
                                     agent = message["username"]
                                     if ':' in agent:
+                                        data = base64.b64decode(raw_message)
                                         agent, stage = agent.split(':')
 
                                         return agent, stage, data, thread_ts, agent_sent
@@ -777,7 +785,8 @@ class Listener:
 
 
         # validate Slack API token and configuration
-        SlackChannels = slack_client.api_call('channels.list')
+        SlackChannels = user_slack_client.api_call('channels.list')
+    PrivateChannels = user_slack_client.api_call('groups.list')
 
         # if the token is unable to retrieve the list of channels return exact error, most common is bad API token
         if 'error' in SlackChannels:
@@ -796,6 +805,10 @@ class Listener:
                 if CommsName == channel['name']:
                     CommsChannel = channel
 
+            for channel in PrivateChannels['groups']:
+                ChannelNames.append(channel['name'])
+                if CommsName == channel['name']:
+                    CommsChannel = channel
 
         # check channels are setup are all ok and if not correct them
         if not CommsName in ChannelNames or CommsChannel == None:
@@ -822,19 +835,19 @@ class Listener:
             else:
                 print helpers.color('[!] The channel {}, couldn\'t be unarchived.'.format(channel_name))
                 return False
-        elif not CommsChannel['is_member']:
-            response = user_slack_client.api_call("channels.invite", channel=channel_id, user=bot_id)
-            if not 'error' in response:
-                message = '[+] The bot was invited to channel {} in Slack.'.format(channel_name)
-                signal = json.dumps({
-                    'print' : True,
-                    'message': message
-                })
-                dispatcher.send(signal, sender="listeners/slack/{}".format(listener_name))
-            else:
-                print helpers.color('[!] The bot couldn\'t be invited to channel {}.'.format(channel_name))
-                return False
-
+        elif 'is_member' in  CommsChannel:
+            if not CommsChannel['is_member']:
+                response = user_slack_client.api_call("channels.invite", channel=channel_id, user=bot_id)
+                if not 'error' in response:
+                    message = '[+] The bot was invited to channel {} in Slack.'.format(channel_name)
+                    signal = json.dumps({
+                        'print' : True,
+                        'message': message
+                    })
+                    dispatcher.send(signal, sender="listeners/slack/{}".format(listener_name))
+                else:
+                    print helpers.color('[!] The bot couldn\'t be invited to channel {}.'.format(channel_name))
+                    return False
 
         if slack_client.rtm_connect(with_team_state=False,auto_reconnect=True):
 
