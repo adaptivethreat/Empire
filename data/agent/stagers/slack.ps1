@@ -186,10 +186,10 @@ function Start-Negotiate {
             #If we're getting rate-limited
             Write-Host "Waiting....";
             Write-Host $_;
-            if($_.Response.StatusCode -eq 429) {
-                Start-Sleep -Seconds ($_.Response.Headers.Get("Retry-After")*2);
+            if($_.Exception.InnerException.Response.StatusCode.value__ -eq 429) {
+                Start-Sleep -Seconds ($_.Exception.InnerException.Response.Headers.Get("Retry-After")*2);
             }
-            #Try again and hope for the test
+            #Try again and hope for the best
             else {
                 Start-Sleep -Seconds 5;
             }
@@ -334,10 +334,10 @@ function Start-Negotiate {
             #If we're getting rate-limited
             Write-Host "Waiting...";
             Write-Host $_;
-            if($_.Response.StatusCode -eq 429) {
-                Start-Sleep -Seconds ($_.Response.Headers.Get("Retry-After")*2);
+            if($_.Exception.InnerException.Response.StatusCode.value__ -eq 429) {
+                Start-Sleep -Seconds ($_.Exception.InnerException.Response.Headers.Get("Retry-After")*2);
             }
-            #Try again and hope for the test
+            #Try again and hope for the best
             else {
                 Start-Sleep -Seconds 5;
             }
