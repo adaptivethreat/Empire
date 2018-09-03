@@ -167,11 +167,11 @@ tar -xvf ../data/misc/xar-1.5.2.tar.gz
 #Installing bomutils
 git clone https://github.com/hogliux/bomutils.git
 (cd bomutils && make)
-(cd bomutils && make install)
+(cd bomutils && sudo make install)
 
 # NIT: This fails on OSX. Leaving it only on Linux instances. 
 if uname | grep -q "Linux"; then
-	(cd bomutils && make install)
+	(cd bomutils && sudo make install)
 fi
 chmod 755 bomutils/build/bin/mkbom && sudo cp bomutils/build/bin/mkbom /usr/local/bin/.
 
