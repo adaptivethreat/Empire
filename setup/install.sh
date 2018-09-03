@@ -84,23 +84,23 @@ function install_powershell() {
 		#Kali Linux
 		if cat /etc/lsb-release | grep -i 'Kali'; then
 			# Install prerequisites
-			apt-get update
-			apt-get install -y curl gnupg apt-transport-https
+			sudo apt-get update
+			sudo apt-get install -y curl gnupg apt-transport-https
 			# Import the public repository GPG keys
 			curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
 			# Register the Microsoft Product feed
-			sh -c 'echo "deb [arch=amd64] https://packages.microsoft.com/repos/microsoft-debian-stretch-prod stretch main" > /etc/apt/sources.list.d/microsoft.list'
+			sudo sh -c 'echo "deb [arch=amd64] https://packages.microsoft.com/repos/microsoft-debian-stretch-prod stretch main" > /etc/apt/sources.list.d/microsoft.list'
 			# Update the list of products
-			apt-get update
+			sudo apt-get update
 			# Install PowerShell
-			apt-get install -y powershell
+			sudo apt-get install -y powershell
 		fi
 	 fi
         if ls /opt/microsoft/powershell/*/DELETE_ME_TO_DISABLE_CONSOLEHOST_TELEMETRY; then
-            rm /opt/microsoft/powershell/*/DELETE_ME_TO_DISABLE_CONSOLEHOST_TELEMETRY
+            sudo rm /opt/microsoft/powershell/*/DELETE_ME_TO_DISABLE_CONSOLEHOST_TELEMETRY
         fi
-	mkdir -p /usr/local/share/powershell/Modules
-	cp -r ../lib/powershell/Invoke-Obfuscation /usr/local/share/powershell/Modules
+	sudo mkdir -p /usr/local/share/powershell/Modules
+	sudo cp -r ../lib/powershell/Invoke-Obfuscation /usr/local/share/powershell/Modules
 }
 
 
@@ -116,8 +116,7 @@ fi
 
 # Check for PIP otherwise install it
 if ! which pip > /dev/null; then
-	wget https://bootstrap.pypa.io/get-pip.py
-	python get-pip.py
+	wget -qO- https://bootstrap.pypa.io/get-pip.py | sudo python
 fi
 
 if uname | grep -q "Darwin"; then
@@ -134,26 +133,26 @@ else
 	if lsb_release -d | grep -q "Fedora"; then
 		Release=Fedora
 		sudo dnf install -y make g++ python-devel m2crypto python-m2ext swig python-iptools python3-iptools libxml2-devel default-jdk openssl-devel libssl1.0.0 libssl-dev build-essential
-		pip install --upgrade pip
+		sudo pip install --upgrade pip
 		sudo pip install -r requirements.txt 
 	elif lsb_release -d | grep -q "Kali"; then
 		Release=Kali
 		wget http://ftp.us.debian.org/debian/pool/main/o/openssl/libssl1.0.0_1.0.1t-1+deb8u7_amd64.deb
-		dpkg -i libssl1.0.0_1.0.1t-1+deb8u7_amd64.deb
+		sudo dpkg -i libssl1.0.0_1.0.1t-1+deb8u7_amd64.deb
 		sudo apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk zlib1g-dev libssl1.0-dev build-essential libssl1.0-dev libxml2-dev zlib1g-dev
-		pip install --upgrade pip
+		sudo pip install --upgrade pip
 		sudo pip install -r requirements.txt 
 		install_powershell
 	elif lsb_release -d | grep -q "Ubuntu"; then
 		Release=Ubuntu
 		sudo apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk libssl1.0.0 libssl-dev build-essential
-		pip install --upgrade pip
+		sudo pip install --upgrade pip
 		sudo pip install -r requirements.txt 
 		install_powershell
 	else
 		echo "Unknown distro - Debian/Ubuntu Fallback"
 		sudo apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk libffi-dev libssl1.0.0 libssl-dev build-essential
-		pip install --upgrade pip
+		sudo pip install --upgrade pip
 		sudo pip install -r requirements.txt 
 		install_powershell
 	fi
