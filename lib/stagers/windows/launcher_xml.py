@@ -43,7 +43,7 @@ class Stager:
             'ObfuscateCommand' : {
                 'Description'   :   'The Invoke-Obfuscation command to use. Only used if Obfuscate switch is True. For powershell only.',
                 'Required'      :   False,
-                'Value'         :   r'Token\All\1,Launcher\STDIN++\12467'
+                'Value'         :   r'Token\All\1,Launcher\PS\12467'
             },
             'OutFile': {
                 'Description':   'File to output XML to, otherwise displayed on the screen.',
