@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import argparse
 import logging
 import random
 import select
@@ -43,7 +42,7 @@ class Message(object):
         self.size = size
 
     def __str__(self):
-        return '<Message type={} channel={}>'.format(self.mtype, self.channel)
+        return '<Message type={0} channel={1}>'.format(self.mtype, self.channel)
 
     @classmethod
     def unpack(cls, data):
@@ -67,7 +66,7 @@ class Channel(object):
         self.logger = logging.getLogger(self.__class__.__name__)
 
     def __str__(self):
-        return '<Channel id={} remote_addr={} local_addr={}>'.format(self.channel_id, self.remote_peer_addr, self.local_peer_addr)
+        return '<Channel id={0} remote_addr={1} local_addr={2}>'.format(self.channel_id, self.remote_peer_addr, self.local_peer_addr)
 
     @property
     def connected(self):
@@ -77,13 +76,13 @@ class Channel(object):
         return self.socket.fileno()
 
     def close(self):
-        self.logger.debug('Closing channel {}'.format(self))
+        self.logger.debug('Closing channel {0}'.format(self))
         if self.connected:
             try:
                 self.socket.shutdown(socket.SHUT_RDWR)
                 self.socket.close()
             except Exception as e:
-                self.logger.debug('Unable to close channel: {}'.format(e))
+                self.logger.debug('Unable to close channel: {0}'.format(e))
             self.socket = None
 
 
@@ -95,18 +94,18 @@ class Tunnel(object):
         self.logger = logging.getLogger(self.__class__.__name__)
 
     def send_message(self, msg, data=''):
-        self.logger.debug('Sending {}'.format(msg))
+        self.logger.debug('Sending {0}'.format(msg))
         try:
             self.transport_socket.sendall(msg.pack(data))
         except (socket.error, TypeError) as e:
-            self.logger.critical('Problem sending a message over transport: {}'.format(e))
+            self.logger.critical('Problem sending a message over transport: {0}'.format(e))
             sys.exit(255)
 
     def recv_message(self):
         try:
             msg, _ = Message.unpack(recvall(self.transport_socket, Message.M_HDR_STRUCT.size))
         except socket.error as e:
-            self.logger.critical('Problem receiving a message over transport: {}'.format(e))
+            self.logger.critical('Problem receiving a message over transport: {0}'.format(e))
             sys.exit(255)
         return msg, recvall(self.transport_socket, msg.size)
 
@@ -114,7 +113,7 @@ class Tunnel(object):
         for c in self.channels:
             if c.channel_id == channel_id:
                 return c
-        raise KeyError('Invalid channel number "{}"'.format(channel_id))
+        raise KeyError('Invalid channel number "{0}"'.format(channel_id))
 
     def open_channel(self, channel_id, remote=False):
         c = Channel()
@@ -130,7 +129,7 @@ class Tunnel(object):
             if c.channel_id == channel_id:
                 c.close()
                 self.channels.remove(c)
-                self.logger.info('Closed channel: {}'.format(c))
+                self.logger.info('Closed channel: {0}'.format(c))
                 break
         if remote:
             msg = Message(mtype=MTYPE_CCLO, channel=channel_id)
@@ -161,7 +160,7 @@ class SocksHandler(object):
                 return struct.pack('BB', 0x05, 0xFF)  # No Acceptable Auth Methods
 
             methods = [self.SOCKS5_AUTH_METHODS.get(x, hex(x)) for x in data[2:]]
-            self.logger.debug('Received SOCKS auth request: {}'.format(', '.join(methods)))
+            self.logger.debug('Received SOCKS auth request: {0}'.format(', '.join(methods)))
 
             self.auth_handled = True
             return struct.pack('BB', 0x05, 0x00)  # No Auth Required
@@ -201,9 +200,9 @@ class SocksHandler(object):
                     port, = struct.unpack('!H', data[-2:])
                     af = socket.AF_INET6
                 else:
-                    raise NotImplementedError('Failed to implement handler for atype={}'.format(hex(atyp)))
+                    raise NotImplementedError('Failed to implement handler for atype={0}'.format(hex(atyp)))
 
-                self.logger.debug('Received SOCKSv5 CONNECT request for {}:{}'.format(host, port))
+                self.logger.debug('Received SOCKSv5 CONNECT request for {0}:{1}'.format(host, port))
 
                 try:
                     s = socket.socket(af)
@@ -218,14 +217,14 @@ class SocksHandler(object):
                 s.settimeout(None)
                 channel.socket = s
                 peer_host, peer_port = s.getpeername()[:2]
-                channel.local_peer_addr = '{}[{}]:{}'.format(host, peer_host, port)
+                channel.local_peer_addr = '{0}[{1}]:{2}'.format(host, peer_host, port)
 
                 local_host, local_port = s.getsockname()[:2]
                 bind_addr = socket.inet_pton(af, local_host)
                 bind_port = struct.pack('!H', local_port)
 
                 ret = struct.pack('!BBBB', 0x05, 0x00, 0x00, atyp) + bind_addr + bind_port
-                self.logger.info('Connected {}'.format(channel))
+                self.logger.info('Connected {0}'.format(channel))
                 self.request_handled = True
                 return ret
 
@@ -236,7 +235,7 @@ class SocksHandler(object):
                 raise NotImplementedError('Need to implement UDP ASSOCIATE command')  # TODO
 
             else:
-                raise NotImplementedError('Failed to implemented handler for cmd={}'.format(hex(cmd)))
+                raise NotImplementedError('Failed to implemented handler for cmd={0}'.format(hex(cmd)))
 
 
 class SocksBase(object):
@@ -276,7 +275,7 @@ class SocksBase(object):
                     msg, data = self.tunnel.recv_message()
                 except Exception as e:
                     self.logger.critical('Error receiving messages, exiting')
-                    self.logger.debug('Error message: {}'.format(e))
+                    self.logger.debug('Error message: {0}'.format(e))
                     self.tunnel.transport_socket.close()
                     return
 
@@ -285,7 +284,7 @@ class SocksBase(object):
 
                 elif msg.mtype == MTYPE_COPEN:
                     c = self.tunnel.open_channel(msg.channel)
-                    self.logger.debug('Received OpenChannel message, opened channel: {}'.format(c))
+                    self.logger.debug('Received OpenChannel message, opened channel: {0}'.format(c))
 
                 elif msg.mtype == MTYPE_CCLO:
                     try:
@@ -294,7 +293,7 @@ class SocksBase(object):
                     except KeyError:
                         pass
                     else:
-                        self.logger.info('Closed a channel: {}'.format(c))
+                        self.logger.info('Closed a channel: {0}'.format(c))
 
                 elif msg.mtype == MTYPE_CADDR:
                     try:
@@ -303,7 +302,7 @@ class SocksBase(object):
                         pass
                     else:
                         c.remote_peer_addr = data
-                        self.logger.info('Channel connected remotely: {}'.format(c))
+                        self.logger.info('Channel connected remotely: {0}'.format(c))
 
                 elif msg.mtype == MTYPE_DATA:
                     try:
@@ -311,33 +310,33 @@ class SocksBase(object):
                     except KeyError:
                         pass
                     else:
-                        self.logger.debug('Received {} bytes from tunnel for {}'.format(len(data), c))
+                        self.logger.debug('Received {0} bytes from tunnel for {1}'.format(len(data), c))
                         if not self.check_socks_protocol(c, data):
                             try:
                                 c.socket.sendall(data)
                             except:
-                                self.logger.debug('Problem sending data to channel {}'.format(c))
+                                self.logger.debug('Problem sending data to channel {0}'.format(c))
                                 self.tunnel.close_channel(msg.channel, remote=True)
 
                 else:
-                    self.logger.warning('Received message of unknown type {}'.format(hex(msg.mtype)))
+                    self.logger.warning('Received message of unknown type {0}'.format(hex(msg.mtype)))
 
                 continue
 
             if self.socks_socket is not None and self.socks_socket in r:
                 s, addr = self.socks_socket.accept()
-                addr = '{}:{}'.format(*addr)
+                addr = '{0}:{1}'.format(*addr)
                 c = self.tunnel.open_channel(self.next_channel_id.next(), remote=True)
                 c.local_peer_addr = addr
                 c.socket = s
-                self.logger.info('Created new channel: {}'.format(c))
+                self.logger.info('Created new channel: {0}'.format(c))
                 continue
 
             for c in r:
                 try:
                     data = c.socket.recv(1024)
                 except Exception as e:
-                    self.logger.debug('Problem recving from {}: {}'.format(c, e))
+                    self.logger.debug('Problem recving from {0}: {1}'.format(c, e))
                     self.tunnel.close_channel(c.channel_id, remote=True)
                     break
                 if not data:
@@ -345,7 +344,7 @@ class SocksBase(object):
                     self.tunnel.close_channel(c.channel_id, remote=True)
                 msg = Message(mtype=MTYPE_DATA, channel=c.channel_id)
                 self.tunnel.send_message(msg, data=data)
-                self.logger.debug('Sent {} bytes over tunnel: {}'.format(len(data), msg))
+                self.logger.debug('Sent {0} bytes over tunnel: {1}'.format(len(data), msg))
 
     def run(self):
         raise NotImplementedError('Subclasses should implement the run() method')
@@ -356,7 +355,7 @@ class SocksRelay(SocksBase):
         if not c.socks_handler.auth_handled:
             res = c.socks_handler.handle(c, data)
             if not c.socks_handler.auth_handled:
-                self.logger.warning('SOCKS auth handler failed, expect channel close for {}'.format(c))
+                self.logger.warning('SOCKS auth handler failed, expect channel close for {0}'.format(c))
             msg = Message(mtype=MTYPE_DATA, channel=c.channel_id)
             self.tunnel.send_message(msg, data=res)
             return True
@@ -365,7 +364,7 @@ class SocksRelay(SocksBase):
             msg = Message(mtype=MTYPE_DATA, channel=c.channel_id)
             self.tunnel.send_message(msg, data=res)
             if not c.socks_handler.request_handled:
-                self.logger.warning('SOCKS req handler failed, expect channel close for {}'.format(c))
+                self.logger.warning('SOCKS req handler failed, expect channel close for {0}'.format(c))
             else:
                 msg = Message(mtype=MTYPE_CADDR, channel=c.channel_id)
                 self.tunnel.send_message(msg, data=c.local_peer_addr)
@@ -376,13 +375,13 @@ class SocksRelay(SocksBase):
     def run(self):
         s = socket.socket()
         s = ssl.wrap_socket(s)
-        self.logger.debug('Connecting to {}:{}'.format(*self.transport_addr))
+        self.logger.debug('Connecting to {0}:{1}'.format(*self.transport_addr))
         try:
             s.connect(self.transport_addr)
         except Exception as e:
-            self.logger.error('Problem connecting to server: {}'.format(e))
+            self.logger.error('Problem connecting to server: {0}'.format(e))
         else:
-            self.logger.info('Connected to {}:{}'.format(*self.transport_addr))
+            self.logger.info('Connected to {0}:{1}'.format(*self.transport_addr))
             self.tunnel = Tunnel(s)
             self.monitor_sockets()
         self.logger.warning('SOCKS relay is exiting')
