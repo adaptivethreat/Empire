@@ -199,16 +199,16 @@ class Module:
             'file_md5': hashlib.md5(file_data).hexdigest(),
             'file_size': helpers.get_file_size(file_data)
         })
-        dispatcher.send(signal, sender="agents/{}".format(self.sessionID))
+        dispatcher.send(signal, sender="agents/{}".format(sessionID))
 
         # update the agent log
         msg = "Tasked agent to upload %s : %s" % (TriggerXPSPrint, hashlib.md5(file_data).hexdigest())
-        self.mainMenu.agents.save_agent_log(self.sessionID, msg)
+        self.mainMenu.agents.save_agent_log(sessionID, msg)
         
         # upload packets -> "filename | script data"
         file_data = helpers.encode_base64(file_data)
         data = uploadname + "|" + file_data
-        self.mainMenu.agents.add_agent_task_db(self.sessionID, "TASK_UPLOAD", data)
+        self.mainMenu.agents.add_agent_task_db(sessionID, "TASK_UPLOAD", data)
 
 
         script = moduleCode
