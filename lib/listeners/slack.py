@@ -637,66 +637,56 @@ class Listener:
 
             # Parses a list of events coming from the Slack RTM API to find commands.
             return_array = []
+            agents = self.mainMenu.agents.agents
+            thread_ids = filter(None, map((lambda x: get_agent_queue(agents[x])), agents))
             for event in slack_events:
                 # if it has a type and subtype most likely a message to process
                 if 'type' in event and 'subtype' in event:
                     if event["type"] == "message" and event["channel"] != bot_id and event["subtype"] != "message_replied":
+                        thread_ts = event["ts"]
 
-                        # grab more details such as the username of the poster
-                        event_details = user_slack_client.api_call("channels.history",channel=channel_id,latest=event["ts"],inclusive=True,count=1)
-                        #time.sleep(1)
-
-                        if 'messages' in event_details:
-                            message = event_details["messages"][0]
-                            thread_ts = message["ts"]
-
-                            if 'thread_ts' in message:
-
-                                if message["thread_ts"] == thread_ts:
-                                    not_thread = True
-                                else:
-                                    not_thread = False
-                            else:
+                        if 'thread_ts' in event:
+                            if event["thread_ts"] == thread_ts:
                                 not_thread = True
+                            else:
+                                not_thread = False
+                        else:
+                            not_thread = True
 
-                            if not_thread:
-                                # by adding a thumbs up helps the listener keep track of what it has processed
-                                reaction = slack_client.api_call("reactions.add", name='thumbsup', channel=channel_id, timestamp=thread_ts)
+                        if not_thread:
+                            if 'username' in event:
+                                raw_message = event["text"]
+                                agent = event["username"]
+                                # incoming agent data from a task
 
-                                if 'username' in message and not 'error' in reaction:
-                                    raw_message = message["text"]
-                                    agent = message["username"]
-                                    # incoming agent data from a task
-
-                                    if ':' in agent and raw_message:
-                                        agent, stage = agent.split(':')
-                                        #If it's a threaded response from an agent, stick it in its own queue so we don't block on it
-                                        if raw_message == '--MESSAGE_START--':
-                                            self.mainMenu.agents.agents[agent]['slack_queue'] = {
-                                                "thread_ts": message['ts'],
-                                                "data": ""
-                                            }
-                                        else:
-                                            data = base64.b64decode(raw_message)
-                                            return_array.append((agent, stage, data, thread_ts))
-
-                                else:
-                                        agent = 'unknown:unknown'
-                                        print helpers.color("[!] No agent name for message: {}".format(message))
-
-                            elif 'thread_ts' in message:
-                                agents = self.mainMenu.agents.agents
-                                thread_ids = filter(None, map((lambda x: get_agent_queue(agents[x])), agents))
-                                if message["thread_ts"] in thread_ids:
-                                    agent_id, stage = message['username'].split(':')
-                                    if agent_id not in agents:
-                                        continue
-                                    queue = agents[agent_id]['slack_queue']
-                                    if message['text'] == '--MESSAGE_END--':
-                                        return_array.append((agent_id, stage, base64.b64decode(queue['data']), queue['thread_ts']))
-                                        agents[agent_id]['slack_queue'] = None
+                                if ':' in agent and raw_message:
+                                    agent, stage = agent.split(':')
+                                    #If it's a threaded response from an agent, stick it in its own queue so we don't block on it
+                                    if raw_message == '--MESSAGE_START--':
+                                        self.mainMenu.agents.agents[agent]['slack_queue'] = {
+                                            "thread_ts": thread_ts,
+                                            "data": ""
+                                        }
+                                        thread_ids.append(thread_ts)
                                     else:
-                                        queue['data'] += message['text']
+                                        data = base64.b64decode(raw_message)
+                                        return_array.append((agent, stage, data, thread_ts))
+
+                            else:
+                                    agent = 'unknown:unknown'
+                                    print helpers.color("[!] No agent name for message: {}".format(event))
+
+                        elif 'thread_ts' in event:
+                            if event["thread_ts"] in thread_ids:
+                                agent_id, stage = event['username'].split(':')
+                                if agent_id not in agents:
+                                    continue
+                                queue = agents[agent_id]['slack_queue']
+                                if event['text'] == '--MESSAGE_END--':
+                                    return_array.append((agent_id, stage, base64.b64decode(queue['data']), queue['thread_ts']))
+                                    agents[agent_id]['slack_queue'] = None
+                                else:
+                                    queue['data'] += event['text']
 
 
             #time.sleep(1)
@@ -898,14 +888,10 @@ class Listener:
                 try:
                     a = datetime.now()
                     raw = []
-                    done = False
-                    while not done:
-                        message = slack_client.rtm_read()
-                        if message:
-                            for m in message:
-                                raw.append(m)
-                        else:
-                            done = True
+                    v = True
+                    while v:
+                        v = slack_client.rtm_read()
+                        raw += v
 
                     messages = parse_commands(raw,bot_id)
                     b = datetime.now()
