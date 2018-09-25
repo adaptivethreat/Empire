@@ -480,7 +480,13 @@ class Listener:
                                     $result
                                 }
                                 elseif($slack_response['messages'].length -eq 2) {
-                                    $waiting = $true
+                                    if($slack_response['messages'][1]['text'] -eq "--RESTAGE--") {
+                                        write-host "Restaging"
+                                        Start-Negotiate -s "$ser" -SK $sk -UA $u;
+                                    }
+                                    else {
+                                        $waiting = $true
+                                    }
                                 }
                             }
                             catch [System.Net.WebException] {
@@ -944,11 +950,15 @@ class Listener:
                                 if task_data:
                                     for task in task_data:
                                         lang, data = task
-                                        if data and data != "VALID":
-                                            self.mainMenu.agents.agents[agent].pop('request_ts', None)
-                                            slack_client.api_call('chat.postMessage', channel=channel_id, text="Starting", thread_ts=thread_ts)
-                                            data_thread = post_data(base64.encodestring(data),agent,channel_id,None,listener_name,user_api_token)
-                                            slack_client.api_call('chat.postMessage', channel=channel_id, text=data_thread, thread_ts=thread_ts)
+                                        if data:
+                                            if "not in cache!" in data:
+                                                #Agent needs restaged
+                                                slack_client.api_call('chat.postMessage', channel=channel_id, text='--RESTAGE--', thread_ts=thread_ts)
+                                            elif data != "VALID":
+                                                self.mainMenu.agents.agents[agent].pop('request_ts', None)
+                                                slack_client.api_call('chat.postMessage', channel=channel_id, text="Starting", thread_ts=thread_ts)
+                                                data_thread = post_data(base64.encodestring(data),agent,channel_id,None,listener_name,user_api_token)
+                                                slack_client.api_call('chat.postMessage', channel=channel_id, text=data_thread, thread_ts=thread_ts)
                                         else:
                                             if agent in self.mainMenu.agents.agents:
                                                 self.mainMenu.agents.agents[agent]['request_ts'] = thread_ts
