@@ -65,6 +65,7 @@ c = conn.cursor()
 
 # try to prevent some of the weird sqlite I/O errors
 c.execute('PRAGMA journal_mode = OFF')
+c.execute('PRAGMA foreign_keys = ON')
 
 c.execute('DROP TABLE IF EXISTS config')
 c.execute('''CREATE TABLE config (
@@ -89,12 +90,9 @@ c.execute("INSERT INTO config VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", (STAGING_KEY,
 c.execute('''CREATE TABLE "agents" (
     "id" integer PRIMARY KEY,
     "session_id" text,
-    "listener" text,
     "name" text,
     "language" text,
     "language_version" text,
-    "delay" integer,
-    "jitter" real,
     "external_ip" text,
     "internal_ip" text,
     "username" text,
@@ -114,7 +112,6 @@ c.execute('''CREATE TABLE "agents" (
     "functions" text,
     "kill_date" text,
     "working_hours" text,
-    "lost_limit" integer,
     "taskings" text,
     "results" text
     )''')
@@ -129,6 +126,17 @@ c.execute('''CREATE TABLE "listeners" (
     "listener_category" text,
     "enabled" boolean,
     "options" blob
+    )''')
+
+c.execute('''CREATE TABLE "agents_listeners" (
+    "agentID" integer,
+    "listenerID" integer,
+    "lost_limit" integer,
+    "delay" integer,
+    "jitter" integer,
+     FOREIGN KEY(agentID) REFERENCES agents(id) ON DELETE CASCADE,
+     FOREIGN KEY(listenerID) REFERENCES listeners(id) ON DELETE CASCADE,
+     PRIMARY KEY(agentID,listenerID)
     )''')
 
 # type = hash, plaintext, token
