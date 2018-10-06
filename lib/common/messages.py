@@ -177,7 +177,7 @@ def display_agents(agents):
 
         print ''
         print helpers.color("[*] Active agents:\n")
-        print " Name     La Internal IP     Machine Name      Username                Process            PID    Delay    Last Seen            Listener"
+        print " Name     La Internal IP     Machine Name      Username                Process            PID    Delay    Last Seen            Listeners"
         print " ----     -- -----------     ------------      --------                -------            ---    -----    ---------            ----------------"
 
         for agent in agents:
@@ -203,7 +203,7 @@ def display_agents(agents):
                                   '{0: <6}'.format(str(agent['process_id'])),
                                   '{0: <8}'.format(str(agent['delay']) + "/"  +str(agent['jitter'])),
                                   '{0: <31}'.format(str(helpers.lastseen(agent['lastseen_time'], agent['delay'], agent['jitter']))),
-                                  '{0: <16}'.format(str(agent['listener'])))
+                                  '{0: <16}'.format(str(agent['listeners'])))
 
             # Skip rows for better readability
             rowToggle = (rowToggle + 1) % 3
