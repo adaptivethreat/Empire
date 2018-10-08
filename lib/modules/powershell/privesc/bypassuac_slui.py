@@ -7,7 +7,7 @@ class Module:
         self.info = {
             'Name': 'Invoke-SluiBypass',
 
-            'Author': ['@Gushmazuko', '@truneski', '@ThePirateWhoSmellsOfSunflowers (github)'],
+            'Author': ['@bytecode77','@Gushmazuko', '@truneski', '@ThePirateWhoSmellsOfSunflowers (github)'],
 
             'Description': ("This module will bypass UAC on Windows 8-10 by hijacking a special key in the Registry under the Current User hive, and inserting a custom command that will get invoked when any binary (.exe) application is launched."),
         
