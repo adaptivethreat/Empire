@@ -100,12 +100,7 @@ def add_remote_repo(base_url):
     sys.meta_path.insert(0, importer)
     return importer
 
-#def add_remote_repo(base_url):
-#    importer = HttpImporter(modules, base_url)
-#    sys.meta_path.insert(0, importer)
-#    return importer
-
-
+#This is a hack. Imports built-in modules not present in the standard library
 for x in sys.builtin_module_names:
     __import__(x)
 
