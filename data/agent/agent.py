@@ -22,7 +22,7 @@ import shutil
 import socket
 import math
 import stat
-import platofrm
+import platform
 if platform.python_implementation() == 'IronPython':
     from System import Environment
 else:

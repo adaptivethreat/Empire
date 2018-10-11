@@ -177,6 +177,10 @@ chmod 755 bomutils/build/bin/mkbom && sudo cp bomutils/build/bin/mkbom /usr/loca
 # Downloading IronPython dependencies
 wget https://github.com/IronLanguages/ironpython2/releases/download/ipy-2.7.8/IronPython.2.7.8.zip
 unzip -o IronPython.2.7.8.zip -d ../data/misc/IronPython
+cp ../data/misc/IronPython/net45/IronPython.dll ../data/misc/IPYcSharpTemplateResources/cmd
+cp ../data/misc/IronPython/net45/IronPython.Modules.dll ../data/misc/IPYcSharpTemplateResources/cmd
+cp ../data/misc/IronPython/net45/Microsoft.Dynamic.dll ../data/misc/IPYcSharpTemplateResources/cmd
+cp ../data/misc/IronPython/net45/Microsoft.Scripting.dll ../data/misc/IPYcSharpTemplateResources/cmd
 rm IronPython.2.7.8.zip
 
 

