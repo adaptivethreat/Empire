@@ -81,6 +81,34 @@ function install_powershell() {
 			# Install PowerShell
 			sudo apt-get install -y powershell
 		fi
+		#Ubuntu 18.04
+		if  cat /etc/lsb-release | grep 'DISTRIB_RELEASE=18.04'; then
+			# Install system components
+			sudo apt-get update
+			sudo apt-get install -y apt-transport-https curl 
+			# Import the public repository GPG keys
+			curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+			# Register the Microsoft Ubuntu repository
+			curl https://packages.microsoft.com/config/ubuntu/18.04/prod.list | sudo tee /etc/apt/sources.list.d/microsoft.list
+			# Update the list of products
+			sudo apt-get update
+			# Install PowerShell
+			sudo apt-get install -y powershell
+		fi
+		#Ubuntu 18.10
+		if  cat /etc/lsb-release | grep 'DISTRIB_RELEASE=18.10'; then
+			# Install system components
+			sudo apt-get update
+			sudo apt-get install -y apt-transport-https curl 
+			# Import the public repository GPG keys
+			curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+			# Register the Microsoft Ubuntu repository
+			curl https://packages.microsoft.com/config/ubuntu/18.10/prod.list | sudo tee /etc/apt/sources.list.d/microsoft.list
+			# Update the list of products
+			sudo apt-get update
+			# Install PowerShell
+			sudo apt-get install -y powershell
+		fi
 		#Kali Linux
 		if cat /etc/lsb-release | grep -i 'Kali'; then
 			# Install prerequisites
