@@ -1,16 +1,11 @@
 ﻿/*
- * 
  * You may compile this in Visual Studio or SharpDevelop etc.
- * 
- * 
- * 
- * 
  */
 using System;
 using System.Text;
 using System.Reflection;
-using System.Management.Automation; 
-using System.Management.Automation.Runspaces; 
+using System.Management.Automation;
+using System.Management.Automation.Runspaces;
 
 namespace cmd
 {
@@ -46,7 +41,6 @@ namespace cmd
 
             pipeline.Commands.Add("Out-Default");
             pipeline.Invoke();
-
         }
 	}
 }
