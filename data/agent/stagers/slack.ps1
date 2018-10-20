@@ -20,8 +20,8 @@ function Start-Negotiate {
     }
 
     function gunzip {param($data)
-        $input =  [System.IO.MemoryStream]::new($data);
-        $output = [System.IO.MemoryStream]::new();
+        $input =  New-Object System.IO.MemoryStream ($data, $False);
+        $output = New-Object System.IO.MemoryStream;
         $gzipStream = New-Object System.IO.Compression.GzipStream $input, ([IO.Compression.CompressionMode]::DeCompress);
 
           $gzipStream.CopyTo($output);

@@ -969,7 +969,7 @@ class Listener:
                         if 'request_ts' in agents[agent]:
                             data = self.mainMenu.agents.handle_agent_request(agent, 'powershell', staging_key, update_lastseen=False)
                             if data and data != "VALID":
-                                self.mainMenu.agents.agents[agent].pop('request_ts', None)
+                                thread_ts = self.mainMenu.agents.agents[agent].pop('request_ts', None)
                                 slack_client.api_call('chat.postMessage', channel=channel_id, text="Starting", thread_ts=thread_ts)
                                 data_thread = post_data(base64.encodestring(data),agent,channel_id,None,listener_name,user_api_token)
                                 slack_client.api_call('chat.postMessage', channel=channel_id, text=data_thread, thread_ts=thread_ts)
