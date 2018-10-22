@@ -169,9 +169,9 @@ def randomize_capitalization(data):
 
 def obfuscate_call_home_address(data):
     """
-    Poowershell script to base64 encode variable contents and execute on command as if clear text in powershell
+    opportunity here to hid call home via this method. TODO Get past AMSI here
     """
-    return '$('+randomize_capitalization('[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String(\'') + enc_powershell(data) +'\')))'
+    return data
 
 def chunks(l, n):
     """
