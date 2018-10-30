@@ -77,8 +77,12 @@ class Module:
                 'Description'   :   "Either 'John' for John the Ripper style hash formatting, or 'Hashcat' for Hashcat format.",
                 'Required'      :   False,
                 'Value'         :   'John'
+            },
+            'OutFile' : {
+                'Description'   :   'Path to Output File.',
+                'Required'      :   False,
+                'Value'         :   ''
             }
-
         }
 
         # save off a copy of the mainMenu object to access external functionality
@@ -127,3 +131,4 @@ class Module:
             scriptEnd = helpers.obfuscate(self.mainMenu.installPath, psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
         script += scriptEnd
         return script
+        

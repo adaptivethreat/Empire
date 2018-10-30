@@ -579,8 +579,8 @@ Outputs a custom object containing the SamAccountName, ServicePrincipalName, and
         else {
             $TargetObject = $SPN
         }
-	
-	$RandNo = New-Object System.Random
+    
+    $RandNo = New-Object System.Random
 
         ForEach ($Object in $TargetObject) {
 
