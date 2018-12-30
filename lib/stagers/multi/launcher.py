@@ -74,6 +74,16 @@ class Stager:
                 'Description'   :   'Proxy credentials ([domain\]username:password) to use for request (default, none, or other).',
                 'Required'      :   False,
                 'Value'         :   'default'
+            },
+            'ScriptLogBypass' : {
+                'Description'   :   'Include cobbr\'s Script Block Log Bypass in the stager code.',
+                'Required'      :   False,
+                'Value'         :   'True'
+            },
+            'AMSIBypass' : {
+                'Description'   :   'Include mattifestation\'s AMSI Bypass in the stager code.',
+                'Required'      :   False,
+                'Value'         :   'True'
             }
         }
 
@@ -101,6 +111,8 @@ class Stager:
         proxyCreds = self.options['ProxyCreds']['Value']
         stagerRetries = self.options['StagerRetries']['Value']
         safeChecks = self.options['SafeChecks']['Value']
+        scriptLogBypass = self.options['ScriptLogBypass']['Value']
+        AMSIBypass = self.options['AMSIBypass']['Value']
 
         encode = False
         if base64.lower() == "true":
@@ -110,8 +122,16 @@ class Stager:
         if obfuscate.lower() == "true":
             invokeObfuscation = True
 
+        scriptLogBypassBool = False
+        if scriptLogBypass.lower() == "true":
+            scriptLogBypassBool = True
+
+        AMSIBypassBool = False
+        if AMSIBypass.lower() == "true":
+            AMSIBypassBool = True
+
         # generate the launcher code
-        launcher = self.mainMenu.stagers.generate_launcher(listenerName, language=language, encode=encode, obfuscate=invokeObfuscation, obfuscationCommand=obfuscateCommand, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries, safeChecks=safeChecks)
+        launcher = self.mainMenu.stagers.generate_launcher(listenerName, language=language, encode=encode, obfuscate=invokeObfuscation, obfuscationCommand=obfuscateCommand, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries, safeChecks=safeChecks, scriptLogBypass=scriptLogBypassBool, AMSIBypass=AMSIBypassBool)
 
         if launcher == "":
             print helpers.color("[!] Error in launcher command generation.")
