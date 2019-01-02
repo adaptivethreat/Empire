@@ -78,6 +78,11 @@ class Stager:
                 'Description'   :   'Include mattifestation\'s AMSI Bypass in the stager code.',
                 'Required'      :   False,
                 'Value'         :   'True'
+            },
+            'AMSIBypass2' : {
+                'Description'   :   'Include rastamouse\'s AMSI Bypass in the stager code.',
+                'Required'      :   False,
+                'Value'         :   'False'
             }
         }
 
@@ -116,6 +121,7 @@ class Stager:
         pixelTrackURL = self.options['PixelTrackURL']['Value']
         scriptLogBypass = self.options['ScriptLogBypass']['Value']
         AMSIBypass = self.options['AMSIBypass']['Value']
+        AMSIBypass2 = self.options['AMSIBypass2']['Value']
 
         scriptLogBypassBool = False
         if scriptLogBypass.lower() == "true":
@@ -124,6 +130,10 @@ class Stager:
         AMSIBypassBool = False
         if AMSIBypass.lower() == "true":
             AMSIBypassBool = True
+
+        AMSIBypass2Bool = False
+        if AMSIBypass2.lower() == "true":
+            AMSIBypass2Bool = True
 
         # generate the python launcher code
         pylauncher = self.mainMenu.stagers.generate_launcher(listenerName, language="python", encode=True, userAgent=userAgent, safeChecks=safeChecks)
@@ -138,7 +148,7 @@ class Stager:
             pypayload = formStr("str", match)
 
         # generate the powershell launcher code
-        poshlauncher = self.mainMenu.stagers.generate_launcher(listenerName, language="powershell", encode=True, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries, scriptLogBypass=scriptLogBypassBool, AMSIBypass=AMSIBypassBool)
+        poshlauncher = self.mainMenu.stagers.generate_launcher(listenerName, language="powershell", encode=True, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries, scriptLogBypass=scriptLogBypassBool, AMSIBypass=AMSIBypassBool, AMSIBypass2=AMSIBypass2Bool)
 
         if poshlauncher == "":
             print helpers.color("[!] Error in powershell launcher command generation.")

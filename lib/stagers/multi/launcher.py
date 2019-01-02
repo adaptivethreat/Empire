@@ -84,6 +84,11 @@ class Stager:
                 'Description'   :   'Include mattifestation\'s AMSI Bypass in the stager code.',
                 'Required'      :   False,
                 'Value'         :   'True'
+            },
+            'AMSIBypass2' : {
+                'Description'   :   'Include rastamouse\'s AMSI Bypass in the stager code.',
+                'Required'      :   False,
+                'Value'         :   'False'
             }
         }
 
@@ -113,6 +118,7 @@ class Stager:
         safeChecks = self.options['SafeChecks']['Value']
         scriptLogBypass = self.options['ScriptLogBypass']['Value']
         AMSIBypass = self.options['AMSIBypass']['Value']
+        AMSIBypass2 = self.options['AMSIBypass2']['Value']
 
         encode = False
         if base64.lower() == "true":
@@ -130,8 +136,12 @@ class Stager:
         if AMSIBypass.lower() == "true":
             AMSIBypassBool = True
 
+        AMSIBypass2Bool = False
+        if AMSIBypass2.lower() == "true":
+            AMSIBypass2Bool = True
+
         # generate the launcher code
-        launcher = self.mainMenu.stagers.generate_launcher(listenerName, language=language, encode=encode, obfuscate=invokeObfuscation, obfuscationCommand=obfuscateCommand, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries, safeChecks=safeChecks, scriptLogBypass=scriptLogBypassBool, AMSIBypass=AMSIBypassBool)
+        launcher = self.mainMenu.stagers.generate_launcher(listenerName, language=language, encode=encode, obfuscate=invokeObfuscation, obfuscationCommand=obfuscateCommand, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries, safeChecks=safeChecks, scriptLogBypass=scriptLogBypassBool, AMSIBypass=AMSIBypassBool, AMSIBypass2=AMSIBypass2Bool)
 
         if launcher == "":
             print helpers.color("[!] Error in launcher command generation.")
