@@ -147,3 +147,12 @@ v1.7 - 2017-03-03 nullcon (Goa, India):
 
 v1.8 - 2017-07-27 Black Hat (Las Vegas, Nevada USA):
 - Added 2 new ENCODING options: Special Characters and Whitespace
+
+v1.8.1 - 2017-12-19:
+- Added COMPRESS function for easier conversion of multi-line scripts to a one-liner 
+command while drastically reducing the command length for cmd.exe command line length 
+limitation purposes.
+
+v1.8.2 - 2018-01-04:
+- Added AST obfuscation functions, which obfuscates by manipulating the structure of
+the AbstractSyntaxTree without using many special characters.
