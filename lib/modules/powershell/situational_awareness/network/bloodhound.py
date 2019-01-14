@@ -63,7 +63,7 @@ class Module:
                 'Value'         :   ''
             },
             'CollectionMethod' : {
-                'Description'   :   "The method to collect data. 'Group', 'ComputerOnly', 'LocalGroup', 'GPOLocalGroup', 'Session', 'LoggedOn', 'Trusts, 'Stealth', or 'Default'.",
+                'Description'   :   "The method to collect data. 'Group', 'LocalAdmin', 'RDP', 'DCOM', 'Session', 'SessionLoop', 'Trusts', 'ACL', 'Container', 'ComputerOnly', 'GPOLocalGroup', 'LoggedOn', 'ObjectProps', 'Default','DCOnly','All'",
                 'Required'      :   True,
                 'Value'         :   'Default'
             },
@@ -72,13 +72,13 @@ class Module:
                 'Required'      :   False,
                 'Value'         :   ''
             },
-            'CSVFolder' : {
-                'Description'   :   'The CSV folder to use for output, defaults to the current folder location.',
+            'JSONFolder' : {
+                'Description'   :   'The JSON folder to use for output, defaults to the current folder location.',
                 'Required'      :   False,
                 'Value'         :   '$(Get-Location)'
             },
-            'CSVPrefix' : {
-                'Description'   :   'A prefix for all CSV files.',
+            'JSONPrefix' : {
+                'Description'   :   'A prefix for all JSON files.',
                 'Required'      :   False,
                 'Value'         :   ''
             },
@@ -162,4 +162,3 @@ class Module:
             scriptEnd = helpers.obfuscate(self.mainMenu.installPath, psScript=scriptEnd, obfuscationCommand=obfuscationCommand)
         script += scriptEnd
         return script
-
