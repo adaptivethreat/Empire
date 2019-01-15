@@ -1,5 +1,5 @@
 # NOTE: Only use this when you want to build image locally
-#       else use `docker pull empireproject\empire:{VERSION}`
+#       else use `docker pull empireproject/empire:{VERSION}`
 #       all image versions can be found at: https://hub.docker.com/r/empireproject/empire/
 
 # -----BUILD COMMANDS----
