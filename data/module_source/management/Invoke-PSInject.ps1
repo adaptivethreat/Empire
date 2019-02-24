@@ -112,7 +112,7 @@ Param(
         write-verbose "replacestart: $replacestart"
         write-verbose "replaceend: $replaceend"
 
-        $NewCode=[System.Text.Encoding]::Unicode.GetString($RawBytes[$replacestart..$replaceend])
+        $NewCode=[System.Text.Encoding]::Unicode.GetString($DllBytes[$replacestart..$replaceend])
         write-verbose "Replaced pattern with: $NewCode"
         
         return $DllBytes
