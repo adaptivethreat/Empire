@@ -920,9 +920,16 @@ def send_message(packets=None):
             """
             Before every request, check if the IP address is allowed.
             """
-            if not self.mainMenu.agents.is_ip_allowed(request.remote_addr):
+
+            if request.headers.getlist("X-Forwarded-For"):
+                clientIP = request.headers.getlist("X-Forwarded-For")[0]
+            else:
+                clientIP = request.remote_addr
+            clientIP = clientIP.encode('utf-8')
+
+            if not self.mainMenu.agents.is_ip_allowed(clientIP):
                 listenerName = self.options['Name']['Value']
-                message = "[!] {} on the blacklist/not on the whitelist requested resource".format(request.remote_addr)
+                message = "[!] {} on the blacklist/not on the whitelist requested resource".format(clientIP)
                 signal = json.dumps({
                     'print': True,
                     'message': message
@@ -977,7 +984,11 @@ def send_message(packets=None):
             This is used during the first step of the staging process,
             and when the agent requests taskings.
             """
-            clientIP = request.remote_addr
+            if request.headers.getlist("X-Forwarded-For"):
+                clientIP = request.headers.getlist("X-Forwarded-For")[0]
+            else:
+                clientIP = request.remote_addr
+            clientIP = clientIP.encode('utf-8')
 
             listenerName = self.options['Name']['Value']
             message = "[*] GET request for {}/{} from {}".format(request.host, request_uri, clientIP)
@@ -1081,7 +1092,11 @@ def send_message(packets=None):
             """
 
             stagingKey = listenerOptions['StagingKey']['Value']
-            clientIP = request.remote_addr
+            if request.headers.getlist("X-Forwarded-For"):
+                clientIP = request.headers.getlist("X-Forwarded-For")[0]
+            else:
+                clientIP = request.remote_addr
+            clientIP = clientIP.encode('utf-8')
 
             requestData = request.get_data()
 
