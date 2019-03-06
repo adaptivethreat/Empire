@@ -10,7 +10,7 @@ import copy
 import json
 import sys
 from pydispatch import dispatcher
-from flask import Flask, request, make_response, send_from_directory
+from flask import Flask, request, make_response, send_from_directory, send_file
 # Empire imports
 from lib.common import helpers
 from lib.common import agents
@@ -914,6 +914,26 @@ def send_message(packets=None):
                 return launcher
             else:
                 return make_response(self.default_response(), 404)
+
+        @app.route('/download/importer')
+        def send_importer():
+            return send_file('../../data/misc/IronPython/httpimport.py')
+
+        @app.route('/download/45/<filename>')
+        def send_assemblies45(filename):
+            return send_from_directory('../../data/misc/IronPython/net45/',filename)
+
+        @app.route('/download/40/<filename>')
+        def send_assemblies40(filename):
+            return send_from_directory('../../data/misc/IronPython/net40/',filename)
+
+        @app.route('/download/stdlib/<filename>')
+        def send_ipy(filename):
+            return send_from_directory('../../data/misc/IronPython/Lib/', filename)
+
+        @app.route('/download/stdlib/<folder>/<filename>')
+        def send_ipy_sub(folder,filename):
+            return send_from_directory('../../data/misc/IronPython/Lib/'+folder, filename)
 
         @app.before_request
         def check_ip():
