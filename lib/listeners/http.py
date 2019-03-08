@@ -316,7 +316,10 @@ class Listener:
 
                 if userAgent.lower() == 'default':
                     profile = listenerOptions['DefaultProfile']['Value']
-                    userAgent = profile.split('|')[1]
+                    if "|" in profile:
+                        userAgent = profile.split('|')[1]
+                    else:
+                        userAgent = ""
                 stager += "$u='"+userAgent+"';"
 
                 if 'https' in host:
@@ -438,7 +441,10 @@ class Listener:
 
                 if userAgent.lower() == 'default':
                     profile = listenerOptions['DefaultProfile']['Value']
-                    userAgent = profile.split('|')[1]
+                    if "|" in profile:
+                        userAgent = profile.split('|')[1]
+                    else:
+                        userAgent = ""
 
                 launcherBase += "import urllib2;\n"
                 launcherBase += "UA='%s';" % (userAgent)

