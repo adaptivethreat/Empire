@@ -35,7 +35,7 @@ class Module:
             'NeedsAdmin': False,
 
             # the minimum language version needed
-            'MinLanguageVersion': '2.7',
+            'MinLanguageVersion': '2.6',
 
             # list of any references/other comments
             'Comments': [
