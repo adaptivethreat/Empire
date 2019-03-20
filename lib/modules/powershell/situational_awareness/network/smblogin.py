@@ -130,5 +130,4 @@ class Module:
         scriptEnd += "'Invoke-SMBLogin completed'"
 
         script += scriptEnd
-        print script
         return script
