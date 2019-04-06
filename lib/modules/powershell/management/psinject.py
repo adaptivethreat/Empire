@@ -125,6 +125,9 @@ class Module:
             if launcher == '':
                 print helpers.color('[!] Error in launcher generation.')
                 return ''
+            elif len(launcher) > 5952:
+                print helpers.color("[!] Launcher string is too long!")
+                return ''
             else:
                 launcherCode = launcher.split(' ')[-1]
 

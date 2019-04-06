@@ -39,7 +39,7 @@ class Listener:
             'Host' : {
                 'Description'   :   'Hostname/IP for staging.',
                 'Required'      :   True,
-                'Value'         :   "http://%s:%s" % (helpers.lhost(), 80)
+                'Value'         :   "http://%s" % (helpers.lhost())
             },
             'BindIP' : {
                 'Description'   :   'The IP to bind to on the control server.',
@@ -49,7 +49,7 @@ class Listener:
             'Port' : {
                 'Description'   :   'Port for the listener.',
                 'Required'      :   True,
-                'Value'         :   80
+                'Value'         :   ''
             },
             'Launcher' : {
                 'Description'   :   'Launcher string.',
@@ -138,7 +138,7 @@ class Listener:
         self.threads = {} # used to keep track of any threaded instances of this server
 
         # optional/specific for this module
-        
+
 
         # set the default staging key to the controller db default
         self.options['StagingKey']['Value'] = str(helpers.get_config('staging_key')[0])
@@ -174,7 +174,7 @@ class Listener:
         if not language:
             print helpers.color('[!] listeners/template generate_launcher(): no language specified!')
             return None
-        
+
         if listenerName and (listenerName in self.mainMenu.listeners.activeListeners):
 
             # extract the set options for this instantiated listener
@@ -223,18 +223,18 @@ class Listener:
         """
         Generate just the agent communication code block needed for communications with this listener.
         This is so agents can easily be dynamically updated for the new listener.
-        
+
         This should be implemented for the module.
         """
 
         if language:
             if language.lower() == 'powershell':
-                
+
                 updateServers = """
                     $Script:ControlServers = @("%s");
                     $Script:ServerIndex = 0;
                 """ % (listenerOptions['Host']['Value'])
-                
+
                 getTask = """
                     $script:GetTask = {
 

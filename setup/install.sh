@@ -14,7 +14,6 @@ function install_powershell() {
 		# Deb 9.x
 		if cat /etc/debian_version | grep 9.* ; then
 			# Install system components
-			sudo apt-get update
 			sudo apt-get install -y apt-transport-https curl
 			# Import the public repository GPG keys
 			curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
@@ -24,11 +23,9 @@ function install_powershell() {
 			sudo apt-get update
 			# Install PowerShell
 			sudo apt-get install -y powershell
-		fi
 		# Deb 8.x
-		if cat /etc/debian_version | grep 8.* ; then
+		elif cat /etc/debian_version | grep 8.* ; then
 			# Install system components
-			sudo apt-get update
 			sudo apt-get install -y apt-transport-https curl gnupg
 			# Import the public repository GPG keys
 			curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
@@ -38,53 +35,23 @@ function install_powershell() {
 			sudo apt-get update
 			# Install PowerShell
 			sudo apt-get install -y powershell
-		fi
-		#Ubuntu 14.x
-		if cat /etc/lsb-release | grep 'DISTRIB_RELEASE=14'; then
+		#Ubuntu
+        elif lsb_release -d | grep -q "Ubuntu"; then
+			# Read Ubuntu version
+			local ubuntu_version=$( grep 'DISTRIB_RELEASE=' /etc/lsb-release | grep -o -E [[:digit:]]+\\.[[:digit:]]+ )
 			# Install system components
-			sudo apt-get update
-			sudo apt-get install -y apt-transport-https curl 
+			sudo apt-get install -y apt-transport-https curl
 			# Import the public repository GPG keys
 			curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
 			# Register the Microsoft Ubuntu repository
-			curl https://packages.microsoft.com/config/ubuntu/14.04/prod.list | sudo tee /etc/apt/sources.list.d/microsoft.list
+			curl https://packages.microsoft.com/config/ubuntu/$ubuntu_version/prod.list | sudo tee /etc/apt/sources.list.d/microsoft.list
 			# Update the list of products
 			sudo apt-get update
 			# Install PowerShell
 			sudo apt-get install -y powershell
-		fi
-		#Ubuntu 16.x
-		if cat /etc/lsb-release | grep 'DISTRIB_RELEASE=16'; then
-			# Install system components
-			sudo apt-get update
-			sudo apt-get install -y apt-transport-https curl 
-			# Import the public repository GPG keys
-			curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
-			# Register the Microsoft Ubuntu repository
-			curl https://packages.microsoft.com/config/ubuntu/16.04/prod.list | sudo tee /etc/apt/sources.list.d/microsoft.list
-			# Update the list of products
-			sudo apt-get update
-			# Install PowerShell
-			sudo apt-get install -y powershell
-		fi
-		#Ubuntu 17.x
-		if  cat /etc/lsb-release | grep 'DISTRIB_RELEASE=17'; then
-			# Install system components
-			sudo apt-get update
-			sudo apt-get install -y apt-transport-https curl 
-			# Import the public repository GPG keys
-			curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
-			# Register the Microsoft Ubuntu repository
-			curl https://packages.microsoft.com/config/ubuntu/17.04/prod.list | sudo tee /etc/apt/sources.list.d/microsoft.list
-			# Update the list of products
-			sudo apt-get update
-			# Install PowerShell
-			sudo apt-get install -y powershell
-		fi
 		#Kali Linux
-		if cat /etc/lsb-release | grep -i 'Kali'; then
+		elif cat /etc/lsb-release | grep -i 'Kali'; then
 			# Install prerequisites
-			apt-get update
 			apt-get install -y curl gnupg apt-transport-https
 			# Import the public repository GPG keys
 			curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
@@ -92,6 +59,8 @@ function install_powershell() {
 			sh -c 'echo "deb [arch=amd64] https://packages.microsoft.com/repos/microsoft-debian-stretch-prod stretch main" > /etc/apt/sources.list.d/microsoft.list'
 			# Update the list of products
 			apt-get update
+            wget http://archive.ubuntu.com/ubuntu/pool/main/i/icu/libicu57_57.1-6_amd64.deb
+            dpkg -i libicu57_57.1-6_amd64.deb
 			# Install PowerShell
 			apt-get install -y powershell
 		fi
@@ -114,18 +83,13 @@ then
     cd ./setup
 fi
 
-# Check for PIP otherwise install it
-if ! which pip > /dev/null; then
-	wget https://bootstrap.pypa.io/get-pip.py
-	python get-pip.py
-fi
-
 if uname | grep -q "Darwin"; then
+    Xar_version="xar-1.5.2"
 	install_powershell
 	sudo pip install -r requirements.txt --global-option=build_ext \
 		--global-option="-L/usr/local/opt/openssl/lib" \
 		--global-option="-I/usr/local/opt/openssl/include"
-	# In order to build dependencies these should be exproted. 
+	# In order to build dependencies these should be exproted.
 	export LDFLAGS=-L/usr/local/opt/openssl/lib
 	export CPPFLAGS=-I/usr/local/opt/openssl/include
 else
@@ -133,44 +97,61 @@ else
 	version=$( lsb_release -r | grep -oP "[0-9]+" | head -1 )
 	if lsb_release -d | grep -q "Fedora"; then
 		Release=Fedora
-		sudo dnf install -y make g++ python-devel m2crypto python-m2ext swig python-iptools python3-iptools libxml2-devel default-jdk openssl-devel libssl1.0.0 libssl-dev build-essential
-		pip install --upgrade pip
-		sudo pip install -r requirements.txt 
+        Xar_version="xar-1.5.2"
+		sudo dnf install -y make automake gcc gcc-c++  python-devel m2crypto python-m2ext swig libxml2-devel java-openjdk-headless openssl-devel openssl libffi-devel redhat-rpm-config
+		sudo pip install -r requirements.txt
 	elif lsb_release -d | grep -q "Kali"; then
 		Release=Kali
-		wget http://ftp.us.debian.org/debian/pool/main/o/openssl/libssl1.0.0_1.0.1t-1+deb8u7_amd64.deb
-		dpkg -i libssl1.0.0_1.0.1t-1+deb8u7_amd64.deb
-		sudo apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk zlib1g-dev libssl1.0-dev build-essential libssl1.0-dev libxml2-dev zlib1g-dev
-		pip install --upgrade pip
-		sudo pip install -r requirements.txt 
+        Xar_version="xar-1.6.1"
+		apt-get update
+		sudo apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk zlib1g-dev libssl1.1 build-essential libssl-dev libxml2-dev zlib1g-dev
+		sudo pip install -r requirements.txt
 		install_powershell
 	elif lsb_release -d | grep -q "Ubuntu"; then
 		Release=Ubuntu
-		sudo apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk libssl1.0.0 libssl-dev build-essential
-		pip install --upgrade pip
-		sudo pip install -r requirements.txt 
+		sudo apt-get update
+        if [ $(lsb_release -rs | cut -d "." -f 1) -ge 18 ]; then
+            LibSSL_pkgs="libssl1.1 libssl-dev"
+            Pip_file="requirements.txt"
+            Xar_version="xar-1.6.1"
+        else
+            LibSSL_pkgs="libssl1.0.0 libssl-dev"
+            Pip_file="requirements_libssl1.0.txt"
+            Xar_version="xar-1.5.2"
+        fi
+		sudo apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk $LibSSL_pkgs build-essential
+		sudo pip install -r $Pip_file
 		install_powershell
 	else
 		echo "Unknown distro - Debian/Ubuntu Fallback"
-		sudo apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk libffi-dev libssl1.0.0 libssl-dev build-essential
-		pip install --upgrade pip
-		sudo pip install -r requirements.txt 
+		sudo apt-get update
+        if [ $(cut -d "." -f 1 /etc/debian_version) -ge 9 ]; then
+            LibSSL_pkgs="libssl1.1 libssl-dev"
+            Pip_file="requirements.txt"
+            Xar_version="xar-1.6.1"
+        else
+            LibSSL_pkgs="libssl1.0.0 libssl-dev"
+            Pip_file="requirements_libssl1.0.txt"
+            Xar_version="xar-1.5.2"
+        fi
+		sudo apt-get install -y make g++ python-dev python-m2crypto swig python-pip libxml2-dev default-jdk libffi-dev $LibSSL_pkgs build-essential
+		sudo pip install -r $Pip_file
 		install_powershell
 	fi
 fi
 
 # Installing xar
-tar -xvf ../data/misc/xar-1.5.2.tar.gz
-(cd xar-1.5.2 && ./configure)
-(cd xar-1.5.2 && make)
-(cd xar-1.5.2 && sudo make install)
+tar -xvf ../data/misc/$Xar_version.tar.gz
+(cd $Xar_version && ./configure)
+(cd $Xar_version && make)
+(cd $Xar_version && sudo make install)
 
 #Installing bomutils
 git clone https://github.com/hogliux/bomutils.git
 (cd bomutils && make)
 (cd bomutils && make install)
 
-# NIT: This fails on OSX. Leaving it only on Linux instances. 
+# NIT: This fails on OSX. Leaving it only on Linux instances.
 if uname | grep -q "Linux"; then
 	(cd bomutils && make install)
 fi

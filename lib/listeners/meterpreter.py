@@ -31,12 +31,12 @@ class Listener:
             'Host' : {
                 'Description'   :   'Hostname/IP for staging.',
                 'Required'      :   True,
-                'Value'         :   "http://%s:%s" % (helpers.lhost(), 80)
+                'Value'         :   "http://%s" % (helpers.lhost())
             },
             'Port' : {
                 'Description'   :   'Port for the listener.',
                 'Required'      :   True,
-                'Value'         :   80
+                'Value'         :   ''
             }
         }
 
@@ -73,7 +73,7 @@ class Listener:
         if not language or language.lower() != 'powershell':
             print helpers.color('[!] listeners/http generate_launcher(): only PowerShell is supported at this time')
             return None
-        
+
         if listenerName and (listenerName in self.mainMenu.listeners.activeListeners):
 
             # extract the set options for this instantiated listener
@@ -93,7 +93,7 @@ class Listener:
             msfPayload = 'windows/meterpreter/reverse_http'
             if 'https' in host:
                 msfPayload += 's'
-            
+
             if 'http' in host:
                 parts = host.split(':')
                 host = parts[1].strip('/')

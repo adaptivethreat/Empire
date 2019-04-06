@@ -2831,6 +2831,11 @@ Switch. Specifies that the searcher should also return deleted/tombstoned object
 A [Management.Automation.PSCredential] object of alternate credentials
 for connection to the target domain.
 
+.PARAMETER OutputFormat
+
+Either 'John' for John the Ripper style hash formatting, or 'Hashcat' for Hashcat format.
+Defaults to 'John'.
+
 .EXAMPLE
 
 Invoke-Kerberoast | fl
@@ -2904,7 +2909,12 @@ Outputs a custom object containing the SamAccountName, ServicePrincipalName, and
 
         [Management.Automation.PSCredential]
         [Management.Automation.CredentialAttribute()]
-        $Credential = [Management.Automation.PSCredential]::Empty
+        $Credential = [Management.Automation.PSCredential]::Empty,
+
+        [ValidateSet('John', 'Hashcat')]
+        [Alias('Format')]
+        [String]
+        $OutputFormat = 'John'
     )
 
     BEGIN {
@@ -2929,7 +2939,7 @@ Outputs a custom object containing the SamAccountName, ServicePrincipalName, and
 
     PROCESS {
         if ($PSBoundParameters['Identity']) { $UserSearcherArguments['Identity'] = $Identity }
-        Get-DomainUser @UserSearcherArguments | Where-Object {$_.samaccountname -ne 'krbtgt'} | Get-DomainSPNTicket
+        Get-DomainUser @UserSearcherArguments | Where-Object {$_.samaccountname -ne 'krbtgt'} | Get-DomainSPNTicket -OutputFormat $OutputFormat
     }
 
     END {

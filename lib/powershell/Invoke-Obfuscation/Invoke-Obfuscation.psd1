@@ -51,7 +51,7 @@ PowerShellVersion = '2.0'
 PowerShellHostVersion = '2.0'
 
 # Script files (.ps1) that are run in the caller's environment prior to importing this module
-ScriptsToProcess = @('Out-ObfuscatedTokenCommand.ps1','Out-ObfuscatedStringCommand.ps1','Out-EncodedAsciiCommand.ps1','Out-EncodedHexCommand.ps1','Out-EncodedOctalCommand.ps1','Out-EncodedBinaryCommand.ps1','Out-SecureStringCommand.ps1','Out-EncodedBXORCommand.ps1','Out-EncodedSpecialCharOnlyCommand.ps1','Out-EncodedWhitespaceCommand.ps1','Out-PowerShellLauncher.ps1','Invoke-Obfuscation.ps1')
+ScriptsToProcess = @('Out-ObfuscatedTokenCommand.ps1','Out-ObfuscatedAst.ps1','Out-ObfuscatedStringCommand.ps1','Out-EncodedAsciiCommand.ps1','Out-EncodedHexCommand.ps1','Out-EncodedOctalCommand.ps1','Out-EncodedBinaryCommand.ps1','Out-SecureStringCommand.ps1','Out-EncodedBXORCommand.ps1','Out-EncodedSpecialCharOnlyCommand.ps1','Out-EncodedWhitespaceCommand.ps1','Out-CompressedCommand.ps1','Out-PowerShellLauncher.ps1','Invoke-Obfuscation.ps1')
 
 # Functions to export from this module
 FunctionsToExport = '*'

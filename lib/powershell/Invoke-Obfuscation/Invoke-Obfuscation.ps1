@@ -84,7 +84,7 @@ http://www.danielbohannon.com
         [ScriptBlock]
         $ScriptBlock,
 
-        [Parameter(Position = 0, ParameterSetName = 'ScriptBlock')]
+        [Parameter(Position = 0, ParameterSetName = 'ScriptPath')]
         [ValidateNotNullOrEmpty()]
         [String]
         $ScriptPath,
@@ -173,6 +173,7 @@ http://www.danielbohannon.com
         If($PathTopsd1.Contains(' ')) {$PathTopsd1 = '"' + $PathTopsd1 + '"'}
         Write-Host "`n`nERROR: Invoke-Obfuscation module is not loaded. You must run:" -ForegroundColor Red
         Write-Host "       Import-Module $PathTopsd1`n`n" -ForegroundColor Yellow
+        Start-Sleep -Seconds 3
         Exit
     }
 
@@ -185,9 +186,11 @@ http://www.danielbohannon.com
     # Main Menu.
     $MenuLevel =   @()
     $MenuLevel+= , @($LineSpacing, 'TOKEN'    , 'Obfuscate PowerShell command <Tokens>')
+    $MenuLevel+= , @($LineSpacing, 'AST'      , "`tObfuscate PowerShell <Ast> nodes <(PS3.0+)>")    
     $MenuLevel+= , @($LineSpacing, 'STRING'   , 'Obfuscate entire command as a <String>')
     $MenuLevel+= , @($LineSpacing, 'ENCODING' , 'Obfuscate entire command via <Encoding>')
-    $MenuLevel+= , @($LineSpacing, 'LAUNCHER' , 'Obfuscate command args w/<Launcher> techniques (run once at end)')
+    $MenuLevel+= , @($LineSpacing, 'COMPRESS'       , 'Convert entire command to one-liner and <Compress>')
+    $MenuLevel+= , @($LineSpacing, 'LAUNCHER'       , 'Obfuscate command args w/<Launcher> techniques (run once at end)')
     
     # Main\Token Menu.
     $MenuLevel_Token                 =   @()
@@ -238,6 +241,53 @@ http://www.danielbohannon.com
     $MenuLevel_Token_All             =   @()
     $MenuLevel_Token_All            += , @($LineSpacing, '1' , "`tExecute <ALL> Token obfuscation techniques (random order)"       , @('Out-ObfuscatedTokenCommandAll', '', ''))
     
+    # Main\Token Menu.
+    $MenuLevel_Ast                            =   @()
+    $MenuLevel_Ast                           += , @($LineSpacing, 'NamedAttributeArgumentAst' , 'Obfuscate <NamedAttributeArgumentAst> nodes')
+    $MenuLevel_Ast                           += , @($LineSpacing, 'ParamBlockAst'             , "`t`tObfuscate <ParamBlockAst> nodes")
+    $MenuLevel_Ast                           += , @($LineSpacing, 'ScriptBlockAst'            , "`t`tObfuscate <ScriptBlockAst> nodes")
+    $MenuLevel_Ast                           += , @($LineSpacing, 'AttributeAst'              , "`t`tObfuscate <AttributeAst> nodes")
+    $MenuLevel_Ast                           += , @($LineSpacing, 'BinaryExpressionAst'       , "`tObfuscate <BinaryExpressionAst> nodes")
+    $MenuLevel_Ast                           += , @($LineSpacing, 'HashtableAst'              , "`t`tObfuscate <HashtableAst> nodes")
+    $MenuLevel_Ast                           += , @($LineSpacing, 'CommandAst'                , "`t`tObfuscate <CommandAst> nodes")
+    $MenuLevel_Ast                           += , @($LineSpacing, 'AssignmentStatementAst'    , "`tObfuscate <AssignmentStatementAst> nodes")
+    $MenuLevel_Ast                           += , @($LineSpacing, 'TypeExpressionAst'         , "`tObfuscate <TypeExpressionAst> nodes")
+    $MenuLevel_Ast                           += , @($LineSpacing, 'TypeConstraintAst'         , "`tObfuscate <TypeConstraintAst> nodes")
+    $MenuLevel_Ast                           += , @($LineSpacing, 'ALL'                       , "`t`t`tSelect <All> choices from above")
+    
+    $MenuLevel_Ast_NamedAttributeArgumentAst  =   @()
+    $MenuLevel_Ast_NamedAttributeArgumentAst += , @($LineSpacing, '1' , 'Reorder e.g. <[Parameter(Mandatory, ValueFromPipeline = $True)]> --> <[Parameter(Mandatory = $True, ValueFromPipeline)]>'                     , @('Out-ObfuscatedAst', @('System.Management.Automation.Language.NamedAttributeArgumentAst'), 1))
+
+    $MenuLevel_Ast_ParamBlockAst              =   @()
+    $MenuLevel_Ast_ParamBlockAst             += , @($LineSpacing, '1' , 'Reorder e.g. <Param([Int]$One, [Int]$Two)> --> <Param([Int]$Two, [Int]$One)>'                                                                 , @('Out-ObfuscatedAst', @('System.Management.Automation.Language.ParamBlockAst'), 1))
+
+    $MenuLevel_Ast_ScriptBlockAst             =   @()
+    $MenuLevel_Ast_ScriptBlockAst            += , @($LineSpacing, '1' , 'Reorder e.g. <{ Begin {} Process {} End {} }> --> <{ End {} Begin {} Process {} }>'                                                           , @('Out-ObfuscatedAst', @('System.Management.Automation.Language.ScriptBlockAst'), 1))
+
+    $MenuLevel_Ast_AttributeAst               =   @()
+    $MenuLevel_Ast_AttributeAst              += , @($LineSpacing, '1' , 'Reorder e.g. <[Parameter(Position = 0, Mandatory)]> --> <[Parameter(Mandatory, Position = 0)]>'                                               , @('Out-ObfuscatedAst', @('System.Management.Automation.Language.AttributeAst'), 1))
+
+    $MenuLevel_Ast_BinaryExpressionAst        =   @()
+    $MenuLevel_Ast_BinaryExpressionAst       += , @($LineSpacing, '1' , 'Reorder e.g. <(2 + 3) * 4> --> <4 * (3 + 2)>'                                                                                                 , @('Out-ObfuscatedAst', @('System.Management.Automation.Language.BinaryExpressionAst'), 1))
+    
+    $MenuLevel_Ast_HashtableAst               =   @()
+    $MenuLevel_Ast_HashtableAst              += , @($LineSpacing, '1' , "Reorder e.g. <@{ProviderName = 'Microsoft-Windows-PowerShell'; Id = 4104}> --> <@{Id = 4104; ProviderName = 'Microsoft-Windows-PowerShell'}>" , @('Out-ObfuscatedAst', @('System.Management.Automation.Language.HashtableAst'), 1))
+
+    $MenuLevel_Ast_CommandAst                 =   @()
+    $MenuLevel_Ast_CommandAst                += , @($LineSpacing, '1' , 'Reorder e.g. <Get-Random -Min 1 -Max 100> --> <Get-Random -Max 100 -Min 1>'                                                                   , @('Out-ObfuscatedAst', @('System.Management.Automation.Language.CommandAst'), 1))
+    
+    $MenuLevel_Ast_AssignmentStatementAst     =   @()
+    $MenuLevel_Ast_AssignmentStatementAst    += , @($LineSpacing, '1' , 'Rename e.g. <$Example = "Example"> --> <Set-Variable -Name Example -Value ("Example")>'                                                       , @('Out-ObfuscatedAst', @('System.Management.Automation.Language.AssignmentStatementAst'), 1))
+    
+    $MenuLevel_Ast_TypeExpressionAst          =   @()
+    $MenuLevel_Ast_TypeExpressionAst         += , @($LineSpacing, '1' , 'Rename e.g. <[ScriptBlock]> --> <[Management.Automation.ScriptBlock]>'                                                                        , @('Out-ObfuscatedAst', @('System.Management.Automation.Language.TypeExpressionAst'), 1))
+
+    $MenuLevel_Ast_TypeConstraintAst          =   @()
+    $MenuLevel_Ast_TypeConstraintAst         += , @($LineSpacing, '1' , 'Rename e.g. <[Int] $Integer = 1> --> <[System.Int32] $Integer = 1>'                                                                             , @('Out-ObfuscatedAst', @('System.Management.Automation.Language.TypeConstraintAst'), 1))
+
+    $MenuLevel_Ast_All                        =   @()
+    $MenuLevel_Ast_All                       += , @($LineSpacing, '1' , "`tExecute <ALL> Ast obfuscation techniques"                                                                                                   , @('Out-ObfuscatedAst', @('System.Management.Automation.Language.NamedAttributeArgumentAst', 'System.Management.Automation.Language.ParamBlockAst', 'System.Management.Automation.Language.ScriptBlockAst', 'System.Management.Automation.Language.AttributeAst', 'System.Management.Automation.Language.BinaryExpressionAst', 'System.Management.Automation.Language.HashtableAst', 'System.Management.Automation.Language.CommandAst', 'System.Management.Automation.Language.AssignmentStatementAst', 'System.Management.Automation.Language.TypeExpressionAst', 'System.Management.Automation.Language.TypeConstraintAst'), ''))
+    
     # Main\String Menu.
     $MenuLevel_String                =   @()
     $MenuLevel_String               += , @($LineSpacing, '1' , '<Concatenate> entire command'                                      , @('Out-ObfuscatedStringCommand', '', 1))
@@ -255,6 +305,10 @@ http://www.danielbohannon.com
     $MenuLevel_Encoding             += , @($LineSpacing, '7' , "`tEncode entire command as <Special Characters>"                   , @('Out-EncodedSpecialCharOnlyCommand' , '', ''))
     $MenuLevel_Encoding             += , @($LineSpacing, '8' , "`tEncode entire command as <Whitespace>"                           , @('Out-EncodedWhitespaceCommand'      , '', ''))
 
+    # Main\Compress Menu.
+    $MenuLevel_Compress              =   @()
+    $MenuLevel_Compress             += , @($LineSpacing, '1' , "Convert entire command to one-liner and <compress>"                , @('Out-CompressedCommand'             , '', ''))
+    
     # Main\Launcher Menu.
     $MenuLevel_Launcher              =   @()
     $MenuLevel_Launcher             += , @($LineSpacing, 'PS'            , "`t<PowerShell>")
@@ -591,6 +645,7 @@ http://www.danielbohannon.com
                 $BreadCrumbOCD += , @('clip++'  ,'Clip++')
                 $BreadCrumbOCD += , @('rundll++','RunDll++')
                 $BreadCrumbOCD += , @('mshta++' ,'Mshta++')
+                $BreadCrumbOCD += , @('ast', 'AST')
 
                 $BreadCrumbArray = @()
                 ForEach($Crumb in $BreadCrumb.Split('_'))
@@ -687,7 +742,14 @@ http://www.danielbohannon.com
                     $MiddlePart = $MiddlePart.SubString(0,$MiddlePart.IndexOf('>'))
                     $LastPart   = $LineValue.SubString($FirstPart.Length+$MiddlePart.Length+2)
                     Write-Host "$FirstPart" -NoNewLine
-                    Write-Host $MiddlePart -NoNewLine -ForegroundColor Cyan
+                    If($MiddlePart.EndsWith("(PS3.0+)"))
+                    {
+                        Write-Host $MiddlePart -NoNewline -ForegroundColor Red
+                    }
+                    Else
+                    {
+                        Write-Host $MiddlePart -NoNewLine -ForegroundColor Cyan
+                    }
                 }
 
                 Write-Host $LastPart
@@ -1131,8 +1193,20 @@ http://www.danielbohannon.com
                     # Save current ObfuscatedCommand to see if obfuscation was successful (i.e. no warnings prevented obfuscation from occurring).
                     $ObfuscatedCommandBefore = $Script:ObfuscatedCommand
                     $CmdToPrint = $NULL
-
-                    If($Script:LauncherApplied)
+                    If($Function -eq 'Out-ObfuscatedAst' -AND $PSVersionTable.PSVersion.Major -lt 3)
+                    {
+                        $AstPS3ErrorMessage = "AST obfuscation can only be used with PS3.0+. Update to PS3.0 or higher to use AST obfuscation."
+                        If ($Script:QuietWasSpecified)
+                        {
+                            Write-Error $AstPS3ErrorMessage
+                        }
+                        Else
+                        {
+                            Write-Host "`n`nERROR: " -NoNewLine -ForegroundColor Red
+                            Write-Host $AstPS3ErrorMessage -NoNewLine
+                        }
+                    }
+                    ElseIf($Script:LauncherApplied)
                     {
                         If($Function -eq 'Out-PowerShellLauncher')
                         {
@@ -1161,6 +1235,10 @@ http://www.danielbohannon.com
                             'Out-ObfuscatedTokenCommandAll'     {
                                 $Script:ObfuscatedCommand = Out-ObfuscatedTokenCommand        -ScriptBlock $ObfCommandScriptBlock
                                 $CmdToPrint = @("Out-ObfuscatedTokenCommand -ScriptBlock ","")
+                            }
+                            'Out-ObfuscatedAst'                 {
+                                $Script:ObfuscatedCommand = Out-ObfuscatedAst                 -ScriptBlock $ObfCommandScriptBlock -AstTypesToObfuscate $Token
+                                $CmdToPrint = @("Out-ObfuscatedAst -ScriptBlock ","")
                             }
                             'Out-ObfuscatedStringCommand'       {
                                 $Script:ObfuscatedCommand = Out-ObfuscatedStringCommand       -ScriptBlock $ObfCommandScriptBlock $ObfLevel
@@ -1197,6 +1275,10 @@ http://www.danielbohannon.com
                             'Out-EncodedWhitespaceCommand' {
                                 $Script:ObfuscatedCommand = Out-EncodedWhitespaceCommand      -ScriptBlock $ObfCommandScriptBlock -PassThru
                                 $CmdToPrint = @("Out-EncodedWhitespaceCommand -ScriptBlock "," -PassThru")
+                            }
+                            'Out-CompressedCommand' {
+                                $Script:ObfuscatedCommand = Out-CompressedCommand             -ScriptBlock $ObfCommandScriptBlock -PassThru
+                                $CmdToPrint = @("Out-CompressedCommand -ScriptBlock "," -PassThru")
                             }
                             'Out-PowerShellLauncher'            {
                                 # Extract numbers from string so we can output proper flag syntax in ExecutionCommands history.

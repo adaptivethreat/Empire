@@ -36,7 +36,7 @@ Includes:
     dict_factory() - helper that returns the SQLite query results as a dictionary
     KThread() - a subclass of threading.Thread, with a kill() method
     slackMessage() - send notifications to the Slack API
-
+    generate_random_script_var_name() - use in scripts to generate random variable names
 """
 
 import re
@@ -52,7 +52,6 @@ import threading
 import pickle
 import netifaces
 import random
-
 import subprocess
 import fnmatch
 import urllib, urllib2
@@ -144,7 +143,6 @@ def generate_ip_list(s):
 # Randomizers/obfuscators
 #
 ####################################################################################
-
 def random_string(length=-1, charset=string.ascii_letters):
     """
     Returns a random string of "length" characters.
@@ -158,10 +156,7 @@ def random_string(length=-1, charset=string.ascii_letters):
 
 def generate_random_script_var_name(origvariname,globDebug=False):
     if globDebug:
-	    return origvariname
-    else:
-	    hash_object=hashlib.sha1(str(origvariname)+str(globentropy)).hexdigest()
-    return hash_object[:-datetime.today().day]
+
 
 def randomize_capitalization(data):
     """
@@ -169,11 +164,15 @@ def randomize_capitalization(data):
     """
     return "".join( random.choice([k.upper(), k ]) for k in data )
 
+def obfuscate_call_home_address(data):
+    """
+    Poowershell script to base64 encode variable contents and execute on command as if clear text in powershell
+    """
+    return '$('+randomize_capitalization('[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String(\'') + enc_powershell(data) +'\')))'
 
 def chunks(l, n):
     """
     Generator to split a string l into chunks of size n.
-
     Used by macro modules.
     """
     for i in xrange(0, len(l), n):
@@ -243,7 +242,6 @@ def strip_powershell_comments(data):
     strippedCode = "\n".join([line for line in strippedCode.split('\n') if ((line.strip() != '') and (not line.strip().startswith("#")) and (not line.strip().lower().startswith("write-verbose ")) and (not line.strip().lower().startswith("write-debug ")) )])
 
     return strippedCode
-
 
 ####################################################################################
 #

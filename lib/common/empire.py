@@ -3641,7 +3641,7 @@ class ListenersMenu(SubMenu):
             print helpers.color("[!] Please enter a valid listenerName")
 
     def do_enable(self, line):
-        "Enables and starts one or all listners."
+        "Enables and starts one or all listeners."
 
         listenerID = line.strip()
 
@@ -3683,7 +3683,7 @@ class ListenersMenu(SubMenu):
             return
         if len(arguments) == 2:
             arguments.append("")
-        self.mainMenu.listeners.update_listener_options(arguments[0], arguments[1], arguments[2])
+        self.mainMenu.listeners.update_listener_options(arguments[0], arguments[1], ' '.join(arguments[2:]))
         if arguments[0] in self.mainMenu.listeners.activeListeners.keys():
             print helpers.color("[*] This change will not take effect until the listener is restarted")
 

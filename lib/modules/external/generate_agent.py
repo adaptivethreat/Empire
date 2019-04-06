@@ -3,6 +3,7 @@ import string
 from pydispatch import dispatcher
 from lib.common import helpers
 
+
 class Module:
 
     def __init__(self, mainMenu, params=[]):
@@ -15,6 +16,16 @@ class Module:
             'Description': ("Generates an agent code instance for a specified listener, "
                             "pre-staged, and register the agent in the database. This allows "
                             "the agent to begin beconing behavior immediately."),
+
+            'Background': True,
+
+            'OutputExtension': None,
+
+            'NeedsAdmin': False,
+
+            'OpsecSafe': True,
+
+            'Language': 'Python',
 
             'Comments': []
         }
@@ -50,9 +61,8 @@ class Module:
             if option in self.options:
                 self.options[option]['Value'] = value
 
-
     def execute(self):
-        
+
         listenerName = self.options['Listener']['Value']
         language = self.options['Language']['Value']
         outFile = self.options['OutFile']['Value']
@@ -91,7 +101,7 @@ class Module:
         else:
             print helpers.color('[!] Only PowerShell agent generation is supported at this time.')
             return ''
-        
+
         # TODO: python agent generation - need to patch in crypto functions from the stager...
 
         print helpers.color("[+] Pre-generated agent '%s' now registered." % (sessionID))
