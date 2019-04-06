@@ -1,5 +1,4 @@
-urllib3
-requests
+
 setuptools
 iptools
 pydispatcher

@@ -156,10 +156,7 @@ def random_string(length=-1, charset=string.ascii_letters):
 
 def generate_random_script_var_name(origvariname,globDebug=False):
     if globDebug:
-	return origvariname
-    else:
-	hash_object=hashlib.sha1(str(origvariname)+str(globentropy)).hexdigest()
-	return hash_object[:(3+(globentropy%3))]
+
 
 def randomize_capitalization(data):
     """

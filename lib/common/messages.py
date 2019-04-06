@@ -177,8 +177,7 @@ def display_agents(agents):
 
         print ''
         print helpers.color("[*] Active agents:\n")
-        print " Name     La Internal IP     Machine Name      Username                Process            PID    Delay    Last Seen            Listener"
-        print " ----     -- -----------     ------------      --------                -------            ---    -----    ---------            ----------------"
+
 
         for agent in agents:
 
@@ -194,7 +193,7 @@ def display_agents(agents):
             else:
                 agent['language'] = 'X'
 
-            print " %.8s %.2s %.15s %.17s %.23s %.18s %.6s %.8s %.31s %.16s" % ('{0: <8}'.format(agent['name']),
+
                                   '{0: <2}'.format(agent['language']),
                                   '{0: <15}'.format(str(agent['internal_ip']).split(" ")[0]),
                                   '{0: <17}'.format(agent['hostname']),
@@ -202,8 +201,7 @@ def display_agents(agents):
                                   '{0: <18}'.format(agent['process_name']),
                                   '{0: <6}'.format(str(agent['process_id'])),
                                   '{0: <8}'.format(str(agent['delay']) + "/"  +str(agent['jitter'])),
-                                  '{0: <31}'.format(str(helpers.lastseen(agent['lastseen_time'], agent['delay'], agent['jitter']))),
-                                  '{0: <16}'.format(str(agent['listener'])))
+
 
             # Skip rows for better readability
             rowToggle = (rowToggle + 1) % 3
