@@ -59,8 +59,14 @@ function install_powershell() {
 			sh -c 'echo "deb [arch=amd64] https://packages.microsoft.com/repos/microsoft-debian-stretch-prod stretch main" > /etc/apt/sources.list.d/microsoft.list'
 			# Update the list of products
 			apt-get update
-            wget http://archive.ubuntu.com/ubuntu/pool/main/i/icu/libicu57_57.1-6_amd64.deb
-            dpkg -i libicu57_57.1-6_amd64.deb
+                        # Install libucu57 as stated in https://web.archive.org/web/20190501222044/https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell-core-on-linux?view=powershell-6#installation---kali
+                        wget http://http.us.debian.org/debian/pool/main/i/icu/libicu57_57.1-6+deb9u2_amd64.deb
+                        if sha256sum libicu57_57.1-6+deb9u2_amd64.deb | grep '^c2dee82e7ae8fa4dc8fd0d9ad5a28cd41598cfccf5d0a71d0cd6a6bb4ac71f25' >/dev/null; then
+                          dpkg -i libicu57_57.1-6+deb9u2_amd64.deb
+                        else
+                          echo "Failed to install libicu57"
+                          exit 1
+                        fi
 			# Install PowerShell
 			apt-get install -y powershell
 		fi
