@@ -86,6 +86,9 @@ function install_powershell() {
 			# Install prerequisites
 			apt-get update
 			apt-get install -y curl gnupg apt-transport-https
+			# Download and install libcui from Debian apt repo. (powershell dependency not in kali repo)
+			wget http://ftp.us.debian.org/debian/pool/main/i/icu/libicu57_57.1-6+deb9u2_amd64.deb
+			dpkg -i libicu57_57.1-6+deb9u2_amd64.deb
 			# Import the public repository GPG keys
 			curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
 			# Register the Microsoft Product feed
