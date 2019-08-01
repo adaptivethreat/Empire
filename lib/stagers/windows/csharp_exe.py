@@ -125,7 +125,7 @@ class Stager:
                 shutil.copytree(directory,destdirectory)
 
                 lines = open(destdirectory + 'cmd/Program.cs').read().splitlines()
-                lines[19] = "\t\t\tstring stager = \"" + launcherCode + "\";"
+                lines[55] = "\t\t\tstring stager = \"" + launcherCode + "\";"
                 open(destdirectory + 'cmd/Program.cs','w').write('\n'.join(lines))
                 shutil.make_archive(outfile,'zip',destdirectory)
                 shutil.rmtree(destdirectory)
