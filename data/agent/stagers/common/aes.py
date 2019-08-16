@@ -355,7 +355,8 @@ def CBCdec(aesObj, ciphertext, base64=False):
 
 
 def getIV(len=16):
-    return ''.join(chr(random.randint(0, 255)) for _ in range(len))
+    rng = random.SystemRandom()
+    return ''.join(chr(rng.randint(0, 255)) for _ in range(len))
 
 
 def aes_encrypt(key, data):
