@@ -42,6 +42,7 @@ RUN apt-get update && apt-get install -qy \
     curl \
     git \
     sudo \
+    zip \
     apt-utils \
     lsb-core \
     python2.7 \
