@@ -1326,6 +1326,10 @@ class AgentsMenu(SubMenu):
             if len(parts) == 3:
                 jitter = parts[2]
 
+            if jitter < 0 or jitter >= 1:
+                print helpers.color("[!] Jitter is a decimal between 0.0 and 1.0'")
+                return
+
             allAgents = self.mainMenu.agents.get_agents_db()
 
             for agent in allAgents:
@@ -1356,6 +1360,10 @@ class AgentsMenu(SubMenu):
             jitter = 0.0
             if len(parts) == 3:
                 jitter = parts[2]
+
+            if jitter < 0 or jitter >= 1:
+                print helpers.color("[!] Jitter is a decimal between 0.0 and 1.0'")
+                return
 
             if sessionID and len(sessionID) != 0:
                 # update this agent's information in the database
