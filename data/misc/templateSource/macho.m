@@ -14,6 +14,7 @@ int main(int argc, const char * argv[]) {
     setlocale(LC_ALL, "en_US.URF-8");
     Py_SetProgramName(argv[0]);
     Py_Initialize();
+    PySys_SetArgv(argc, argv);
     PyRun_SimpleString(command);
     
     Py_Finalize();
