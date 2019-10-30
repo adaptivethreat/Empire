@@ -3641,7 +3641,7 @@ class ListenersMenu(SubMenu):
             print helpers.color("[!] Please enter a valid listenerName")
 
     def do_enable(self, line):
-        "Enables and starts one or all listners."
+        "Enables and starts one or all listeners."
 
         listenerID = line.strip()
 
