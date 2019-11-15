@@ -1,7 +1,10 @@
+from __future__ import print_function
+from builtins import str
+from builtins import object
 import os
 from lib.common import helpers
 
-class Module:
+class Module(object):
 
     def __init__(self, mainMenu, params=[]):
 
@@ -131,7 +134,7 @@ Invoke-ResolverBackdoor"""
 
         if not self.mainMenu.listeners.is_listener_valid(listenerName):
             # not a valid listener, return nothing for the script
-            print helpers.color("[!] Invalid listener: " + listenerName)
+            print(helpers.color("[!] Invalid listener: " + listenerName))
             return ""
 
         else:
@@ -149,7 +152,7 @@ Invoke-ResolverBackdoor"""
                 script = script.replace("REPLACE_LAUNCHER", stagerCode)
                 script = script.encode('ascii', 'ignore')
         
-        for option,values in self.options.iteritems():
+        for option,values in self.options.items():
             if option.lower() != "agent" and option.lower() != "listener" and option.lower() != "outfile":
                 if values['Value'] and values['Value'] != '':
                     if values['Value'].lower() == "true":
@@ -168,7 +171,7 @@ Invoke-ResolverBackdoor"""
             f.write(script)
             f.close()
 
-            print helpers.color("[+] PowerBreach deaduser backdoor written to " + outFile)
+            print(helpers.color("[+] PowerBreach deaduser backdoor written to " + outFile))
             return ""
 
         if obfuscate:

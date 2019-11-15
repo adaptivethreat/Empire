@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-class Module:
+from builtins import object
+class Module(object):
     def __init__(self, mainMenu, params=[]):
         # metadata info about the module, not modified during runtime
         self.info = {

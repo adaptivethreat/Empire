@@ -1,6 +1,7 @@
 """ Provides helper methods for templating.
 This is useful for generating stagers """
 
+from builtins import object
 import jinja2
 
 class TemplateEngine(object):

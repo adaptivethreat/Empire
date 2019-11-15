@@ -1,7 +1,9 @@
+from __future__ import print_function
+from builtins import object
 from lib.common import helpers
 import shutil
 
-class Stager:
+class Stager(object):
 
     def __init__(self, mainMenu, params=[]):
 
@@ -100,7 +102,7 @@ class Stager:
 
         if not self.mainMenu.listeners.is_listener_valid(listenerName):
             # not a valid listener, return nothing for the script
-            print helpers.color("[!] Invalid listener: " + listenerName)
+            print(helpers.color("[!] Invalid listener: " + listenerName))
             return ""
         else:
             obfuscateScript = False
@@ -108,13 +110,13 @@ class Stager:
                 obfuscateScript = True
 
             if obfuscateScript and "launcher" in obfuscateCommand.lower():
-                print helpers.color("[!] If using obfuscation, LAUNCHER obfuscation cannot be used in the C# stager.")
+                print(helpers.color("[!] If using obfuscation, LAUNCHER obfuscation cannot be used in the C# stager."))
                 return ""
             # generate the PowerShell one-liner with all of the proper options set
             launcher = self.mainMenu.stagers.generate_launcher(listenerName, language=language, encode=True, obfuscate=obfuscateScript, obfuscationCommand=obfuscateCommand, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries)
 
             if launcher == "":
-                print helpers.color("[!] Error in launcher generation.")
+                print(helpers.color("[!] Error in launcher generation."))
                 return ""
             else:
                 launcherCode = launcher.split(" ")[-1]

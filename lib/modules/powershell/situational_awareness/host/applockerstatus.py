@@ -1,7 +1,9 @@
+from builtins import str
+from builtins import object
 from lib.common import helpers
 
 
-class Module:
+class Module(object):
 
     def __init__(self, mainMenu, params=[]):
 
@@ -56,7 +58,6 @@ class Module:
                 if option in self.options:
                     self.options[option]['Value'] = value
 
-
     def generate(self, obfuscate=False, obfuscationCommand=""):
 
         script = """
@@ -86,10 +87,10 @@ function Get-AppLockerConfig
 
     .EXAMPLE
 
-    Get-AppLockerStatus 'c:\windows\system32\calc.exe'
+    Get-AppLockerStatus 'c:\\windows\\system32\\calc.exe'
     Tests the AppLocker policy for calc.exe for "Everyone."
 
-    Get-AppLockerStatus 'c:\users\jdoe\Desktop\*.exe' 'dguy'
+    Get-AppLockerStatus 'c:\\users\\jdoe\\Desktop\\*.exe' 'dguy'
     Tests the AppLocker policy for "dguy" against every file ending in ".exe" in jdoe's Desktop folder.
 
     #>
@@ -122,7 +123,7 @@ function Get-AppLockerConfig
         scriptEnd = ""
 
         # Add any arguments to the end execution of the script
-        for option, values in self.options.iteritems():
+        for option, values in self.options.items():
             if option.lower() != "agent":
                 if values['Value'] and values['Value'] != '':
                     if values['Value'].lower() == "true":

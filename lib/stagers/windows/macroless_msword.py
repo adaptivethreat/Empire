@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
+from __future__ import print_function
+from builtins import object
 from lib.common import helpers
 import os
 
-class Stager:
+class Stager(object):
 
     def __init__(self, mainMenu, params=[]):
 
@@ -72,7 +74,7 @@ class Stager:
       ps1 = self.options['OutputPs1']['Value']
 
       if not self.mainMenu.listeners.is_listener_valid(listener):
-        print helpers.color("[!] Invalid listener: " + listener)
+        print(helpers.color("[!] Invalid listener: " + listener))
         return ""
       else:
         launcher = self.mainMenu.stagers.generate_launcher(listener, language='powershell', encode=True)
@@ -165,7 +167,7 @@ class Stager:
       craft_ps(output_path, launcher, ps1)
       craft_exploit(output_path, host, ps1)
 
-      print helpers.color("[+] '%s' and '%s' was created in the '%s' directory" % (output_docx, ps1, output_path))
+      print(helpers.color("[+] '%s' and '%s' was created in the '%s' directory" % (output_docx, ps1, output_path)))
 
       return os.system("cd %s && zip %s%s -r [Content_Types].xml docProps/ _rels word && rm -rf [Content_Types].xml docProps/ _rels/ word/ && cd -" % (output_path, output_path, output_docx))
 

@@ -5,13 +5,17 @@ Common terminal messages used across Empire.
 Titles, agent displays, listener displays, etc.
 
 """
+from __future__ import print_function
+from __future__ import absolute_import
 
+from builtins import str
+from builtins import range
 import os
 import time
 import textwrap
 
 # Empire imports
-import helpers
+from . import helpers
 
 
 ###############################################################
@@ -24,14 +28,13 @@ def title(version):
     """
     Print the tool title, with version.
     """
-    os.system('clear')
-    print "================================================================"
-    # print ' [Empire]  PowerShell/Python post-exploitation framework'
-    print " [Empire]  Post-Exploitation Framework"
-    print '================================================================'
-    print " [Version] %s | [Web] https://github.com/empireProject/Empire" % (version)
-    print '================================================================'
-    print """
+    #os.system('clear')
+    print("================================================================================")
+    print(" [Empire]  Post-Exploitation Framework")
+    print('================================================================================')
+    print(" [Version] %s | [Web] https://github.com/BC-SECURITY/Empire" % (version))
+    print('================================================================================')
+    print("""
    _______ .___  ___. .______    __  .______       _______
   |   ____||   \/   | |   _  \  |  | |   _  \     |   ____|
   |  |__   |  \  /  | |  |_)  | |  | |  |_)  |    |  |__
@@ -39,14 +42,14 @@ def title(version):
   |  |____ |  |  |  | |  |      |  | |  |\  \----.|  |____
   |_______||__|  |__| | _|      |__| | _| `._____||_______|
 
-"""
+""")
 
 def loading():
     """
     Print and ascii loading screen.
     """
 
-    print """
+    print("""
                               `````````
                          ``````.--::///+
                      ````-+sydmmmNNNNNNN
@@ -85,7 +88,7 @@ def loading():
                    `-/osyhdddddhyo:
                         ``.----.`
 
-                Welcome to the Empire"""
+                Welcome to the Empire""")
     time.sleep(3)
     os.system('clear')
 
@@ -134,7 +137,7 @@ def wrap_columns(col1, col2, width1=24, width2=40, indent=31):
 
     limit = max(len(lines1), len(lines2))
 
-    for x in xrange(limit):
+    for x in range(limit):
 
         if x < len(lines1):
             if x != 0:
@@ -161,9 +164,9 @@ def display_options(options, color=True):
     """
     for key in options:
         if color:
-            print "\t%s\t%s" % (helpers.color('{0: <16}'.format(key), "green"), wrap_string(options[key]))
+            print("\t%s\t%s" % (helpers.color('{0: <16}'.format(key), "green"), wrap_string(options[key])))
         else:
-            print "\t%s\t%s" % ('{0: <16}'.format(key), wrap_string(options[key]))
+            print("\t%s\t%s" % ('{0: <16}'.format(key), wrap_string(options[key])))
 
 
 def display_agents(agents):
@@ -175,10 +178,10 @@ def display_agents(agents):
 
     if len(agents) > 0:
 
-        print ''
-        print helpers.color("[*] Active agents:\n")
-        print " Name     La Internal IP     Machine Name      Username                Process            PID    Delay    Last Seen            Listener"
-        print " ----     -- -----------     ------------      --------                -------            ---    -----    ---------            ----------------"
+        print('')
+        print(helpers.color("[*] Active agents:\n"))
+        print(" Name     La Internal IP     Machine Name      Username                Process            PID    Delay    Last Seen            Listener")
+        print(" ----     -- -----------     ------------      --------                -------            ---    -----    ---------            ----------------")
 
         for agent in agents:
 
@@ -194,7 +197,7 @@ def display_agents(agents):
             else:
                 agent['language'] = 'X'
 
-            print " %.8s %.2s %.15s %.17s %.23s %.18s %.6s %.8s %.31s %.16s" % ('{0: <8}'.format(agent['name']),
+            print(" %.8s %.2s %.15s %.17s %.23s %.18s %.6s %.8s %.31s %.16s" % ('{0: <8}'.format(agent['name']),
                                   '{0: <2}'.format(agent['language']),
                                   '{0: <15}'.format(str(agent['internal_ip']).split(" ")[0]),
                                   '{0: <17}'.format(agent['hostname']),
@@ -203,15 +206,15 @@ def display_agents(agents):
                                   '{0: <6}'.format(str(agent['process_id'])),
                                   '{0: <8}'.format(str(agent['delay']) + "/"  +str(agent['jitter'])),
                                   '{0: <31}'.format(str(helpers.lastseen(agent['lastseen_time'], agent['delay'], agent['jitter']))),
-                                  '{0: <16}'.format(str(agent['listener'])))
+                                  '{0: <16}'.format(str(agent['listener']))))
 
             # Skip rows for better readability
             rowToggle = (rowToggle + 1) % 3
             if rowToggle == 0:
-                print
-        print ''
+                print()
+        print('')
     else:
-        print helpers.color('[!] No agents currently registered')
+        print(helpers.color('[!] No agents currently registered'))
 
 
 def display_agent(agent, returnAsString=False):
@@ -223,16 +226,16 @@ def display_agent(agent, returnAsString=False):
 
     if returnAsString:
         agentString = "\n[*] Agent info:\n"
-        for key, value in agent.iteritems():
+        for key, value in agent.items():
             if key != 'functions' and key != 'takings' and key != 'results':
                 agentString += "  %s\t%s\n" % ('{0: <16}'.format(key), wrap_string(value, width=70))
         return agentString + '\n'
     else:
-        print helpers.color("\n[*] Agent info:\n")
-        for key, value in agent.iteritems():
+        print(helpers.color("\n[*] Agent info:\n"))
+        for key, value in agent.items():
             if key != 'functions' and key != 'takings' and key != 'results':
-                print "\t%s\t%s" % (helpers.color('{0: <16}'.format(key), "blue"), wrap_string(value, width=70))
-        print ''
+                print("\t%s\t%s" % (helpers.color('{0: <16}'.format(key), "blue"), wrap_string(value, width=70)))
+        print('')
 
 
 def display_listeners(listeners, type = "Active"):
@@ -241,13 +244,13 @@ def display_listeners(listeners, type = "Active"):
     """
 
     if len(listeners) > 0:
-        print ''
-        print helpers.color("[*] %s listeners:\n" % type)
+        print('')
+        print(helpers.color("[*] %s listeners:\n" % type))
 
-        print "  Name              Module          Host                                 Delay/Jitter   KillDate"
-        print "  ----              ------          ----                                 ------------   --------"
+        print("  Name              Module          Host                                 Delay/Jitter   KillDate")
+        print("  ----              ------          ----                                 ------------   --------")
 
-        for listenerName, listener in listeners.iteritems():
+        for listenerName, listener in listeners.items():
 
             moduleName = listener['moduleName']
             if 'Host' in listener['options']:
@@ -275,13 +278,13 @@ def display_listeners(listeners, type = "Active"):
             else:
                 killDate = 'n/a'
 
-            print "  %s%s%s%s%s" % ('{0: <18}'.format(listenerName), '{0: <16}'.format(moduleName), '{0: <37}'.format(host), '{0: <15}'.format(connectInterval), '{0: <12}'.format(killDate))
+            print("  %s%s%s%s%s" % ('{0: <18}'.format(listenerName), '{0: <16}'.format(moduleName), '{0: <37}'.format(host), '{0: <15}'.format(connectInterval), '{0: <12}'.format(killDate)))
 
-        print ''
+        print('')
 
     else:
         if(type.lower() != "inactive"):
-            print helpers.color("[!] No listeners currently %s " % type.lower())
+            print(helpers.color("[!] No listeners currently %s " % type.lower()))
 
 
 def display_active_listener(listener):
@@ -289,18 +292,18 @@ def display_active_listener(listener):
     Displays an active listener's information structure.
     """
 
-    print "\n%s Options:\n" % (listener['options']['Name']['Value'])
-    print "  Name              Required    Value                            Description"
-    print "  ----              --------    -------                          -----------"
+    print("\n%s Options:\n" % (listener['options']['Name']['Value']))
+    print("  Name              Required    Value                            Description")
+    print("  ----              --------    -------                          -----------")
 
-    for option, values in listener['options'].iteritems():
+    for option, values in listener['options'].items():
         # if there's a long value length, wrap it
         if len(str(values['Value'])) > 33:
-            print "  %s%s%s" % ('{0: <18}'.format(option), '{0: <12}'.format(("True" if values['Required'] else "False")), '{0: <33}'.format(wrap_string(values['Value'], width=32, indent=32, followingHeader=values['Description'])))
+            print("  %s%s%s" % ('{0: <18}'.format(option), '{0: <12}'.format(("True" if values['Required'] else "False")), '{0: <33}'.format(wrap_string(values['Value'], width=32, indent=32, followingHeader=values['Description']))))
         else:
-            print "  %s%s%s%s" % ('{0: <18}'.format(option), '{0: <12}'.format(("True" if values['Required'] else "False")), '{0: <33}'.format(values['Value']), values['Description'])
+            print("  %s%s%s%s" % ('{0: <18}'.format(option), '{0: <12}'.format(("True" if values['Required'] else "False")), '{0: <33}'.format(values['Value']), values['Description']))
 
-    print "\n"
+    print("\n")
 
 
 def display_listener_module(listener):
@@ -308,47 +311,47 @@ def display_listener_module(listener):
     Displays a listener module's information structure.
     """
 
-    print '\n{0: >10}'.format("Name: ") + str(listener.info['Name'])
-    print '{0: >10}'.format("Category: ") + str(listener.info['Category'])
+    print('\n{0: >10}'.format("Name: ") + str(listener.info['Name']))
+    print('{0: >10}'.format("Category: ") + str(listener.info['Category']))
 
-    print "\nAuthors:"
+    print("\nAuthors:")
     for author in listener.info['Author']:
-        print "  " +author
+        print("  " +author)
 
-    print "\nDescription:"
+    print("\nDescription:")
     desc = wrap_string(listener.info['Description'], width=60, indent=2, indentAll=True)
     if len(desc.splitlines()) == 1:
-        print "  " + str(desc)
+        print("  " + str(desc))
     else:
-        print desc
+        print(desc)
 
     if 'Comments' in listener.info:
         comments = listener.info['Comments']
         if isinstance(comments, list):
             comments = ' '.join(comments)
         if comments.strip() != '':
-            print "\nComments:"
+            print("\nComments:")
             if isinstance(comments, list):
                 comments = ' '.join(comments)
             comment = wrap_string(comments, width=60, indent=2, indentAll=True)
             if len(comment.splitlines()) == 1:
-                print "  " + str(comment)
+                print("  " + str(comment))
             else:
-                print comment
+                print(comment)
 
 
-    print "\n%s Options:\n" % (listener.info['Name'])
-    print "  Name              Required    Value                            Description"
-    print "  ----              --------    -------                          -----------"
+    print("\n%s Options:\n" % (listener.info['Name']))
+    print("  Name              Required    Value                            Description")
+    print("  ----              --------    -------                          -----------")
 
-    for option, values in listener.options.iteritems():
+    for option, values in listener.options.items():
         # if there's a long value length, wrap it
         if len(str(values['Value'])) > 33:
-            print "  %s%s%s" % ('{0: <18}'.format(option), '{0: <12}'.format(("True" if values['Required'] else "False")), '{0: <33}'.format(wrap_string(values['Value'], width=32, indent=32, followingHeader=values['Description'])))
+            print("  %s%s%s" % ('{0: <18}'.format(option), '{0: <12}'.format(("True" if values['Required'] else "False")), '{0: <33}'.format(wrap_string(values['Value'], width=32, indent=32, followingHeader=values['Description']))))
         else:
-            print "  %s%s%s%s" % ('{0: <18}'.format(option), '{0: <12}'.format(("True" if values['Required'] else "False")), '{0: <33}'.format(values['Value']), values['Description'])
+            print("  %s%s%s%s" % ('{0: <18}'.format(option), '{0: <12}'.format(("True" if values['Required'] else "False")), '{0: <33}'.format(values['Value']), values['Description']))
 
-    print "\n"
+    print("\n")
 
 
 def display_stager(stager):
@@ -356,25 +359,25 @@ def display_stager(stager):
     Displays a stager's information structure.
     """
 
-    print "\nName: " + stager.info['Name']
+    print("\nName: " + stager.info['Name'])
 
-    print "\nDescription:"
+    print("\nDescription:")
     desc = wrap_string(stager.info['Description'], width=50, indent=2, indentAll=True)
     if len(desc.splitlines()) == 1:
-        print "  " + str(desc)
+        print("  " + str(desc))
     else:
-        print desc
+        print(desc)
 
     # print out any options, if present
     if stager.options:
-        print "\nOptions:\n"
-        print "  Name             Required    Value             Description"
-        print "  ----             --------    -------           -----------"
+        print("\nOptions:\n")
+        print("  Name             Required    Value             Description")
+        print("  ----             --------    -------           -----------")
 
-        for option, values in stager.options.iteritems():
-            print "  %s%s%s%s" % ('{0: <17}'.format(option), '{0: <12}'.format(("True" if values['Required'] else "False")), '{0: <18}'.format(values['Value']), wrap_string(values['Description'], indent=49))
+        for option, values in stager.options.items():
+            print("  %s%s%s%s" % ('{0: <17}'.format(option), '{0: <12}'.format(("True" if values['Required'] else "False")), '{0: <18}'.format(values['Value']), wrap_string(values['Description'], indent=49)))
 
-    print "\n"
+    print("\n")
 
 
 def display_module(moduleName, module):
@@ -382,60 +385,60 @@ def display_module(moduleName, module):
     Displays a module's information structure.
     """
 
-    print '\n{0: >20}'.format("Name: ") + str(module.info['Name'])
-    print '{0: >20}'.format("Module: ") + str(moduleName)
+    print('\n{0: >20}'.format("Name: ") + str(module.info['Name']))
+    print('{0: >20}'.format("Module: ") + str(moduleName))
     if 'NeedsAdmin' in module.info:
-        print '{0: >20}'.format("NeedsAdmin: ") + ("True" if module.info['NeedsAdmin'] else "False")
+        print('{0: >20}'.format("NeedsAdmin: ") + ("True" if module.info['NeedsAdmin'] else "False"))
     if 'OpsecSafe' in module.info:
-        print '{0: >20}'.format("OpsecSafe: ") + ("True" if module.info['OpsecSafe'] else "False")
+        print('{0: >20}'.format("OpsecSafe: ") + ("True" if module.info['OpsecSafe'] else "False"))
     if 'Language' in module.info:
-        print '{0: >20}'.format("Language: ") + str(module.info['Language'])
+        print('{0: >20}'.format("Language: ") + str(module.info['Language']))
     if 'MinLanguageVersion' in module.info:
-        print '{0: >20}'.format("MinLanguageVersion: ") + str(module.info['MinLanguageVersion'])
+        print('{0: >20}'.format("MinLanguageVersion: ") + str(module.info['MinLanguageVersion']))
     if 'Background' in module.info:
-        print '{0: >20}'.format("Background: ") + ("True" if module.info['Background'] else "False")
+        print('{0: >20}'.format("Background: ") + ("True" if module.info['Background'] else "False"))
     if 'OutputExtension' in module.info:
-        print '{0: >20}'.format("OutputExtension: ") + (str(module.info['OutputExtension']) if module.info['OutputExtension'] else "None")
+        print('{0: >20}'.format("OutputExtension: ") + (str(module.info['OutputExtension']) if module.info['OutputExtension'] else "None"))
 
-    print "\nAuthors:"
+    print("\nAuthors:")
     for author in module.info['Author']:
-        print "  " +author
+        print("  " +author)
 
-    print "\nDescription:"
+    print("\nDescription:")
     desc = wrap_string(module.info['Description'], width=60, indent=2, indentAll=True)
     if len(desc.splitlines()) == 1:
-        print "  " + str(desc)
+        print("  " + str(desc))
     else:
-        print desc
+        print(desc)
 
     if 'Comments' in module.info:
         comments = module.info['Comments']
         if isinstance(comments, list):
             comments = ' '.join(comments)
         if comments.strip() != '':
-            print "\nComments:"
+            print("\nComments:")
             if isinstance(comments, list):
                 comments = ' '.join(comments)
             comment = wrap_string(comments, width=60, indent=2, indentAll=True)
             if len(comment.splitlines()) == 1:
-                print "  " + str(comment)
+                print("  " + str(comment))
             else:
-                print comment
+                print(comment)
 
     # print out any options, if present
     if module.options:
 
         # get the size for the first column
-        maxNameLen = len(max(module.options.keys(), key=len))
+        maxNameLen = len(max(list(module.options.keys()), key=len))
 
-        print "\nOptions:\n"
-        print "  %sRequired    Value                     Description" %('{:<{}s}'.format("Name", maxNameLen+1))
-        print "  %s--------    -------                   -----------" %('{:<{}s}'.format("----", maxNameLen+1))
+        print("\nOptions:\n")
+        print("  %sRequired    Value                     Description" %('{:<{}s}'.format("Name", maxNameLen+1)))
+        print("  %s--------    -------                   -----------" %('{:<{}s}'.format("----", maxNameLen+1)))
 
-        for option, values in module.options.iteritems():
-            print "  %s%s%s" % ('{:<{}s}'.format(str(option), maxNameLen+1), '{0: <12}'.format(("True" if values['Required'] else "False")), wrap_columns(str(values['Value']), str(values['Description']), indent=(31 + (maxNameLen-16))))
+        for option, values in module.options.items():
+            print("  %s%s%s" % ('{:<{}s}'.format(str(option), maxNameLen+1), '{0: <12}'.format(("True" if values['Required'] else "False")), wrap_columns(str(values['Value']), str(values['Description']), indent=(31 + (maxNameLen-16)))))
 
-    print ''
+    print('')
 
 
 def display_module_search(moduleName, module):
@@ -445,16 +448,16 @@ def display_module_search(moduleName, module):
 
     # Suffix modules requring elevated context with '*'
     if module.info['NeedsAdmin']:
-        print " %s*\n" % (helpers.color(moduleName, 'blue'))
+        print(" %s*\n" % (helpers.color(moduleName, 'blue')))
     else:
-        print " %s\n" % (helpers.color(moduleName, 'blue'))
+        print(" %s\n" % (helpers.color(moduleName, 'blue')))
     # width=40, indent=32, indentAll=False,
 
     lines = textwrap.wrap(textwrap.dedent(module.info['Description']).strip(), width=70)
     for line in lines:
-        print "\t" + line
+        print("\t" + line)
 
-    print "\n"
+    print("\n")
 
 
 def display_credentials(creds):
@@ -462,9 +465,9 @@ def display_credentials(creds):
     Take a credential array and display everything nicely.
     """
 
-    print helpers.color("\nCredentials:\n", "blue")
-    print "  CredID  CredType   Domain                   UserName         Host             Password"
-    print "  ------  --------   ------                   --------         ----             --------"
+    print(helpers.color("\nCredentials:\n", "blue"))
+    print("  CredID  CredType   Domain                   UserName         Host             Password")
+    print("  ------  --------   ------                   --------         ----             --------")
 
     for cred in creds:
         # (id, credtype, domain, username, password, host, notes, sid)
@@ -475,6 +478,6 @@ def display_credentials(creds):
         password = cred[4]
         host = cred[5]
 
-        print "  %s%s%s%s%s%s" % ('{0: <8}'.format(credID), '{0: <11}'.format(credType), '{0: <25}'.format(domain), '{0: <17}'.format(username), '{0: <17}'.format(host), password)
+        print("  %s%s%s%s%s%s" % ('{0: <8}'.format(credID), '{0: <11}'.format(credType), '{0: <25}'.format(domain), '{0: <17}'.format(username), '{0: <17}'.format(host), password))
 
-    print ''
+    print('')

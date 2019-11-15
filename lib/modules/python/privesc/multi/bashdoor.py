@@ -1,4 +1,5 @@
-class Module:
+from builtins import object
+class Module(object):
 
     def __init__(self, mainMenu, params=[]):
 

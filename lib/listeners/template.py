@@ -1,3 +1,6 @@
+from __future__ import print_function
+from builtins import str
+from builtins import object
 import base64
 import random
 
@@ -9,7 +12,7 @@ from lib.common import packets
 from lib.common import messages
 
 
-class Listener:
+class Listener(object):
 
     def __init__(self, mainMenu, params=[]):
 
@@ -149,7 +152,7 @@ class Listener:
         If there's a default response expected from the server that the client needs to ignore,
         (i.e. a default HTTP page), put the generation here.
         """
-        print helpers.color("[!] default_response() not implemented for listeners/template")
+        print(helpers.color("[!] default_response() not implemented for listeners/template"))
         return ''
 
 
@@ -160,7 +163,7 @@ class Listener:
 
         for key in self.options:
             if self.options[key]['Required'] and (str(self.options[key]['Value']).strip() == ''):
-                print helpers.color("[!] Option \"%s\" is required." % (key))
+                print(helpers.color("[!] Option \"%s\" is required." % (key)))
                 return False
 
         return True
@@ -172,7 +175,7 @@ class Listener:
         """
 
         if not language:
-            print helpers.color('[!] listeners/template generate_launcher(): no language specified!')
+            print(helpers.color('[!] listeners/template generate_launcher(): no language specified!'))
             return None
 
         if listenerName and (listenerName in self.mainMenu.listeners.activeListeners):
@@ -195,10 +198,10 @@ class Listener:
                 return ''
 
             else:
-                print helpers.color("[!] listeners/template generate_launcher(): invalid language specification: only 'powershell' and 'python' are current supported for this module.")
+                print(helpers.color("[!] listeners/template generate_launcher(): invalid language specification: only 'powershell' and 'python' are current supported for this module."))
 
         else:
-            print helpers.color("[!] listeners/template generate_launcher(): invalid listener name specification!")
+            print(helpers.color("[!] listeners/template generate_launcher(): invalid listener name specification!"))
 
 
     def generate_stager(self, listenerOptions, encode=False, encrypt=True, obfuscate=False, obfuscationCommand="", language=None):
@@ -206,7 +209,7 @@ class Listener:
         If you want to support staging for the listener module, generate_stager must be
         implemented to return the stage1 key-negotiation stager code.
         """
-        print helpers.color("[!] generate_stager() not implemented for listeners/template")
+        print(helpers.color("[!] generate_stager() not implemented for listeners/template"))
         return ''
 
 
@@ -215,7 +218,7 @@ class Listener:
         If you want to support staging for the listener module, generate_agent must be
         implemented to return the actual staged agent code.
         """
-        print helpers.color("[!] generate_agent() not implemented for listeners/template")
+        print(helpers.color("[!] generate_agent() not implemented for listeners/template"))
         return ''
 
 
@@ -258,9 +261,9 @@ class Listener:
                 # send_message()
                 pass
             else:
-                print helpers.color("[!] listeners/template generate_comms(): invalid language specification, only 'powershell' and 'python' are current supported for this module.")
+                print(helpers.color("[!] listeners/template generate_comms(): invalid language specification, only 'powershell' and 'python' are current supported for this module."))
         else:
-            print helpers.color('[!] listeners/template generate_comms(): no language specified!')
+            print(helpers.color('[!] listeners/template generate_comms(): no language specified!'))
 
 
     def start(self, name=''):

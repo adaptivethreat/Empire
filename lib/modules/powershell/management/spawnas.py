@@ -1,6 +1,9 @@
+from __future__ import print_function
+from builtins import str
+from builtins import object
 from lib.common import helpers
 
-class Module:
+class Module(object):
 
     def __init__(self, mainMenu, params=[]):
 
@@ -100,7 +103,7 @@ class Module:
         try:
             f = open(moduleSource, 'r')
         except:
-            print helpers.color("[!] Could not read module source path at: " + str(moduleSource))
+            print(helpers.color("[!] Could not read module source path at: " + str(moduleSource)))
             return ""
 
         script = f.read()
@@ -111,7 +114,7 @@ class Module:
         if credID != "":
             
             if not self.mainMenu.credentials.is_credential_valid(credID):
-                print helpers.color("[!] CredID is invalid!")
+                print(helpers.color("[!] CredID is invalid!"))
                 return ""
 
             (credID, credType, domainName, userName, password, host, os, sid, notes) = self.mainMenu.credentials.get_credentials(credID)[0]

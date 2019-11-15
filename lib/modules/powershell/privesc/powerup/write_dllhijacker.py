@@ -1,6 +1,9 @@
+from __future__ import print_function
+from builtins import str
+from builtins import object
 from lib.common import helpers
 
-class Module:
+class Module(object):
 
     def __init__(self, mainMenu, params=[]):
 
@@ -90,7 +93,7 @@ class Module:
         try:
             f = open(moduleSource, 'r')
         except:
-            print helpers.color("[!] Could not read module source path at: " + str(moduleSource))
+            print(helpers.color("[!] Could not read module source path at: " + str(moduleSource)))
             return ""
 
         moduleCode = f.read()
@@ -112,7 +115,7 @@ class Module:
         launcher = self.mainMenu.stagers.generate_launcher(listenerName, language='powershell', encode=True, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds)
 
         if launcher == "":
-            print helpers.color("[!] Error in launcher command generation.")
+            print(helpers.color("[!] Error in launcher command generation."))
             return ""
 
         else:

@@ -1,7 +1,9 @@
+from __future__ import print_function
+from builtins import object
 from lib.common import helpers
 
 
-class Stager:
+class Stager(object):
 
     def __init__(self, mainMenu, params=[]):
 
@@ -73,7 +75,7 @@ class Stager:
         launcher = self.mainMenu.stagers.generate_launcher(listenerName, language=language, encode=encode, userAgent=userAgent,  safeChecks=safeChecks)
 
         if launcher == "":
-            print helpers.color("[!] Error in launcher command generation.")
+            print(helpers.color("[!] Error in launcher command generation."))
             return ""
 
         else:

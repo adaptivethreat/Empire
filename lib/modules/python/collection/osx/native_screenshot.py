@@ -1,10 +1,11 @@
+from builtins import object
 from zlib_wrapper import compress
 import os
 from lib.common import helpers
 import hashlib
 import base64
 
-class Module:
+class Module(object):
 
     def __init__(self, mainMenu, params=[]):
 

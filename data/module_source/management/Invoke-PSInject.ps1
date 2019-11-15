@@ -483,7 +483,8 @@ $RemoteScriptBlock = {
 
     Function Get-Win32Constants
     {
-        $Win32Constants = New-Object System.Object
+	$Creator = New-Object -ComObject RDS.DataSpace        
+	$Win32Constants = $Creator.CreateObject('System.Object','')
         
         $Win32Constants | Add-Member -MemberType NoteProperty -Name MEM_COMMIT -Value 0x00001000
         $Win32Constants | Add-Member -MemberType NoteProperty -Name MEM_RESERVE -Value 0x00002000
@@ -520,7 +521,8 @@ $RemoteScriptBlock = {
 
     Function Get-Win32Functions
     {
-        $Win32Functions = New-Object System.Object
+	$Creator = New-Object -ComObject RDS.DataSpace        
+	$Win32Functions = $Creator.CreateObject('System.Object','')
         
         $VirtualAllocAddr = Get-ProcAddress kernel32.dll VirtualAlloc
         $VirtualAllocDelegate = Get-DelegateType @([IntPtr], [UIntPtr], [UInt32], [UInt32]) ([IntPtr])

@@ -6,15 +6,18 @@ Right now, just loads up all modules from the
 install path in the common config.
 
 """
+from __future__ import print_function
+from __future__ import absolute_import
 
+from builtins import object
 import fnmatch
 import os
 import imp
-import messages
-import helpers
+from . import messages
+from . import helpers
 
 
-class Modules:
+class Modules(object):
 
     def __init__(self, MainMenu, args):
 
@@ -36,12 +39,11 @@ class Modules:
         Load Empire modules from a specified path, default to
         installPath + "/lib/modules/*"
         """
-        
         if rootPath == '':
             rootPath = "%s/lib/modules/" % (self.mainMenu.installPath)
 
         pattern = '*.py'
-        print helpers.color("[*] Loading modules from: %s" % (rootPath))
+        print(helpers.color("[*] Loading modules from: %s" % (rootPath)))
          
         for root, dirs, files in os.walk(rootPath):
             for filename in fnmatch.filter(files, pattern):
@@ -90,9 +92,9 @@ class Modules:
         Search currently loaded module names and descriptions.
         """
 
-        print ''
+        print('')
 
-        for moduleName, module in self.modules.iteritems():
+        for moduleName, module in self.modules.items():
 
             if searchTerm.lower() == '' or searchTerm.lower() in moduleName.lower() or searchTerm.lower() in module.info['Description'].lower():
                 messages.display_module_search(moduleName, module)

@@ -9,16 +9,19 @@ handler (RequestHandler).
 These are the first places URI requests are processed.
 
 """
+from __future__ import absolute_import
 
-from BaseHTTPServer import BaseHTTPRequestHandler
-import BaseHTTPServer, threading, ssl, os, string, random
+from future import standard_library
+standard_library.install_aliases()
+from http.server import BaseHTTPRequestHandler
+import http.server, threading, ssl, os, string, random
 from pydispatch import dispatcher
 import re
 import json
 
 # Empire imports
-import encryption
-import helpers
+from . import encryption
+from . import helpers
 
 
 def default_page(path_to_html_file="empty"):
@@ -185,7 +188,7 @@ class EmpireServer(threading.Thread):
             threading.Thread.__init__(self)
             self.server = None
 
-            self.server = BaseHTTPServer.HTTPServer((lhost, int(port)), RequestHandler)
+            self.server = http.server.HTTPServer((lhost, int(port)), RequestHandler)
 
             # pass the agent handler object along for the RequestHandler
             self.server.agents = handler

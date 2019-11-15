@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+from builtins import next
+from builtins import hex
+from builtins import object
 import argparse
 import logging
 import random
@@ -327,7 +330,7 @@ class SocksBase(object):
             if self.socks_socket is not None and self.socks_socket in r:
                 s, addr = self.socks_socket.accept()
                 addr = '{}:{}'.format(*addr)
-                c = self.tunnel.open_channel(self.next_channel_id.next(), remote=True)
+                c = self.tunnel.open_channel(next(self.next_channel_id), remote=True)
                 c.local_peer_addr = addr
                 c.socket = s
                 self.logger.info('Created new channel: {}'.format(c))

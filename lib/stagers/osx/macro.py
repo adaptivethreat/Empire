@@ -1,7 +1,11 @@
+from __future__ import print_function
+from builtins import str
+from builtins import range
+from builtins import object
 from lib.common import helpers
 import re
 
-class Stager:
+class Stager(object):
 
     def __init__(self, mainMenu, params=[]):
 
@@ -70,7 +74,7 @@ class Stager:
             str1 = ''
             str2 = ''
             str1 = varstr + ' = "' + instr[:54] + '"'
-            for i in xrange(54, len(instr), 48):
+            for i in range(54, len(instr), 48):
                 holder.append('\t\t' + varstr + ' = '+ varstr +' + "'+instr[i:i+48])
                 str2 = '"\r\n'.join(holder)
             str2 = str2 + "\""
@@ -93,7 +97,7 @@ class Stager:
         pylauncher = self.mainMenu.stagers.generate_launcher(listenerName, language="python", encode=True, userAgent=userAgent, safeChecks=safeChecks)
 
         if pylauncher == "":
-            print helpers.color("[!] Error in python launcher command generation.")
+            print(helpers.color("[!] Error in python launcher command generation."))
             return ""
 
         # render python launcher into python payload

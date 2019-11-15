@@ -1,5 +1,6 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
+from __future__ import print_function
 import sqlite3, argparse, sys, argparse, logging, json, string, subprocess
 import os, re, time, signal, copy, base64, pickle, random
 from flask import Flask, request, jsonify, make_response, abort, url_for
@@ -12,9 +13,10 @@ import ast
 # Empire imports
 from lib.common import empire, helpers
 
-# set global utf8 encoding
-reload(sys)
-sys.setdefaultencoding('utf8')
+# if running in python 2.7 set global utf8 encoding otherwise python 3 is already UTF-8 by default
+if sys.version[0] == '2':
+	reload(sys)
+	sys.setdefaultencoding("utf-8")
 
 global serverExitCommand
 serverExitCommand = 'restart'
@@ -32,7 +34,7 @@ def database_check_docker():
     """
     if os.path.exists('/.dockerenv'):
         if not os.path.exists('data/empire.db'):
-            print '[*] Fresh start in docker, running reset.sh for you'
+            print('[*] Fresh start in docker, running reset.sh for you')
             subprocess.call(['./setup/reset.sh'])
 
 
@@ -49,8 +51,8 @@ def database_connect():
         return conn
 
     except Exception:
-        print helpers.color("[!] Could not connect to database")
-        print helpers.color("[!] Please run setup_database.py")
+        print(helpers.color("[!] Could not connect to database"))
+        print(helpers.color("[!] Please run setup_database.py"))
         sys.exit()
 
 
@@ -194,15 +196,15 @@ def start_restful_api(empireMenu, suppress=False, username=None, password=None, 
         password = password[0]
 
 
-    print ''
+    print('')
 
 
 
-    print " * Starting Empire RESTful API on port: %s" %(port)
+    print(" * Starting Empire RESTful API on port: %s" %(port))
 
     # refresh the token for the RESTful API
     apiToken = refresh_api_token(conn)
-    print " * RESTful API token: %s" %(apiToken)
+    print(" * RESTful API token: %s" %(apiToken))
 
     permanentApiToken = get_permanent_token(conn)
     tokenAllowed = re.compile("^[0-9a-z]{40}")
@@ -1278,7 +1280,7 @@ def start_restful_api(empireMenu, suppress=False, username=None, password=None, 
 
 
     if not os.path.exists('./data/empire-chain.pem'):
-        print "[!] Error: cannot find certificate ./data/empire-chain.pem"
+        print("[!] Error: cannot find certificate ./data/empire-chain.pem")
         sys.exit()
 
 
@@ -1293,13 +1295,13 @@ def start_restful_api(empireMenu, suppress=False, username=None, password=None, 
             sys.stdout.close()
             sys.stdout = oldStdout
 
-        print "\n * Shutting down Empire RESTful API"
+        print("\n * Shutting down Empire RESTful API")
 
         if conn:
             conn.close()
 
         if suppress:
-            print " * Shutting down the Empire instance"
+            print(" * Shutting down the Empire instance")
             main.shutdown()
 
         serverExitCommand = 'shutdown'
@@ -1390,7 +1392,7 @@ if __name__ == '__main__':
         args.restport = args.restport[0]
 
     if args.version:
-        print empire.VERSION
+        print(empire.VERSION)
 
     elif args.rest:
          # start an Empire instance and RESTful API

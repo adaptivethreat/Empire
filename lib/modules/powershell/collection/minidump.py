@@ -1,6 +1,9 @@
+from __future__ import print_function
+from builtins import str
+from builtins import object
 from lib.common import helpers
 
-class Module:
+class Module(object):
 
     def __init__(self, mainMenu, params=[]):
 
@@ -75,7 +78,7 @@ class Module:
         try:
             f = open(moduleSource, 'r')
         except:
-            print helpers.color("[!] Could not read module source path at: " + str(moduleSource))
+            print(helpers.color("[!] Could not read module source path at: " + str(moduleSource)))
             return ""
 
         moduleCode = f.read()
@@ -85,7 +88,7 @@ class Module:
         
         scriptEnd = ""
 
-        for option,values in self.options.iteritems():
+        for option,values in self.options.items():
             if option.lower() != "agent":
                 if values['Value'] and values['Value'] != '':
                     if option == "ProcessName":
@@ -93,7 +96,7 @@ class Module:
                     elif option == "ProcessId":
                         scriptEnd = "Get-Process -Id " + values['Value'] + " | Out-Minidump"
         
-        for option,values in self.options.iteritems():
+        for option,values in self.options.items():
             if values['Value'] and values['Value'] != '':
                 if option != "Agent" and option != "ProcessName" and option != "ProcessId":
                     scriptEnd += " -" + str(option) + " " + str(values['Value'])

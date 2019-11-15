@@ -1,7 +1,9 @@
+from builtins import str
+from builtins import object
 import base64
 from lib.common import helpers
 
-class Module:
+class Module(object):
 
     def __init__(self, mainMenu, params=[]):
 
@@ -100,7 +102,7 @@ function Invoke-ProcessKiller {
 Invoke-ProcessKiller"""
 
 
-        for option,values in self.options.iteritems():
+        for option,values in self.options.items():
             if option.lower() != "agent":
                 if values['Value'] and values['Value'] != '':
                     if values['Value'].lower() == "true":

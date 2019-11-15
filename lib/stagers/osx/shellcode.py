@@ -1,7 +1,9 @@
+from __future__ import print_function
+from builtins import object
 from lib.common import helpers
 
 
-class Stager:
+class Stager(object):
 
     def __init__(self, mainMenu, params=[]):
 
@@ -75,14 +77,14 @@ class Stager:
 
         if not self.mainMenu.listeners.is_listener_valid(listenerName):
             # not a valid listener, return nothing for the script
-            print helpers.color("[!] Invalid listener: " + listenerName)
+            print(helpers.color("[!] Invalid listener: " + listenerName))
             return ""
         else:
             # generate launcher code
             launcher = self.mainMenu.stagers.generate_launcher(listenerName, language=language, encode=True, userAgent=userAgent, safeChecks=safeChecks)
             sc = ""
             if launcher == "":
-                print helpers.color("[!] Error in launcher command generation.")
+                print(helpers.color("[!] Error in launcher command generation."))
                 return ""
             elif arch.lower() == 'x86':
                 sc = (

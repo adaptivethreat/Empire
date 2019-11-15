@@ -1,7 +1,9 @@
+from __future__ import print_function
+from builtins import object
 from lib.common import helpers
 
 
-class Stager:
+class Stager(object):
 
     def __init__(self, mainMenu, params=[]):
 
@@ -57,7 +59,7 @@ class Stager:
                 'Value'         :   'True'
             },
             'AMSIBypass2' : {
-                'Description'   :   'Include rastamouse\'s AMSI Bypass in the stager code.',
+                'Description'   :   'Include Tal Liberman\'s AMSI Bypass in the stager code.',
                 'Required'      :   False,
                 'Value'         :   'False'
             }
@@ -100,7 +102,7 @@ class Stager:
         launcher = self.mainMenu.stagers.generate_launcher(listenerName, language=language, encode=True, userAgent=userAgent, safeChecks=safeChecks, scriptLogBypass=scriptLogBypassBool, AMSIBypass=AMSIBypassBool, AMSIBypass2=AMSIBypass2Bool)
 
         if launcher == "":
-            print helpers.color("[!] Error in launcher command generation.")
+            print(helpers.color("[!] Error in launcher command generation."))
             return ""
 
         else:

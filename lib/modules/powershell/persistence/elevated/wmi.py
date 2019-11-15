@@ -1,8 +1,10 @@
+from __future__ import print_function
+from builtins import object
 import os
 from lib.common import helpers
 
 
-class Module:
+class Module(object):
     def __init__(self, mainMenu, params=[]):
 
         self.info = {
@@ -147,20 +149,20 @@ class Module:
                 statusMsg += "using external file " + extFile
 
             else:
-                print
+                print()
                 helpers.color("[!] File does not exist: " + extFile)
                 return ""
 
         else:
             if listenerName == "":
-                print
+                print()
                 helpers.color("[!] Either an ExtFile or a Listener must be specified")
                 return ""
 
             # if an external file isn't specified, use a listener
             elif not self.mainMenu.listeners.is_listener_valid(listenerName):
                 # not a valid listener, return nothing for the script
-                print
+                print()
                 helpers.color("[!] Invalid listener: " + listenerName)
                 return ""
 
@@ -175,7 +177,7 @@ class Module:
 
         # sanity check to make sure we haven't exceeded the powershell -enc 8190 char max
         if len(encScript) > 8190:
-            print
+            print()
             helpers.color("[!] Warning: -enc command exceeds the maximum of 8190 characters.")
             return ""
 
@@ -196,7 +198,7 @@ class Module:
             parts = dailyTime.split(":")
 
             if len(parts) < 2:
-                print
+                print()
                 helpers.color("[!] Please use HH:mm format for DailyTime")
                 return ""
 

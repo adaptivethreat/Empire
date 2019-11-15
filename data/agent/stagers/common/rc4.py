@@ -1,3 +1,6 @@
+from __future__ import print_function
+from builtins import chr
+from builtins import range
 import os
 import struct
 
@@ -8,7 +11,7 @@ LANGUAGE = {
 }
 
 LANGUAGE_IDS = {}
-for name, ID in LANGUAGE.items(): LANGUAGE_IDS[ID] = name
+for name, ID in list(LANGUAGE.items()): LANGUAGE_IDS[ID] = name
 
 META = {
     'NONE' : 0,
@@ -19,17 +22,17 @@ META = {
     'SERVER_RESPONSE' : 5
 }
 META_IDS = {}
-for name, ID in META.items(): META_IDS[ID] = name
+for name, ID in list(META.items()): META_IDS[ID] = name
 
 ADDITIONAL = {}
 ADDITIONAL_IDS = {}
-for name, ID in ADDITIONAL.items(): ADDITIONAL_IDS[ID] = name
+for name, ID in list(ADDITIONAL.items()): ADDITIONAL_IDS[ID] = name
 
 def rc4(key, data):
     """
     Decrypt/encrypt the passed data using RC4 and the given key.
     """
-    S,j,out=range(256),0,[]
+    S,j,out=list(range(256)),0,[]
     for i in range(256):
         j=(j+S[i]+ord(key[i%len(key)]))%256
         S[i],S[j]=S[j],S[i]
@@ -102,11 +105,11 @@ def parse_routing_packet(stagingKey, data):
             return results
 
         else:
-            print "[*] parse_agent_data() data length incorrect: %s" % (len(data))
+            print("[*] parse_agent_data() data length incorrect: %s" % (len(data)))
             return None
 
     else:
-        print "[*] parse_agent_data() data is None"
+        print("[*] parse_agent_data() data is None")
         return None
 
 

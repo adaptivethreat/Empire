@@ -3,6 +3,12 @@ Implements AES in python as a jinja2 partial.
 AES code from https://github.com/ricmoo/pyaes
 """
 
+from builtins import bytes
+from builtins import chr
+from builtins import zip
+from builtins import str
+from builtins import range
+from builtins import object
 import copy
 import struct
 import hashlib
@@ -109,19 +115,19 @@ class AES(object):
         rounds = self.number_of_rounds[len(key)]
 
         # Encryption round keys
-        self._Ke = [[0] * 4 for i in xrange(rounds + 1)]
+        self._Ke = [[0] * 4 for i in range(rounds + 1)]
 
         # Decryption round keys
-        self._Kd = [[0] * 4 for i in xrange(rounds + 1)]
+        self._Kd = [[0] * 4 for i in range(rounds + 1)]
 
         round_key_count = (rounds + 1) * 4
         KC = len(key) // 4
 
         # Convert the key into ints
-        tk = [struct.unpack('>i', key[i:i + 4])[0] for i in xrange(0, len(key), 4)]
+        tk = [struct.unpack('>i', key[i:i + 4])[0] for i in range(0, len(key), 4)]
 
         # Copy values into round key arrays
-        for i in xrange(0, KC):
+        for i in range(0, KC):
             self._Ke[i // 4][i % 4] = tk[i]
             self._Kd[rounds - (i // 4)][i % 4] = tk[i]
 
@@ -139,12 +145,12 @@ class AES(object):
             rconpointer += 1
 
             if KC != 8:
-                for i in xrange(1, KC):
+                for i in range(1, KC):
                     tk[i] ^= tk[i - 1]
 
             # Key expansion for 256-bit keys is "slightly different" (fips-197)
             else:
-                for i in xrange(1, KC // 2):
+                for i in range(1, KC // 2):
                     tk[i] ^= tk[i - 1]
                 tt = tk[KC // 2 - 1]
 
@@ -153,7 +159,7 @@ class AES(object):
                                (self.S[(tt >> 16) & 0xFF] << 16) ^
                                (self.S[(tt >> 24) & 0xFF] << 24))
 
-                for i in xrange(KC // 2 + 1, KC):
+                for i in range(KC // 2 + 1, KC):
                     tk[i] ^= tk[i - 1]
 
             # Copy values into round key arrays
@@ -165,8 +171,8 @@ class AES(object):
                 t += 1
 
         # Inverse-Cipher-ify the decryption round key (fips-197 section 5.3)
-        for r in xrange(1, rounds):
-            for j in xrange(0, 4):
+        for r in range(1, rounds):
+            for j in range(0, 4):
                 tt = self._Kd[r][j]
                 self._Kd[r][j] = (self.U1[(tt >> 24) & 0xFF] ^
                                   self.U2[(tt >> 16) & 0xFF] ^
@@ -184,11 +190,11 @@ class AES(object):
         a = [0, 0, 0, 0]
 
         # Convert plaintext to (ints ^ key)
-        t = [(_compact_word(plaintext[4 * i:4 * i + 4]) ^ self._Ke[0][i]) for i in xrange(0, 4)]
+        t = [(_compact_word(plaintext[4 * i:4 * i + 4]) ^ self._Ke[0][i]) for i in range(0, 4)]
 
         # Apply round transforms
-        for r in xrange(1, rounds):
-            for i in xrange(0, 4):
+        for r in range(1, rounds):
+            for i in range(0, 4):
                 a[i] = (self.T1[(t[ i          ] >> 24) & 0xFF] ^
                         self.T2[(t[(i + s1) % 4] >> 16) & 0xFF] ^
                         self.T3[(t[(i + s2) % 4] >>  8) & 0xFF] ^
@@ -198,7 +204,7 @@ class AES(object):
 
         # The last round is special
         result = []
-        for i in xrange(0, 4):
+        for i in range(0, 4):
             tt = self._Ke[rounds][i]
             result.append((self.S[(t[ i           ] >> 24) & 0xFF] ^ (tt >> 24)) & 0xFF)
             result.append((self.S[(t[(i + s1) % 4] >> 16) & 0xFF] ^ (tt >> 16)) & 0xFF)
@@ -218,11 +224,11 @@ class AES(object):
         a = [0, 0, 0, 0]
 
         # Convert ciphertext to (ints ^ key)
-        t = [(_compact_word(ciphertext[4 * i:4 * i + 4]) ^ self._Kd[0][i]) for i in xrange(0, 4)]
+        t = [(_compact_word(ciphertext[4 * i:4 * i + 4]) ^ self._Kd[0][i]) for i in range(0, 4)]
 
         # Apply round transforms
-        for r in xrange(1, rounds):
-            for i in xrange(0, 4):
+        for r in range(1, rounds):
+            for i in range(0, 4):
                 a[i] = (self.T5[(t[ i          ] >> 24) & 0xFF] ^
                         self.T6[(t[(i + s1) % 4] >> 16) & 0xFF] ^
                         self.T7[(t[(i + s2) % 4] >>  8) & 0xFF] ^
@@ -232,7 +238,7 @@ class AES(object):
 
         # The last round is special
         result = []
-        for i in xrange(0, 4):
+        for i in range(0, 4):
             tt = self._Kd[rounds][i]
             result.append((self.Si[(t[ i          ] >> 24) & 0xFF] ^ (tt >> 24)) & 0xFF)
             result.append((self.Si[(t[(i + s1) % 4] >> 16) & 0xFF] ^ (tt >> 16)) & 0xFF)
@@ -252,11 +258,11 @@ def decrypt(self, ciphertext):
         a = [0, 0, 0, 0]
 
         # Convert ciphertext to (ints ^ key)
-        t = [(_compact_word(ciphertext[4 * i:4 * i + 4]) ^ self._Kd[0][i]) for i in xrange(0, 4)]
+        t = [(_compact_word(ciphertext[4 * i:4 * i + 4]) ^ self._Kd[0][i]) for i in range(0, 4)]
 
         # Apply round transforms
-        for r in xrange(1, rounds):
-            for i in xrange(0, 4):
+        for r in range(1, rounds):
+            for i in range(0, 4):
                 a[i] = (self.T5[(t[ i          ] >> 24) & 0xFF] ^
                         self.T6[(t[(i + s1) % 4] >> 16) & 0xFF] ^
                         self.T7[(t[(i + s2) % 4] >>  8) & 0xFF] ^
@@ -266,7 +272,7 @@ def decrypt(self, ciphertext):
 
         # The last round is special
         result = [ ]
-        for i in xrange(0, 4):
+        for i in range(0, 4):
             tt = self._Kd[rounds][i]
             result.append((self.Si[(t[ i           ] >> 24) & 0xFF] ^ (tt >> 24)) & 0xFF)
             result.append((self.Si[(t[(i + s1) % 4] >> 16) & 0xFF] ^ (tt >> 16)) & 0xFF)

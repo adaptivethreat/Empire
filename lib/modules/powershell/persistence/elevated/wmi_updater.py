@@ -1,7 +1,9 @@
+from __future__ import print_function
+from builtins import object
 import os
 from lib.common import helpers
 
-class Module:
+class Module(object):
 
     def __init__(self, mainMenu, params=[]):
 
@@ -150,7 +152,7 @@ class Module:
                 statusMsg += "using external file " + extFile
 
             else:
-                print helpers.color("[!] File does not exist: " + extFile)
+                print(helpers.color("[!] File does not exist: " + extFile))
                 return ""
 
         else:
@@ -162,7 +164,7 @@ class Module:
 
         # sanity check to make sure we haven't exceeded the powershell -enc 8190 char max
         if len(encScript) > 8190:
-            print helpers.color("[!] Warning: -enc command exceeds the maximum of 8190 characters.")
+            print(helpers.color("[!] Warning: -enc command exceeds the maximum of 8190 characters."))
             return ""
 
         # built the command that will be triggered
@@ -173,7 +175,7 @@ class Module:
             parts = dailyTime.split(":")
             
             if len(parts) < 2:
-                print helpers.color("[!] Please use HH:mm format for DailyTime")
+                print(helpers.color("[!] Please use HH:mm format for DailyTime"))
                 return ""
 
             hour = parts[0]

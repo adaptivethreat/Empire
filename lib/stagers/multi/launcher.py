@@ -1,6 +1,8 @@
+from __future__ import print_function
+from builtins import object
 from lib.common import helpers
 
-class Stager:
+class Stager(object):
 
     def __init__(self, mainMenu, params=[]):
 
@@ -53,7 +55,7 @@ class Stager:
             'ObfuscateCommand' : {
                 'Description'   :   'The Invoke-Obfuscation command to use. Only used if Obfuscate switch is True. For powershell only.',
                 'Required'      :   False,
-                'Value'         :   r'Token\All\1,Launcher\STDIN++\12467'
+                'Value'         :   r'Token\All\1'
             },
             'SafeChecks' : {
                 'Description'   :   'Switch. Checks for LittleSnitch or a SandBox, exit the staging process if true. Defaults to True.',
@@ -86,7 +88,7 @@ class Stager:
                 'Value'         :   'True'
             },
             'AMSIBypass2' : {
-                'Description'   :   'Include rastamouse\'s AMSI Bypass in the stager code.',
+                'Description'   :   'Include Tal Liberman\'s AMSI Bypass in the stager code.',
                 'Required'      :   False,
                 'Value'         :   'False'
             }
@@ -144,7 +146,7 @@ class Stager:
         launcher = self.mainMenu.stagers.generate_launcher(listenerName, language=language, encode=encode, obfuscate=invokeObfuscation, obfuscationCommand=obfuscateCommand, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries, safeChecks=safeChecks, scriptLogBypass=scriptLogBypassBool, AMSIBypass=AMSIBypassBool, AMSIBypass2=AMSIBypass2Bool)
 
         if launcher == "":
-            print helpers.color("[!] Error in launcher command generation.")
+            print(helpers.color("[!] Error in launcher command generation."))
             return ""
 
         return launcher

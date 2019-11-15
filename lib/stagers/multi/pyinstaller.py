@@ -1,3 +1,6 @@
+from __future__ import print_function
+from builtins import str
+from builtins import object
 from lib.common import helpers
 import os
 
@@ -19,7 +22,7 @@ Install steps...
 
 """
 
-class Stager:
+class Stager(object):
 
 	def __init__(self, mainMenu, params=[]):
 
@@ -98,14 +101,14 @@ class Stager:
 		import subprocess
 		output_Str = subprocess.check_output(['which', 'pyinstaller'])
 		if output_Str == "":
-			print helpers.color("[!] Error pyInstaller is not installed")
-			print helpers.color("[!] Try: apt-get -y install python-pip && pip install pyinstaller")
+			print(helpers.color("[!] Error pyInstaller is not installed"))
+			print(helpers.color("[!] Try: apt-get -y install python-pip && pip install pyinstaller"))
 			return ""
 		else:
 			# generate the launcher code
 			launcher = self.mainMenu.stagers.generate_launcher(listenerName, language=language, encode=encode, userAgent=userAgent, safeChecks=safeChecks)
 			if launcher == "":
-				print helpers.color("[!] Error in launcher command generation.")
+				print(helpers.color("[!] Error in launcher command generation."))
 				return ""
 			else:
 				filesToExtractImportsFrom_List = []

@@ -16,3 +16,4 @@ cryptography
 pyminifier
 xlutils
 pycrypto
+pefile

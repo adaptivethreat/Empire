@@ -1,11 +1,14 @@
 """
 Connect to the default database at ./data/empire.db.
 """
+from __future__ import print_function
+from __future__ import absolute_import
 
 import sys
 import sqlite3
 
-import helpers
+from . import helpers
+
 
 def connect_to_db():
     try:
@@ -14,10 +17,11 @@ def connect_to_db():
         conn.text_factory = str
         conn.isolation_level = None
         return conn
-
+    
     except Exception:
-        print helpers.color("[!] Could not connect to database")
-        print helpers.color("[!] Please run database_setup.py")
+        print(helpers.color("[!] Could not connect to database"))
+        print(helpers.color("[!] Please run database_setup.py"))
         sys.exit()
+
 
 db = connect_to_db()

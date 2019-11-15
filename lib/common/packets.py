@@ -58,17 +58,18 @@ HMACc = first 10 bytes of a SHA256 HMAC using the client's session key
             [X...]     - tasking data
 
 """
+from __future__ import absolute_import
 
-import struct
 import base64
-import os
-import hashlib
-import hmac
 import json
+import os
+import sys
+import struct
+
 from pydispatch import dispatcher
 
 # Empire imports
-import encryption
+from . import encryption
 
 # 0         -> error
 # 1-99      -> standard functionality
@@ -76,70 +77,70 @@ import encryption
 # 200-299   -> SMB functionality
 
 PACKET_NAMES = {
-    "ERROR" : 0,
-
-    "TASK_SYSINFO"   : 1,
-    "TASK_EXIT"   : 2,
-
-    "TASK_SET_DELAY" : 10,
-    "TASK_GET_DELAY" : 12,
-    "TASK_SET_SERVERS" : 13,
-    "TASK_ADD_SERVERS" : 14,
-    "TASK_UPDATE_PROFILE" : 20,
-    "TASK_SET_KILLDATE" : 30,
-    "TASK_GET_KILLDATE" : 31,
-    "TASK_SET_WORKING_HOURS" : 32,
-    "TASK_GET_WORKING_HOURS" : 33,
-
-    "TASK_SHELL" : 40,
-    "TASK_DOWNLOAD" : 41,
-    "TASK_UPLOAD" : 42,
-
-    "TASK_GETJOBS" : 50,
-    "TASK_STOPJOB" : 51,
-
-    "TASK_CMD_WAIT" : 100,
-    "TASK_CMD_WAIT_SAVE" : 101,
-    "TASK_CMD_JOB" : 110,
-    "TASK_CMD_JOB_SAVE" : 111,
-
-    "TASK_SCRIPT_IMPORT" : 120,
-    "TASK_SCRIPT_COMMAND" : 121,
-    "TASK_IMPORT_MODULE" : 122,
-    "TASK_VIEW_MODULE" : 123,
-    "TASK_REMOVE_MODULE" : 124,
-
-    "TASK_SWITCH_LISTENER" : 130,
-    "TASK_UPDATE_LISTENERNAME" : 131
+    "ERROR": 0,
+    
+    "TASK_SYSINFO": 1,
+    "TASK_EXIT": 2,
+    
+    "TASK_SET_DELAY": 10,
+    "TASK_GET_DELAY": 12,
+    "TASK_SET_SERVERS": 13,
+    "TASK_ADD_SERVERS": 14,
+    "TASK_UPDATE_PROFILE": 20,
+    "TASK_SET_KILLDATE": 30,
+    "TASK_GET_KILLDATE": 31,
+    "TASK_SET_WORKING_HOURS": 32,
+    "TASK_GET_WORKING_HOURS": 33,
+    
+    "TASK_SHELL": 40,
+    "TASK_DOWNLOAD": 41,
+    "TASK_UPLOAD": 42,
+    
+    "TASK_GETJOBS": 50,
+    "TASK_STOPJOB": 51,
+    
+    "TASK_CMD_WAIT": 100,
+    "TASK_CMD_WAIT_SAVE": 101,
+    "TASK_CMD_JOB": 110,
+    "TASK_CMD_JOB_SAVE": 111,
+    
+    "TASK_SCRIPT_IMPORT": 120,
+    "TASK_SCRIPT_COMMAND": 121,
+    "TASK_IMPORT_MODULE": 122,
+    "TASK_VIEW_MODULE": 123,
+    "TASK_REMOVE_MODULE": 124,
+    
+    "TASK_SWITCH_LISTENER": 130,
+    "TASK_UPDATE_LISTENERNAME": 131
 }
 
 # build a lookup table for IDS
 PACKET_IDS = {}
-for name, ID in PACKET_NAMES.items(): PACKET_IDS[ID] = name
+for name, ID in list(PACKET_NAMES.items()): PACKET_IDS[ID] = name
 
 LANGUAGE = {
-    'NONE' : 0,
-    'POWERSHELL' : 1,
-    'PYTHON' : 2
+    'NONE': 0,
+    'POWERSHELL': 1,
+    'PYTHON': 2
 }
 LANGUAGE_IDS = {}
-for name, ID in LANGUAGE.items(): LANGUAGE_IDS[ID] = name
+for name, ID in list(LANGUAGE.items()): LANGUAGE_IDS[ID] = name
 
 META = {
-    'NONE' : 0,
-    'STAGE0' : 1,
-    'STAGE1' : 2,
-    'STAGE2' : 3,
-    'TASKING_REQUEST' : 4,
-    'RESULT_POST' : 5,
-    'SERVER_RESPONSE' : 6
+    'NONE': 0,
+    'STAGE0': 1,
+    'STAGE1': 2,
+    'STAGE2': 3,
+    'TASKING_REQUEST': 4,
+    'RESULT_POST': 5,
+    'SERVER_RESPONSE': 6
 }
 META_IDS = {}
-for name, ID in META.items(): META_IDS[ID] = name
+for name, ID in list(META.items()): META_IDS[ID] = name
 
 ADDITIONAL = {}
 ADDITIONAL_IDS = {}
-for name, ID in ADDITIONAL.items(): ADDITIONAL_IDS[ID] = name
+for name, ID in list(ADDITIONAL.items()): ADDITIONAL_IDS[ID] = name
 
 
 def build_task_packet(taskName, data, resultID):
@@ -159,14 +160,13 @@ def build_task_packet(taskName, data, resultID):
         |  2   |         2          |    2     |    2    |   4    | <Length>  |
         +------+--------------------+----------+---------+--------+-----------+
     """
-
+    
     taskType = struct.pack('=H', PACKET_NAMES[taskName])
     totalPacket = struct.pack('=H', 1)
     packetNum = struct.pack('=H', 1)
     resultID = struct.pack('=H', resultID)
-    length = struct.pack('=L',len(data.decode('utf-8').encode('utf-8',errors='ignore')))
-    return taskType + totalPacket + packetNum + resultID + length + data.decode('utf-8').encode('utf-8',errors='ignore')
-
+    length = struct.pack('=L', len(data))
+    return taskType + totalPacket + packetNum + resultID + length + data.encode("UTF-8")
 
 def parse_result_packet(packet, offset=0):
     """
@@ -189,18 +189,18 @@ def parse_result_packet(packet, offset=0):
 
     Returns a tuple with (responseName, totalPackets, packetNum, taskID, length, data, remainingData)
     """
-
+    
     try:
-        responseID = struct.unpack('=H', packet[0+offset:2+offset])[0]
-        totalPacket = struct.unpack('=H', packet[2+offset:4+offset])[0]
-        packetNum = struct.unpack('=H', packet[4+offset:6+offset])[0]
-        taskID = struct.unpack('=H', packet[6+offset:8+offset])[0]
-        length = struct.unpack('=L', packet[8+offset:12+offset])[0]
+        responseID = struct.unpack('=H', packet[0 + offset:2 + offset])[0]
+        totalPacket = struct.unpack('=H', packet[2 + offset:4 + offset])[0]
+        packetNum = struct.unpack('=H', packet[4 + offset:6 + offset])[0]
+        taskID = struct.unpack('=H', packet[6 + offset:8 + offset])[0]
+        length = struct.unpack('=L', packet[8 + offset:12 + offset])[0]
         if length != '0':
-            data = base64.b64decode(packet[12+offset:12+offset+length])
+            data = base64.b64decode(packet[12 + offset:12 + offset + length])
         else:
             data = None
-        remainingData = packet[12+offset+length:]
+        remainingData = packet[12 + offset + length:]
         return (PACKET_IDS[responseID], totalPacket, packetNum, taskID, length, data, remainingData)
     except Exception as e:
         message = "[!] parse_result_packet(): exception: {}".format(e)
@@ -209,7 +209,7 @@ def parse_result_packet(packet, offset=0):
             'message': message
         })
         dispatcher.send(signal, sender="empire")
-
+        
         return (None, None, None, None, None, None, None)
 
 
@@ -219,23 +219,24 @@ def parse_result_packets(packets):
     """
 
     resultPackets = []
-
+    
     # parse the first result packet
     (responseName, totalPacket, packetNum, taskID, length, data, remainingData) = parse_result_packet(packets)
-
+    
     if responseName and responseName != '':
-        resultPackets.append( (responseName, totalPacket, packetNum, taskID, length, data) )
-
+        resultPackets.append((responseName, totalPacket, packetNum, taskID, length, data))
+    
     # iterate 12 (size of packet header) + length of the decoded
     offset = 12 + length
     while remainingData and remainingData != '':
         # parse any additional result packets
         # (responseName, length, data, remainingData) = parse_result_packet(packets, offset=offset)
-        (responseName, totalPacket, packetNum, taskID, length, data, remainingData) = parse_result_packet(packets, offset=offset)
+        (responseName, totalPacket, packetNum, taskID, length, data, remainingData) = parse_result_packet(packets,
+                                                                                                          offset=offset)
         if responseName and responseName != '':
-            resultPackets.append( (responseName, totalPacket, packetNum, taskID, length, data) )
+            resultPackets.append((responseName, totalPacket, packetNum, taskID, length, data))
         offset += 12 + length
-
+    
     return resultPackets
 
 
@@ -262,23 +263,22 @@ def parse_routing_packet(stagingKey, data):
         +-----------+------+------+-------+--------+
 
     """
-
+    
     if data:
         results = {}
         offset = 0
-
         # ensure we have at least the 20 bytes for a routing packet
         if len(data) >= 20:
-
+            
             while True:
-
+                
                 if len(data) - offset < 20:
                     break
-
-                RC4IV = data[0+offset:4+offset]
-                RC4data = data[4+offset:20+offset]
-                routingPacket = encryption.rc4(RC4IV+stagingKey, RC4data)
-                sessionID = routingPacket[0:8]
+                
+                RC4IV = data[0 + offset:4 + offset]
+                RC4data = data[4 + offset:20 + offset]
+                routingPacket = encryption.rc4(RC4IV + stagingKey.encode('UTF-8'), RC4data)
+                sessionID = routingPacket[0:8].decode('UTF-8')
 
                 # B == 1 byte unsigned char, H == 2 byte unsigned short, L == 4 byte unsigned long
                 (language, meta, additional, length) = struct.unpack("=BBHL", routingPacket[8:])
@@ -291,19 +291,22 @@ def parse_routing_packet(stagingKey, data):
                     dispatcher.send(signal, sender="empire")
                     encData = None
                 else:
-                    encData = data[(20+offset):(20+offset+length)]
-
-                results[sessionID] = (LANGUAGE_IDS.get(language, 'NONE'), META_IDS.get(meta, 'NONE'), ADDITIONAL_IDS.get(additional, 'NONE'), encData)
-
+                    encData = data[(20 + offset):(20 + offset + length)]
+                
+                results[sessionID] = (
+                    LANGUAGE_IDS.get(language, 'NONE'), META_IDS.get(meta, 'NONE'),
+                    ADDITIONAL_IDS.get(additional, 'NONE'),
+                    encData)
+                
                 # check if we're at the end of the packet processing
-                remainingData = data[20+offset+length:]
+                remainingData = data[20 + offset + length:]
                 if not remainingData or remainingData == '':
                     break
-
+                
                 offset += 20 + length
-
+            
             return results
-
+        
         else:
             message = "[*] parse_agent_data() data length incorrect: {}".format(len(data))
             signal = json.dumps({
@@ -345,19 +348,20 @@ def build_routing_packet(stagingKey, sessionID, language, meta="NONE", additiona
         +-----------+------+------+-------+--------+
 
     """
-
-    # binary pack all of the passed config values as unsigned numbers
+    # binary pack all of the pcassed config values as unsigned numbers
     #   B == 1 byte unsigned char, H == 2 byte unsigned short, L == 4 byte unsigned long
-    data = sessionID + struct.pack("=BBHL", LANGUAGE.get(language.upper(), 0), META.get(meta.upper(), 0), ADDITIONAL.get(additional.upper(), 0), len(encData))
-
+    sessionID = sessionID.encode('UTF-8')
+    data = sessionID + struct.pack("=BBHL", LANGUAGE.get(language.upper(), 0), META.get(meta.upper(), 0),
+                                   ADDITIONAL.get(additional.upper(), 0), len(encData))
     RC4IV = os.urandom(4)
-    stagingKey = str(stagingKey)
+    stagingKey = stagingKey.encode('UTF-8')
     key = RC4IV + stagingKey
     rc4EncData = encryption.rc4(key, data)
-
     # return an rc4 encyption of the routing packet, append an HMAC of the packet, then the actual encrypted data
-    packet = RC4IV + rc4EncData + encData
+    if isinstance(encData, str) and sys.version[0] != "2":
+        encData = encData.encode('UTF-8')
 
+    packet = RC4IV + rc4EncData + encData
     return packet
 
 

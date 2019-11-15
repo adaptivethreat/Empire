@@ -15,3 +15,5 @@ setup/xar*/
 setup/bomutils/
 .venv
 .DS_Store
+venv/
+

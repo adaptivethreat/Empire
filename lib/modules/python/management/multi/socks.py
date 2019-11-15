@@ -1,10 +1,13 @@
+from __future__ import print_function
+from builtins import str
+from builtins import object
 import os
 import string
 
 from lib.common import helpers
 
 
-class Module:
+class Module(object):
     def __init__(self, mainMenu, params=None):
 
         # metadata info about the module, not modified during runtime
@@ -82,7 +85,7 @@ class Module:
             with open(module_source_file) as f:
                 module_source = f.read()
         except:
-            print helpers.color("[!] Could not read module source path at: " + str(module_source_file))
+            print(helpers.color("[!] Could not read module source path at: " + str(module_source_file)))
             return ''
 
         # Render the module_template
@@ -90,7 +93,7 @@ class Module:
         try:
             module = module_template.substitute(TUNNEL_ADDR=tunnel_addr)
         except KeyError as e:
-            print helpers.color("[!] Error rendering module template: {0}".format(e))
+            print(helpers.color("[!] Error rendering module template: {0}".format(e)))
             return ''
 
         return module

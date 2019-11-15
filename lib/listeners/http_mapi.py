@@ -1,3 +1,6 @@
+from __future__ import print_function
+from builtins import str
+from builtins import object
 import logging
 import base64
 import random
@@ -17,7 +20,7 @@ from lib.common import packets
 from lib.common import messages
 
 
-class Listener:
+class Listener(object):
 
     def __init__(self, mainMenu, params=[]):
 
@@ -157,11 +160,11 @@ class Listener:
 
         for key in self.options:
             if self.options[key]['Required'] and (str(self.options[key]['Value']).strip() == ''):
-                print helpers.color("[!] Option \"%s\" is required." % (key))
+                print(helpers.color("[!] Option \"%s\" is required." % (key)))
                 return False
         # If we've selected an HTTPS listener without specifying CertPath, let us know.
         if self.options['Host']['Value'].startswith('https') and self.options['CertPath']['Value'] == '':
-            print helpers.color("[!] HTTPS selected but no CertPath specified.")
+            print(helpers.color("[!] HTTPS selected but no CertPath specified."))
             return False
 
         return True
@@ -173,7 +176,7 @@ class Listener:
         """
 
         if not language:
-            print helpers.color('[!] listeners/http generate_launcher(): no language specified!')
+            print(helpers.color('[!] listeners/http generate_launcher(): no language specified!'))
 
         if listenerName and (listenerName in self.threads) and (listenerName in self.mainMenu.listeners.activeListeners):
 
@@ -251,10 +254,10 @@ class Listener:
                     # otherwise return the case-randomized stager
                     return stager
             else:
-                print helpers.color("[!] listeners/http_mapi generate_launcher(): invalid language specification: only 'powershell' is currently supported for this module.")
+                print(helpers.color("[!] listeners/http_mapi generate_launcher(): invalid language specification: only 'powershell' is currently supported for this module."))
 
         else:
-            print helpers.color("[!] listeners/http_mapi generate_launcher(): invalid listener name specification!")
+            print(helpers.color("[!] listeners/http_mapi generate_launcher(): invalid listener name specification!"))
 
 
     def generate_stager(self, listenerOptions, encode=False, encrypt=True, language="powershell"):
@@ -314,7 +317,7 @@ class Listener:
                 # otherwise just return the case-randomized stager
                 return randomizedStager
         else:
-            print helpers.color("[!] listeners/http generate_stager(): invalid language specification, only 'powershell' is currently supported for this module.")
+            print(helpers.color("[!] listeners/http generate_stager(): invalid language specification, only 'powershell' is currently supported for this module."))
 
 
     def generate_agent(self, listenerOptions, language=None):
@@ -323,7 +326,7 @@ class Listener:
         """
 
         if not language:
-            print helpers.color('[!] listeners/http_mapi generate_agent(): no language specified!')
+            print(helpers.color('[!] listeners/http_mapi generate_agent(): no language specified!'))
             return None
 
         language = language.lower()
@@ -363,7 +366,7 @@ class Listener:
 
             return code
         else:
-            print helpers.color("[!] listeners/http_mapi generate_agent(): invalid language specification, only 'powershell' is currently supported for this module.")
+            print(helpers.color("[!] listeners/http_mapi generate_agent(): invalid language specification, only 'powershell' is currently supported for this module."))
 
 
     def generate_comms(self, listenerOptions, language=None):
@@ -456,9 +459,9 @@ class Listener:
                 return updateServers + getTask + sendMessage
 
             else:
-                print helpers.color("[!] listeners/http_mapi generate_comms(): invalid language specification, only 'powershell' is currently supported for this module.")
+                print(helpers.color("[!] listeners/http_mapi generate_comms(): invalid language specification, only 'powershell' is currently supported for this module."))
         else:
-            print helpers.color('[!] listeners/http_mapi generate_comms(): no language specified!')
+            print(helpers.color('[!] listeners/http_mapi generate_comms(): no language specified!'))
 
 
     def start_server(self, listenerOptions):
@@ -554,7 +557,7 @@ class Listener:
 
                                 if 'not in cache' in results:
                                     # signal the client to restage
-                                    print helpers.color("[*] Orphaned agent from %s, signaling retaging" % (clientIP))
+                                    print(helpers.color("[*] Orphaned agent from %s, signaling retaging" % (clientIP)))
                                     return make_response(self.default_response(), 401)
                                 else:
                                     return make_response(self.default_response(), 200)
@@ -634,12 +637,14 @@ class Listener:
 
                 context = ssl.SSLContext(proto)
                 context.load_cert_chain("%s/empire-chain.pem" % (certPath), "%s/empire-priv.key"  % (certPath))
+                #setting the cipher list allows for modification of the JA3 signature 
+                context.set_ciphers("ECDHE-RSA-AES128-GCM-SHA256")
                 app.run(host=bindIP, port=int(port), threaded=True, ssl_context=context)
             else:
                 app.run(host=bindIP, port=int(port), threaded=True)
 
         except Exception as e:
-            print helpers.color("[!] Listener startup on port %s failed: %s " % (port, e))
+            print(helpers.color("[!] Listener startup on port %s failed: %s " % (port, e)))
             dispatcher.send("[!] Listener startup on port %s failed: %s " % (port, e), sender='listeners/http')
 
 
@@ -671,8 +676,8 @@ class Listener:
         """
 
         if name and name != '':
-            print helpers.color("[!] Killing listener '%s'" % (name))
+            print(helpers.color("[!] Killing listener '%s'" % (name)))
             self.threads[name].kill()
         else:
-            print helpers.color("[!] Killing listener '%s'" % (self.options['Name']['Value']))
+            print(helpers.color("[!] Killing listener '%s'" % (self.options['Name']['Value'])))
             self.threads[self.options['Name']['Value']].kill()

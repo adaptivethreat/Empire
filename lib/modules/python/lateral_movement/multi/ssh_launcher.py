@@ -1,6 +1,8 @@
+from __future__ import print_function
+from builtins import object
 from lib.common import helpers
 
-class Module:
+class Module(object):
     def __init__(self, mainMenu, params=[]):
         # metadata info about the module, not modified during runtime
         self.info = {
@@ -101,7 +103,7 @@ class Module:
         launcher = launcher.replace("'", "\\'")
         launcher = launcher.replace('"', '\\"')
         if launcher == "":
-            print helpers.color("[!] Error in launcher command generation.")
+            print(helpers.color("[!] Error in launcher command generation."))
             return ""
         script = """
 import os

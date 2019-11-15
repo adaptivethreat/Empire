@@ -864,7 +864,7 @@ The raw DirectoryServices.SearchResult object, if -Raw is enabled.
         [Switch]
         $Raw
     )
-
+<#
     DynamicParam {
         $UACValueNames = [Enum]::GetNames($UACEnum)
         # add in the negations
@@ -872,7 +872,7 @@ The raw DirectoryServices.SearchResult object, if -Raw is enabled.
         # create new dynamic parameter
         New-DynamicParameter -Name UACFilter -ValidateSet $UACValueNames -Type ([array])
     }
-
+#>
     BEGIN {
         $SearcherArguments = @{}
         if ($PSBoundParameters['Domain']) { $SearcherArguments['Domain'] = $Domain }
@@ -890,9 +890,9 @@ The raw DirectoryServices.SearchResult object, if -Raw is enabled.
 
     PROCESS {
         #bind dynamic parameter to a friendly variable
-        if ($PSBoundParameters -and ($PSBoundParameters.Count -ne 0)) {
-            New-DynamicParameter -CreateVariables -BoundParameters $PSBoundParameters
-        }
+        #if ($PSBoundParameters -and ($PSBoundParameters.Count -ne 0)) {
+        #    New-DynamicParameter -CreateVariables -BoundParameters $PSBoundParameters
+        #}
 
         if ($UserSearcher) {
             $IdentityFilter = ''

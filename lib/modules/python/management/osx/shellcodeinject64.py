@@ -1,9 +1,11 @@
+from __future__ import print_function
+from builtins import object
 from lib.common import helpers
 import os
 import base64
 
 
-class Module:
+class Module(object):
 
     def __init__(self, mainMenu, params=[]):
 
@@ -86,7 +88,7 @@ class Module:
         shellcodeBinPath =  self.options['Shellcode']['Value']
 
         if not os.path.exists(shellcodeBinPath):
-            print helpers.color("[!] Shellcode bin file not found.")
+            print(helpers.color("[!] Shellcode bin file not found."))
             return ""
 
         f = open(shellcodeBinPath, 'rb')
